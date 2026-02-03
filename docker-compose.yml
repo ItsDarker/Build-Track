@@ -1,0 +1,89 @@
+# Docker Compose for BuildTrack Local Development
+
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: buildtrack-postgres
+    environment:
+      POSTGRES_DB: buildtrack
+      POSTGRES_USER: buildtrack
+      POSTGRES_PASSWORD: buildtrack_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U buildtrack"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - buildtrack-network
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: buildtrack-backend
+    ports:
+      - "4000:4000"
+    environment:
+      NODE_ENV: development
+      PORT: 4000
+      DATABASE_URL: postgresql://buildtrack:buildtrack_dev_password@postgres:5432/buildtrack?schema=public
+      JWT_SECRET: development-jwt-secret-change-in-production
+      JWT_REFRESH_SECRET: development-refresh-secret-change-in-production
+      FRONTEND_URL: http://localhost:3000
+      MAIL_MODE: console
+      COOKIE_DOMAIN: localhost
+      COOKIE_SECURE: "false"
+      COOKIE_SAME_SITE: lax
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend/src:/app/src
+      - ./backend/prisma:/app/prisma
+    networks:
+      - buildtrack-network
+    command: sh -c "npx prisma migrate deploy && npm run dev"
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: buildtrack-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+    networks:
+      - buildtrack-network
+
+  # MailDev (Optional - for testing emails locally)
+  maildev:
+    image: maildev/maildev
+    container_name: buildtrack-maildev
+    ports:
+      - "1080:1080"  # Web UI
+      - "1025:1025"  # SMTP Server
+    networks:
+      - buildtrack-network
+
+networks:
+  buildtrack-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
