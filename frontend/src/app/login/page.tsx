@@ -31,6 +31,8 @@ export default function LoginPage() {
     if (result.error) {
       if (result.error.includes("verify your email")) {
         setError("Please verify your email before logging in.");
+      } else if (result.error.includes("blocked")) {
+        setError("Your account has been blocked. Please contact support.");
       } else if (result.error.includes("Too many attempts")) {
         setError(result.error);
       } else {
@@ -38,7 +40,13 @@ export default function LoginPage() {
       }
       setIsLoading(false);
     } else {
-      router.push("/app");
+      // Check user role and redirect accordingly
+      const user = (result.data as any)?.user;
+      if (user?.role === "ADMIN") {
+        router.push("/admin");
+      } else {
+        router.push("/app");
+      }
       router.refresh();
     }
   };
@@ -268,6 +276,10 @@ export default function LoginPage() {
             <Link href="/signup" className="text-orange-600 hover:text-orange-700 font-medium hover:underline">
               Sign Up
             </Link>
+          </p>
+
+          <p className="text-center text-xs text-gray-400 mt-4">
+            Admin users will be redirected to the admin dashboard automatically.
           </p>
         </div>
       </div>

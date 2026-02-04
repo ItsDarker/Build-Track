@@ -6,6 +6,9 @@ import { generateAccessToken, generateRefreshToken } from '../utils/jwt';
 import { isDisposableEmail, isLikelySpamDomain } from '../utils/emailValidation';
 import { sendVerificationEmail } from './emailService';
 
+const MAX_FAILED_ATTEMPTS = 10;
+const ATTEMPT_WINDOW_HOURS = 1;
+
 export interface SignupData {
   email: string;
   password: string;
@@ -107,6 +110,11 @@ export class AuthService {
       throw new Error('Invalid credentials');
     }
 
+    // Check if user is blocked
+    if (user.isBlocked) {
+      throw new Error('Your account has been blocked. Please contact support.');
+    }
+
     if (!user.emailVerified) {
       throw new Error('Please verify your email before logging in');
     }
@@ -118,6 +126,10 @@ export class AuthService {
       await prisma.loginAttempt.create({
         data: { email, ip, success: false, userId: user.id },
       });
+
+      // Check for auto-block
+      await this.checkAndAutoBlock(user.id, email);
+
       throw new Error('Invalid credentials');
     }
 
@@ -150,8 +162,47 @@ export class AuthService {
         email: user.email,
         name: user.name,
         emailVerified: user.emailVerified,
+        role: user.role,
       },
     };
+  }
+
+  /**
+   * Check and auto-block user after too many failed attempts
+   */
+  private async checkAndAutoBlock(userId: string, email: string): Promise<void> {
+    const windowStart = new Date();
+    windowStart.setHours(windowStart.getHours() - ATTEMPT_WINDOW_HOURS);
+
+    const failedAttempts = await prisma.loginAttempt.count({
+      where: {
+        userId,
+        success: false,
+        createdAt: { gte: windowStart },
+      },
+    });
+
+    if (failedAttempts >= MAX_FAILED_ATTEMPTS) {
+      // Auto-block the user
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          isBlocked: true,
+          blockedAt: new Date(),
+          blockedReason: `Automatically blocked after ${MAX_FAILED_ATTEMPTS} failed login attempts`,
+        },
+      });
+
+      // Create admin notification
+      await prisma.adminNotification.create({
+        data: {
+          type: 'auto_blocked',
+          title: 'User Auto-Blocked',
+          message: `User ${email} was automatically blocked after ${MAX_FAILED_ATTEMPTS} failed login attempts within ${ATTEMPT_WINDOW_HOURS} hour(s).`,
+          data: JSON.stringify({ userId, email, failedAttempts }),
+        },
+      });
+    }
   }
 
   async verifyEmail(token: string): Promise<{ message: string }> {
@@ -275,6 +326,8 @@ export class AuthService {
         email: true,
         name: true,
         emailVerified: true,
+        role: true,
+        isBlocked: true,
         createdAt: true,
       },
     });

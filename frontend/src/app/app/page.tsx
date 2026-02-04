@@ -8,12 +8,7 @@ import { DashboardLayout } from "@/components/ui-kit/DashboardLayout";
 import { ProjectCard } from "@/components/ui-kit/ProjectCard";
 import { QuickStats } from "@/components/ui-kit/QuickStats";
 import { apiClient } from "@/lib/api/client";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip as AntdTooltip } from "antd"; // Add this import
 
 interface User {
   id: string;
@@ -79,11 +74,13 @@ export default function AppPage() {
       const result = await apiClient.getCurrentUser();
 
       if (result.error || !result.data) {
+        console.error("Failed to fetch current user:", result.error); // Add this line
         router.push("/login");
         return;
       }
 
       const userData = (result.data as { user: User }).user;
+      console.log("Current user data:", userData); // Add this line
 
       if (!userData.emailVerified) {
         router.push("/login?unverified=1");
@@ -110,14 +107,11 @@ export default function AppPage() {
   }
 
   return (
-    <TooltipProvider>
       <DashboardLayout user={user}>
-        <div className="p-6 lg:p-8">
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
             <h1 className="text-2xl font-bold text-slate-900">My Projects</h1>
-            <Tooltip>
-              <TooltipTrigger asChild>
+            <AntdTooltip title="MVP: This feature is disabled"> {/* Use AntdTooltip */}
                 <Button
                   className="bg-orange-500 hover:bg-orange-600 text-white gap-2"
                   disabled
@@ -125,11 +119,7 @@ export default function AppPage() {
                   <Plus className="w-4 h-4" />
                   New Project
                 </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>MVP: This feature is disabled</p>
-              </TooltipContent>
-            </Tooltip>
+            </AntdTooltip>
           </div>
 
           {/* Projects Grid */}
@@ -146,8 +136,6 @@ export default function AppPage() {
 
           {/* Quick Stats */}
           <QuickStats stats={mockStats} />
-        </div>
       </DashboardLayout>
-    </TooltipProvider>
   );
 }

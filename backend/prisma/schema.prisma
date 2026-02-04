@@ -9,12 +9,18 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// UserRole: 'USER' | 'ADMIN' (SQLite doesn't support enums, using String)
+
 model User {
   id                String    @id @default(cuid())
   name              String?
   email             String    @unique
   passwordHash      String?   @map("password_hash")
   emailVerified     DateTime? @map("email_verified_at")
+  role              String    @default("USER") // 'USER' | 'ADMIN'
+  isBlocked         Boolean   @default(false) @map("is_blocked")
+  blockedAt         DateTime? @map("blocked_at")
+  blockedReason     String?   @map("blocked_reason")
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
 
@@ -81,4 +87,37 @@ model LoginAttempt {
   @@index([email, createdAt])
   @@index([ip, createdAt])
   @@map("login_attempts")
+}
+
+model AdminNotification {
+  id        String   @id @default(cuid())
+  type      String   // 'user_blocked', 'failed_attempts', 'new_user', etc.
+  title     String
+  message   String
+  data      String?  // JSON string for additional data (SQLite doesn't support Json natively)
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("admin_notifications")
+}
+
+model SiteContent {
+  id        String   @id @default(cuid())
+  page      String   @unique // 'home', 'about', etc.
+  sections  String   // JSON string of section configs
+  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by") // Admin user ID who last updated
+
+  @@map("site_content")
+}
+
+model ContentImage {
+  id        String   @id @default(cuid())
+  filename  String   // Original filename
+  path      String   // Path in public/uploads/
+  mimeType  String   @map("mime_type")
+  size      Int      // File size in bytes
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("content_images")
 }

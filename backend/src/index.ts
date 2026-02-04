@@ -1,8 +1,11 @@
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import path from 'path';
 import { config } from './config/env';
 import authRoutes from './routes/auth.routes';
+import adminRoutes from './routes/admin.routes';
+import cmsRoutes from './routes/cms.routes';
 
 const app = express();
 
@@ -16,6 +19,9 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
+// Serve static uploads
+app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
+
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -23,6 +29,8 @@ app.get('/health', (req, res) => {
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/cms', cmsRoutes);
 
 // Error handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

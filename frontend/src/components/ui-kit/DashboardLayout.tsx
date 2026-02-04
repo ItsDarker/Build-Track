@@ -1,10 +1,22 @@
 "use client";
 
-import { ReactNode, useState } from "react";
+import React, { ReactNode, useState } from "react";
 import Link from "next/link";
-import { Menu } from "lucide-react";
-import { Sidebar } from "./Sidebar";
-import { LogoutButton } from "@/components/auth/LogoutButton";
+import { usePathname } from "next/navigation";
+import { Layout, Menu, theme, Dropdown, Space } from "antd";
+import {
+  UserOutlined,
+  LogoutOutlined,
+  DashboardOutlined,
+  CheckSquareOutlined,
+  TeamOutlined,
+  BarChartOutlined,
+  SettingOutlined,
+} from "@ant-design/icons";
+import { useRouter } from "next/navigation";
+import { apiClient } from "@/lib/api/client";
+
+const { Header, Content, Footer, Sider } = Layout;
 
 interface User {
   id: string;
@@ -17,8 +29,21 @@ interface DashboardLayoutProps {
   children: ReactNode;
 }
 
+const navItems = [
+  { key: "/app", icon: <DashboardOutlined />, label: "Dashboard" },
+  { key: "/app/tasks", icon: <CheckSquareOutlined />, label: "Tasks", disabled: true },
+  { key: "/app/team", icon: <TeamOutlined />, label: "Team", disabled: true },
+  { key: "/app/reports", icon: <BarChartOutlined />, label: "Reports", disabled: true },
+  { key: "/app/settings", icon: <SettingOutlined />, label: "Settings", disabled: true },
+];
+
 export function DashboardLayout({ user, children }: DashboardLayoutProps) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const router = useRouter();
+  const pathname = usePathname();
+  const [collapsed, setCollapsed] = useState(false);
+  const {
+    token: { colorBgContainer, borderRadiusLG },
+  } = theme.useToken();
 
   const displayName = user.name || user.email.split("@")[0];
   const initials = displayName
@@ -28,40 +53,118 @@ export function DashboardLayout({ user, children }: DashboardLayoutProps) {
     .toUpperCase()
     .slice(0, 2);
 
-  return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Top Header */}
-      <header className="fixed top-0 left-0 right-0 z-40 bg-slate-900 h-16">
-        <div className="flex items-center justify-between h-full px-4">
-          {/* Left: Logo & Mobile Menu */}
-          <div className="flex items-center gap-4">
-            <button
-              className="lg:hidden text-white p-2"
-              onClick={() => setSidebarOpen(true)}
-            >
-              <Menu className="w-6 h-6" />
-            </button>
-            <Link href="/app" className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center">
-                <svg
-                  className="w-5 h-5 text-white"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path d="M3 21h18M3 7v1a3 3 0 0 0 6 0V7m0 1a3 3 0 0 0 6 0V7m0 1a3 3 0 0 0 6 0V7H3l2-4h14l2 4M4 21V10.5M20 21V10.5" />
-                </svg>
-              </div>
-              <span className="text-xl font-bold text-white">BuildTrack</span>
-            </Link>
-          </div>
+  const handleLogout = async () => {
+    await apiClient.logout();
+    router.push("/");
+    router.refresh();
+  };
 
-          {/* Right: User Info */}
-          <div className="flex items-center gap-4">
+  const userMenuItems = [
+    {
+      key: "profile",
+      icon: <UserOutlined />,
+      label: "Profile",
+      disabled: true,
+    },
+    {
+      key: "logout",
+      icon: <LogoutOutlined />,
+      label: "Logout",
+      onClick: handleLogout,
+    },
+  ];
+
+  const menuItems = navItems.map((item) => ({
+    key: item.key,
+    icon: item.icon,
+    label: item.disabled ? (
+      <span className="flex items-center justify-between w-full">
+        {item.label}
+        <span className="text-xs bg-slate-600 px-2 py-0.5 rounded ml-2">Soon</span>
+      </span>
+    ) : (
+      item.label
+    ),
+    disabled: item.disabled,
+  }));
+
+  const handleMenuClick = ({ key }: { key: string }) => {
+    const item = navItems.find((i) => i.key === key);
+    if (!item?.disabled) {
+      router.push(key);
+    }
+  };
+
+  return (
+    <Layout style={{ minHeight: "100vh" }}>
+      <Sider
+        collapsible
+        collapsed={collapsed}
+        onCollapse={(value) => setCollapsed(value)}
+        theme="dark"
+        width={250}
+        style={{
+          overflow: "auto",
+          height: "100vh",
+          position: "fixed",
+          left: 0,
+          top: 0,
+          bottom: 0,
+          zIndex: 100,
+        }}
+      >
+        <div
+          style={{
+            height: 64,
+            margin: 16,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: collapsed ? "center" : "flex-start",
+            gap: 8,
+          }}
+        >
+          <Link href="/app" className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center flex-shrink-0">
+              <svg
+                className="w-5 h-5 text-white"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M3 21h18M3 7v1a3 3 0 0 0 6 0V7m0 1a3 3 0 0 0 6 0V7m0 1a3 3 0 0 0 6 0V7H3l2-4h14l2 4M4 21V10.5M20 21V10.5" />
+              </svg>
+            </div>
+            {!collapsed && (
+              <span className="text-xl font-bold text-white">BuildTrack</span>
+            )}
+          </Link>
+        </div>
+        <Menu
+          theme="dark"
+          mode="inline"
+          selectedKeys={[pathname]}
+          items={menuItems}
+          onClick={handleMenuClick}
+        />
+      </Sider>
+      <Layout style={{ marginLeft: collapsed ? 80 : 250, transition: "margin-left 0.2s" }}>
+        <Header
+          style={{
+            padding: "0 24px",
+            background: colorBgContainer,
+            display: "flex",
+            justifyContent: "flex-end",
+            alignItems: "center",
+            position: "sticky",
+            top: 0,
+            zIndex: 99,
+          }}
+        >
+          <Space size="middle">
             <div className="hidden sm:block text-right">
-              <p className="text-white font-medium text-sm">{displayName}</p>
-              <p className="text-gray-400 text-xs">
+              <p className="text-slate-900 font-medium text-sm">{displayName}</p>
+              <p className="text-gray-500 text-xs">
                 {new Date().toLocaleDateString("en-US", {
                   weekday: "long",
                   year: "numeric",
@@ -70,23 +173,34 @@ export function DashboardLayout({ user, children }: DashboardLayoutProps) {
                 })}
               </p>
             </div>
-            <div className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center text-white font-semibold">
-              {initials}
-            </div>
-            <LogoutButton />
+            <Dropdown menu={{ items: userMenuItems }} trigger={["click"]}>
+              <a
+                onClick={(e) => e.preventDefault()}
+                className="flex items-center gap-2 cursor-pointer"
+              >
+                <div className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center text-white font-semibold">
+                  {initials}
+                </div>
+              </a>
+            </Dropdown>
+          </Space>
+        </Header>
+        <Content style={{ margin: "24px 16px 0", overflow: "initial" }}>
+          <div
+            style={{
+              padding: 24,
+              minHeight: 360,
+              background: colorBgContainer,
+              borderRadius: borderRadiusLG,
+            }}
+          >
+            {children}
           </div>
-        </div>
-      </header>
-
-      <div className="flex pt-16">
-        {/* Sidebar */}
-        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-
-        {/* Main Content */}
-        <main className="flex-1 lg:ml-0 min-h-[calc(100vh-4rem)]">
-          {children}
-        </main>
-      </div>
-    </div>
+        </Content>
+        <Footer style={{ textAlign: "center" }}>
+          BuildTrack &copy;{new Date().getFullYear()} Created by BuildTrack Team
+        </Footer>
+      </Layout>
+    </Layout>
   );
 }
