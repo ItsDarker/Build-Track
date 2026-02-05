@@ -87,8 +87,15 @@ class ApiClient {
   }
 
   async getCurrentUser() {
-    return this.request('/api/auth/me', {
+    return this.request(`/api/auth/me`, {
       method: 'GET',
+    });
+  }
+
+  async sendContactMessage(data: { name: string; email: string; message: string }) {
+    return this.request('/api/contact', {
+      method: 'POST',
+      body: JSON.stringify(data),
     });
   }
 

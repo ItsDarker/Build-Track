@@ -2,6 +2,7 @@ import { TopNav } from "@/components/ui-kit/TopNav";
 import { Hero } from "@/components/ui-kit/Hero";
 import { FeatureCards } from "@/components/ui-kit/FeatureCards";
 import { Footer } from "@/components/ui-kit/Footer";
+import { Contact } from "@/components/ui-kit/Contact";
 
 export default function Home() {
   return (
@@ -9,6 +10,7 @@ export default function Home() {
       <TopNav />
       <Hero />
       <FeatureCards />
+      <Contact />
       <Footer />
     </main>
   );
