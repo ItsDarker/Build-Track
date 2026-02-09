@@ -17,12 +17,25 @@ const createUserSchema = z.object({
   password: z.string().min(10),
   role: z.enum(['USER', 'ADMIN']).optional(),
   emailVerified: z.boolean().optional(),
+  phone: z.string().optional(),
+  company: z.string().optional(),
+  jobTitle: z.string().optional(),
+  bio: z.string().optional(),
 });
 
 const updateUserSchema = z.object({
   email: z.string().email().optional(),
   name: z.string().optional(),
   role: z.enum(['USER', 'ADMIN']).optional(),
+  phone: z.string().optional(),
+  company: z.string().optional(),
+  jobTitle: z.string().optional(),
+  bio: z.string().optional(),
+  emailVerified: z.boolean().optional(),
+});
+
+const resetPasswordSchema = z.object({
+  password: z.string().min(10),
 });
 
 const blockUserSchema = z.object({

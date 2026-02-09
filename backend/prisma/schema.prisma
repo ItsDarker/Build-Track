@@ -18,6 +18,10 @@ model User {
   passwordHash      String?   @map("password_hash")
   emailVerified     DateTime? @map("email_verified_at")
   role              String    @default("USER") // 'USER' | 'ADMIN'
+  phone             String?
+  company           String?
+  jobTitle          String?   @map("job_title")
+  bio               String?
   isBlocked         Boolean   @default(false) @map("is_blocked")
   blockedAt         DateTime? @map("blocked_at")
   blockedReason     String?   @map("blocked_reason")

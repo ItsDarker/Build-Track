@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
 import { useState } from "react";
+import { Logo } from "./Logo";
 
 const navLinks = [
   { href: "#features", label: "Features" },
@@ -19,21 +20,7 @@ export function TopNav() {
     <nav className="absolute top-0 left-0 right-0 z-50 bg-slate-900/90 backdrop-blur-sm">
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center">
-              <svg
-                className="w-5 h-5 text-white"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <path d="M3 21h18M3 7v1a3 3 0 0 0 6 0V7m0 1a3 3 0 0 0 6 0V7m0 1a3 3 0 0 0 6 0V7H3l2-4h14l2 4M4 21V10.5M20 21V10.5" />
-              </svg>
-            </div>
-            <span className="text-xl font-bold text-white">BuildTrack</span>
-          </Link>
+          <Logo href="/" size="sm" showText textColor="white" />
 
           {/* Desktop Nav */}
           <div className="hidden md:flex items-center gap-8">

@@ -3,12 +3,11 @@ import bcrypt from 'bcryptjs';
 
 export interface AdminStats {
   totalUsers: number;
-  activeUsers: number;
+  verifiedUsers: number;
+  unverifiedUsers: number;
   blockedUsers: number;
-  pendingVerifications: number;
-  admins: number;
-  recentLoginAttempts: number;
-  failedLoginAttempts: number;
+  adminUsers: number;
+  recentSignups: number;
 }
 
 export interface UserListParams {
@@ -25,50 +24,53 @@ export interface CreateUserData {
   password: string;
   role?: string;
   emailVerified?: boolean;
+  phone?: string;
+  company?: string;
+  jobTitle?: string;
+  bio?: string;
 }
 
 export interface UpdateUserData {
   name?: string;
   email?: string;
   role?: string;
+  phone?: string;
+  company?: string;
+  jobTitle?: string;
+  bio?: string;
+  emailVerified?: boolean;
 }
 
 class AdminService {
+
   /**
    * Get dashboard statistics
    */
   async getStats(): Promise<AdminStats> {
     const now = new Date();
-    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
     const [
       totalUsers,
       blockedUsers,
-      pendingVerifications,
-      admins,
-      recentLoginAttempts,
-      failedLoginAttempts,
+      verifiedUsers,
+      adminUsers,
+      recentSignups,
     ] = await Promise.all([
       prisma.user.count(),
       prisma.user.count({ where: { isBlocked: true } }),
-      prisma.user.count({ where: { emailVerified: null } }),
+      prisma.user.count({ where: { emailVerified: { not: null } } }),
       prisma.user.count({ where: { role: 'ADMIN' } }),
-      prisma.loginAttempt.count({
-        where: { createdAt: { gte: oneDayAgo } },
-      }),
-      prisma.loginAttempt.count({
-        where: { createdAt: { gte: oneDayAgo }, success: false },
-      }),
+      prisma.user.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
     ]);
 
     return {
       totalUsers,
-      activeUsers: totalUsers - blockedUsers,
+      verifiedUsers,
+      unverifiedUsers: totalUsers - verifiedUsers,
       blockedUsers,
-      pendingVerifications,
-      admins,
-      recentLoginAttempts,
-      failedLoginAttempts,
+      adminUsers,
+      recentSignups,
     };
   }
 
@@ -113,6 +115,9 @@ class AdminService {
           name: true,
           role: true,
           emailVerified: true,
+          phone: true,
+          company: true,
+          jobTitle: true,
           isBlocked: true,
           blockedAt: true,
           blockedReason: true,
@@ -153,6 +158,9 @@ class AdminService {
         name: true,
         role: true,
         emailVerified: true,
+        phone: true,
+        company: true,
+        jobTitle: true,
         isBlocked: true,
         createdAt: true,
         updatedAt: true,
@@ -172,6 +180,10 @@ class AdminService {
         name: true,
         role: true,
         emailVerified: true,
+        phone: true,
+        company: true,
+        jobTitle: true,
+        bio: true,
         isBlocked: true,
         blockedAt: true,
         blockedReason: true,
@@ -197,7 +209,7 @@ class AdminService {
    * Create a new user
    */
   async createUser(data: CreateUserData) {
-    const { email, name, password, role = 'USER', emailVerified = false } = data;
+    const { email, name, password, role = 'USER', emailVerified = false, phone, company, jobTitle, bio } = data;
 
     // Check if email already exists
     const existing = await prisma.user.findUnique({ where: { email } });
@@ -214,6 +226,10 @@ class AdminService {
         passwordHash,
         role,
         emailVerified: emailVerified ? new Date() : null,
+        phone,
+        company,
+        jobTitle,
+        bio,
       },
       select: {
         id: true,
@@ -221,6 +237,9 @@ class AdminService {
         name: true,
         role: true,
         emailVerified: true,
+        phone: true,
+        company: true,
+        jobTitle: true,
         createdAt: true,
       },
     });
@@ -232,9 +251,10 @@ class AdminService {
       message: `User ${email} was created by admin`,
       data: { userId: user.id, email },
     });
-
     return user;
   }
+
+
 
   /**
    * Update user
@@ -250,15 +270,24 @@ class AdminService {
       }
     }
 
+    const updateData: any = { ...data };
+    if (data.emailVerified !== undefined) {
+      updateData.emailVerified = data.emailVerified ? new Date() : null;
+    }
+
     const user = await prisma.user.update({
       where: { id: userId },
-      data,
+      data: updateData,
       select: {
         id: true,
         email: true,
         name: true,
         role: true,
         emailVerified: true,
+        phone: true,
+        company: true,
+        jobTitle: true,
+        bio: true,
         isBlocked: true,
         createdAt: true,
         updatedAt: true,
@@ -268,6 +297,19 @@ class AdminService {
     return user;
   }
 
+  /**
+   * Reset user password
+   */
+  async resetPassword(userId: string, password: string) {
+    const passwordHash = await bcrypt.hash(password, 12);
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash },
+    });
+
+    return { success: true };
+  }
   /**
    * Delete user
    */

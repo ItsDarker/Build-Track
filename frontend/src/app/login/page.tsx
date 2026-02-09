@@ -6,10 +6,12 @@ import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { apiClient } from "@/lib/api/client";
+import { Logo } from "@/components/ui-kit/Logo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -78,21 +80,9 @@ export default function LoginPage() {
       {/* Left Side - Branding */}
       <div className="hidden lg:flex flex-col justify-between relative z-10 w-full items-center justify-center lg:w-1/2 p-12">
         <div>
-          <Link href="/" className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center">
-              <svg
-                className="w-6 h-6 text-white"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <path d="M3 21h18M3 7v1a3 3 0 0 0 6 0V7m0 1a3 3 0 0 0 6 0V7m0 1a3 3 0 0 0 6 0V7H3l2-4h14l2 4M4 21V10.5M20 21V10.5" />
-              </svg>
-            </div>
-          </Link>
+          <Logo href="/" size="lg" showText={false} />
           <h1 className="text-5xl font-bold text-white mt-8 leading-tight">
-            BuildTrack
+            <span>Build</span><span className="text-orange-500">Track</span>
           </h1>
           <p className="text-xl text-white/80 mt-4">
             One Reliable Place for Construction Tracking
@@ -135,20 +125,7 @@ export default function LoginPage() {
         <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8 lg:ml-10">
           {/* Mobile Logo */}
           <div className="lg:hidden text-center mb-6">
-            <Link href="/" className="inline-flex items-center gap-2">
-              <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center">
-                <svg
-                  className="w-5 h-5 text-white"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path d="M3 21h18M3 7v1a3 3 0 0 0 6 0V7m0 1a3 3 0 0 0 6 0V7m0 1a3 3 0 0 0 6 0V7H3l2-4h14l2 4M4 21V10.5M20 21V10.5" />
-                </svg>
-              </div>
-              <span className="text-xl font-bold text-slate-900">BuildTrack</span>
-            </Link>
+            <Logo href="/" size="sm" showText textColor="dark" className="inline-flex" />
           </div>
 
           <h2 className="text-2xl font-bold text-slate-900 text-center mb-8">
@@ -182,10 +159,9 @@ export default function LoginPage() {
               <Label htmlFor="password" className="text-slate-700">
                 Password
               </Label>
-              <Input
+              <PasswordInput
                 id="password"
                 name="password"
-                type="password"
                 placeholder="••••••••"
                 required
                 disabled={isLoading}

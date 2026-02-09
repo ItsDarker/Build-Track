@@ -6,19 +6,24 @@ import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { PasswordStrength } from "@/components/auth/PasswordStrength";
 import { apiClient } from "@/lib/api/client";
+import { Logo } from "@/components/ui-kit/Logo";
+import { normalizePhoneNumber, formatPhoneNumber } from "@/lib/phoneUtils";
 
 export default function SignupPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [password, setPassword] = useState("");
+  const [phone, setPhone] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
   const [imgError, setImgError] = useState(false);
+
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -42,10 +47,19 @@ export default function SignupPage() {
       return;
     }
 
+    // Normalize phone
+    const normalizedPhone = normalizePhoneNumber(phone);
+    if (phone && !normalizedPhone) {
+      setError("Invalid phone number format");
+      setIsLoading(false);
+      return;
+    }
+
     const result = await apiClient.signup({
       name: formData.get("name") as string,
       email: formData.get("email") as string,
       password: passwordValue,
+      phone: normalizedPhone || undefined,
     });
 
     if (result.error) {
@@ -135,21 +149,9 @@ export default function SignupPage() {
       {/* Left Side - Branding */}
       <div className="hidden lg:flex flex-col justify-between relative z-10 w-full items-center justify-center lg:w-1/2 p-12">
         <div>
-          <Link href="/" className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center">
-              <svg
-                className="w-6 h-6 text-white"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <path d="M3 21h18M3 7v1a3 3 0 0 0 6 0V7m0 1a3 3 0 0 0 6 0V7m0 1a3 3 0 0 0 6 0V7H3l2-4h14l2 4M4 21V10.5M20 21V10.5" />
-              </svg>
-            </div>
-          </Link>
+          <Logo href="/" size="lg" showText={false} />
           <h1 className="text-5xl font-bold text-white mt-8 leading-tight">
-            BuildTrack
+            <span>Build</span><span className="text-orange-500">Track</span>
           </h1>
           <p className="text-xl text-white/80 mt-4">
             One Reliable Place for Construction Tracking
@@ -193,20 +195,7 @@ export default function SignupPage() {
         <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8 my-6 lg:ml-10">
           {/* Mobile Logo */}
           <div className="lg:hidden text-center mb-6">
-            <Link href="/" className="inline-flex items-center gap-2">
-              <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center">
-                <svg
-                  className="w-5 h-5 text-white"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path d="M3 21h18M3 7v1a3 3 0 0 0 6 0V7m0 1a3 3 0 0 0 6 0V7m0 1a3 3 0 0 0 6 0V7H3l2-4h14l2 4M4 21V10.5M20 21V10.5" />
-                </svg>
-              </div>
-              <span className="text-xl font-bold text-slate-900">BuildTrack</span>
-            </Link>
+            <Logo href="/" size="sm" showText textColor="dark" className="inline-flex" />
           </div>
 
           <h2 className="text-2xl font-bold text-slate-900 text-center mb-6">
@@ -293,13 +282,33 @@ export default function SignupPage() {
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="phone">Phone Number (Optional)</Label>
+              <div className="h-12">
+                <Input
+                  id="phone"
+                  name="phone"
+                  type="text"
+                  placeholder="e.g. +1 312 285 6334"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  onBlur={(e) => {
+                    const formatted = formatPhoneNumber(e.target.value);
+                    if (formatted) {
+                      setPhone(formatted);
+                    }
+                  }}
+                  className="h-11 border-gray-300 focus:border-orange-500 focus:ring-orange-500"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="password" className="text-slate-700">
                 Password
               </Label>
-              <Input
+              <PasswordInput
                 id="password"
                 name="password"
-                type="password"
                 placeholder="••••••••••"
                 required
                 disabled={isLoading}
@@ -318,10 +327,9 @@ export default function SignupPage() {
               <Label htmlFor="confirmPassword" className="text-slate-700">
                 Confirm Password
               </Label>
-              <Input
+              <PasswordInput
                 id="confirmPassword"
                 name="confirmPassword"
-                type="password"
                 placeholder="••••••••••"
                 required
                 disabled={isLoading}
@@ -345,7 +353,7 @@ export default function SignupPage() {
                 <Link
                   href="/terms"
                   className="text-orange-600 hover:underline"
-                  onClick={(e) => e.stopPropagation()}
+                  onClick={(e: React.MouseEvent) => e.stopPropagation()}
                 >
                   Terms of Service
                 </Link>{" "}
@@ -355,7 +363,7 @@ export default function SignupPage() {
                 <Link
                   href="/privacy"
                   className="text-orange-600 hover:underline"
-                  onClick={(e) => e.stopPropagation()}
+                  onClick={(e: React.MouseEvent) => e.stopPropagation()}
                 >
                   Privacy Policy
                 </Link>

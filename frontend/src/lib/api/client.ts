@@ -46,7 +46,7 @@ class ApiClient {
   }
 
   // Auth endpoints
-  async signup(data: { email: string; password: string; name?: string }) {
+  async signup(data: { email: string; password: string; name?: string; phone?: string }) {
     return this.request('/api/auth/signup', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -92,6 +92,82 @@ class ApiClient {
     });
   }
 
+  // Password reset
+  async requestPasswordReset(email: string) {
+    return this.request('/api/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  }
+
+  async resetPassword(data: { token: string; password: string }) {
+    return this.request('/api/auth/reset-password/confirm', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Profile endpoints
+  async updateProfile(data: { name?: string; phone?: string; company?: string; jobTitle?: string; bio?: string }) {
+    return this.request('/api/auth/profile', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async changePassword(data: { currentPassword: string; newPassword: string }) {
+    return this.request('/api/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Team endpoints
+  async getTeamMembers() {
+    return this.request('/api/teams/members', { method: 'GET' });
+  }
+
+  async inviteTeamMember(data: { email: string; role: string }) {
+    return this.request('/api/teams/invite', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async removeTeamMember(memberId: string) {
+    return this.request(`/api/teams/members/${memberId}`, { method: 'DELETE' });
+  }
+
+  async updateTeamMemberRole(memberId: string, role: string) {
+    return this.request(`/api/teams/members/${memberId}/role`, {
+      method: 'PUT',
+      body: JSON.stringify({ role }),
+    });
+  }
+
+  // Client endpoints
+  async getClients() {
+    return this.request('/api/clients', { method: 'GET' });
+  }
+
+  async createClient(data: { name: string; email?: string; phone?: string; company?: string; address?: string; notes?: string }) {
+    return this.request('/api/clients', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateClient(clientId: string, data: { name?: string; email?: string; phone?: string; company?: string; address?: string; notes?: string }) {
+    return this.request(`/api/clients/${clientId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteClient(clientId: string) {
+    return this.request(`/api/clients/${clientId}`, { method: 'DELETE' });
+  }
+
   async sendContactMessage(data: { name: string; email: string; message: string }) {
     return this.request('/api/contact', {
       method: 'POST',
@@ -122,17 +198,43 @@ class ApiClient {
     return this.request(`/api/admin/users/${userId}`, { method: 'GET' });
   }
 
-  async createAdminUser(data: { email: string; password: string; name?: string; role?: string; emailVerified?: boolean }) {
+  async createAdminUser(data: {
+    email: string;
+    password: string;
+    name?: string;
+    role?: string;
+    emailVerified?: boolean;
+    phone?: string;
+    company?: string;
+    jobTitle?: string;
+    bio?: string;
+  }) {
     return this.request('/api/admin/users', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
-  async updateAdminUser(userId: string, data: { email?: string; name?: string; role?: string }) {
+  async updateAdminUser(userId: string, data: {
+    email?: string;
+    name?: string;
+    role?: string;
+    phone?: string;
+    company?: string;
+    jobTitle?: string;
+    bio?: string;
+    emailVerified?: boolean;
+  }) {
     return this.request(`/api/admin/users/${userId}`, {
       method: 'PUT',
       body: JSON.stringify(data),
+    });
+  }
+
+  async resetAdminUserPassword(userId: string, password: string) {
+    return this.request(`/api/admin/users/${userId}/reset-password`, {
+      method: 'POST',
+      body: JSON.stringify({ password }),
     });
   }
 

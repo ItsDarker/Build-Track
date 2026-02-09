@@ -15,6 +15,7 @@ import {
 } from "@ant-design/icons";
 import { useRouter } from "next/navigation";
 import { apiClient } from "@/lib/api/client";
+import { Logo } from "./Logo";
 
 const { Header, Content, Footer, Sider } = Layout;
 
@@ -31,8 +32,9 @@ interface DashboardLayoutProps {
 
 const navItems = [
   { key: "/app", icon: <DashboardOutlined />, label: "Dashboard" },
-  { key: "/app/tasks", icon: <CheckSquareOutlined />, label: "Tasks", disabled: true },
-  { key: "/app/team", icon: <TeamOutlined />, label: "Team", disabled: true },
+  { key: "/app/profile", icon: <UserOutlined />, label: "My Profile" },
+  { key: "/app/team", icon: <TeamOutlined />, label: "Team" },
+  { key: "/app/clients", icon: <CheckSquareOutlined />, label: "Clients" },
   { key: "/app/reports", icon: <BarChartOutlined />, label: "Reports", disabled: true },
   { key: "/app/settings", icon: <SettingOutlined />, label: "Settings", disabled: true },
 ];
@@ -64,7 +66,7 @@ export function DashboardLayout({ user, children }: DashboardLayoutProps) {
       key: "profile",
       icon: <UserOutlined />,
       label: "Profile",
-      disabled: true,
+      onClick: () => router.push("/app/profile"),
     },
     {
       key: "logout",
@@ -100,7 +102,7 @@ export function DashboardLayout({ user, children }: DashboardLayoutProps) {
       <Sider
         collapsible
         collapsed={collapsed}
-        onCollapse={(value) => setCollapsed(value)}
+        onCollapse={(value: boolean) => setCollapsed(value)}
         theme="dark"
         width={250}
         style={{
@@ -123,22 +125,7 @@ export function DashboardLayout({ user, children }: DashboardLayoutProps) {
             gap: 8,
           }}
         >
-          <Link href="/app" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center flex-shrink-0">
-              <svg
-                className="w-5 h-5 text-white"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <path d="M3 21h18M3 7v1a3 3 0 0 0 6 0V7m0 1a3 3 0 0 0 6 0V7m0 1a3 3 0 0 0 6 0V7H3l2-4h14l2 4M4 21V10.5M20 21V10.5" />
-              </svg>
-            </div>
-            {!collapsed && (
-              <span className="text-xl font-bold text-white">BuildTrack</span>
-            )}
-          </Link>
+          <Logo href="/app" size="sm" showText={!collapsed} textColor="white" />
         </div>
         <Menu
           theme="dark"

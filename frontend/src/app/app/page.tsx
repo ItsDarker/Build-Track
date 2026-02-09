@@ -1,21 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+// Auth is now handled in layout.tsx
+import { useState } from "react";
 import { Loader2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { DashboardLayout } from "@/components/ui-kit/DashboardLayout";
 import { ProjectCard } from "@/components/ui-kit/ProjectCard";
 import { QuickStats } from "@/components/ui-kit/QuickStats";
-import { apiClient } from "@/lib/api/client";
-import { Tooltip as AntdTooltip } from "antd"; // Add this import
-
-interface User {
-  id: string;
-  email: string;
-  name?: string;
-  emailVerified?: string;
-}
+import { Tooltip as AntdTooltip } from "antd";
 
 // Mock project data
 const mockProjects = [
@@ -65,77 +56,39 @@ const mockStats = [
 ];
 
 export default function AppPage() {
-  const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function checkAuth() {
-      const result = await apiClient.getCurrentUser();
-
-      if (result.error || !result.data) {
-        console.error("Failed to fetch current user:", result.error); // Add this line
-        router.push("/login");
-        return;
-      }
-
-      const userData = (result.data as { user: User }).user;
-      console.log("Current user data:", userData); // Add this line
-
-      if (!userData.emailVerified) {
-        router.push("/login?unverified=1");
-        return;
-      }
-
-      setUser(userData);
-      setLoading(false);
-    }
-
-    checkAuth();
-  }, [router]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
-      </div>
-    );
-  }
-
-  if (!user) {
-    return null;
-  }
+  // No need for auth check here, layout handles it
 
   return (
-      <DashboardLayout user={user}>
-          {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-            <h1 className="text-2xl font-bold text-slate-900">My Projects</h1>
-            <AntdTooltip title="MVP: This feature is disabled"> {/* Use AntdTooltip */}
-                <Button
-                  className="bg-orange-500 hover:bg-orange-600 text-white gap-2"
-                  disabled
-                >
-                  <Plus className="w-4 h-4" />
-                  New Project
-                </Button>
-            </AntdTooltip>
-          </div>
+    <>
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+        <h1 className="text-2xl font-bold text-slate-900">My Projects</h1>
+        <AntdTooltip title="MVP: This feature is disabled">
+          <Button
+            className="bg-orange-500 hover:bg-orange-600 text-white gap-2"
+            disabled
+          >
+            <Plus className="w-4 h-4" />
+            New Project
+          </Button>
+        </AntdTooltip>
+      </div>
 
-          {/* Projects Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-            {mockProjects.map((project) => (
-              <ProjectCard
-                key={project.id}
-                title={project.title}
-                progress={project.progress}
-                dueDate={project.dueDate}
-              />
-            ))}
-          </div>
+      {/* Projects Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        {mockProjects.map((project) => (
+          <ProjectCard
+            key={project.id}
+            title={project.title}
+            progress={project.progress}
+            dueDate={project.dueDate}
+          />
+        ))}
+      </div>
 
-          {/* Quick Stats */}
-          <QuickStats stats={mockStats} />
-      </DashboardLayout>
+      {/* Quick Stats */}
+      <QuickStats stats={mockStats} />
+    </>
   );
 }
+

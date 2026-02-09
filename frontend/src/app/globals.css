@@ -50,8 +50,18 @@
 }
 
 @layer base {
-  * {
-    @apply border-border;
+  *,
+  *::before,
+  *::after {
+    border-color: hsl(var(--border));
+  }
+  /* Exclude Ant Design components from shadcn border override */
+  .ant-btn,
+  .ant-btn::before,
+  .ant-btn::after,
+  [class^="ant-"],
+  [class*=" ant-"] {
+    border-color: revert;
   }
   body {
     @apply bg-background text-foreground;

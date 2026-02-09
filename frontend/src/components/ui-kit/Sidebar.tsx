@@ -59,7 +59,7 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
                 <Link
                   key={item.href}
                   href={item.disabled ? "#" : item.href}
-                  onClick={(e) => {
+                  onClick={(e: React.MouseEvent) => {
                     if (item.disabled) e.preventDefault();
                     if (onClose) onClose();
                   }}

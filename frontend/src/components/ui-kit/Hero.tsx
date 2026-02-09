@@ -3,14 +3,73 @@
 import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { motion, useReducedMotion } from "framer-motion";
+import { useCMSContent } from "@/lib/hooks/useCMSContent";
 
 export function Hero() {
   const [imgError, setImgError] = useState(false);
   const [previewError, setPreviewError] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+  const prefersReducedMotion = useReducedMotion();
+  const { getHeroContent } = useCMSContent();
+  const heroContent = getHeroContent();
+
+  // Only enable animations after hydration to prevent mismatch
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  // Use safe motion detection - default to false during SSR
+  const shouldAnimate = isMounted && !prefersReducedMotion;
+
+  // Animation variants
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: shouldAnimate ? 0.2 : 0,
+        delayChildren: shouldAnimate ? 0.1 : 0,
+      },
+    },
+  };
+
+  const itemVariants = {
+    hidden: {
+      opacity: 0,
+      y: shouldAnimate ? 30 : 0
+    },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: shouldAnimate ? 0.6 : 0.1,
+        ease: [0.25, 0.46, 0.45, 0.94],
+      },
+    },
+  };
+
+  const previewVariants = {
+    hidden: {
+      opacity: 0,
+      x: shouldAnimate ? 50 : 0,
+      scale: shouldAnimate ? 0.95 : 1
+    },
+    visible: {
+      opacity: 1,
+      x: 0,
+      scale: 1,
+      transition: {
+        duration: shouldAnimate ? 0.8 : 0.1,
+        delay: shouldAnimate ? 0.4 : 0,
+        ease: [0.25, 0.46, 0.45, 0.94],
+      },
+    },
+  };
 
   return (
-    <section className="relative min-h-[70vh] md:min-h-[80vh] flex items-center">
+    <section className="relative min-h-[70vh] md:min-h-[80vh] flex items-center overflow-hidden">
       {/* Background Image with Overlay */}
       <div className="absolute inset-0 z-0">
         {!imgError ? (
@@ -29,27 +88,65 @@ export function Hero() {
         <div className="absolute inset-0 bg-gradient-to-r from-slate-900/95 via-slate-900/80 to-slate-900/40" />
       </div>
 
+      {/* Subtle animated background effect - only render after mount to prevent hydration mismatch */}
+      {isMounted && shouldAnimate && (
+        <motion.div
+          className="absolute inset-0 z-[1] opacity-30"
+          initial={{ backgroundPosition: "0% 0%" }}
+          animate={{ backgroundPosition: "100% 100%" }}
+          transition={{ duration: 20, repeat: Infinity, repeatType: "reverse", ease: "linear" }}
+          style={{
+            background: "radial-gradient(circle at 50% 50%, rgba(249, 115, 22, 0.1) 0%, transparent 50%)",
+            backgroundSize: "200% 200%",
+          }}
+        />
+      )}
+
       {/* Content */}
       <div className="container mx-auto px-4 pt-24 pb-12 relative z-10">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           {/* Left Content */}
-          <div className="max-w-xl">
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-tight mb-6">
-              One Reliable Place for{" "}
-              <span className="text-orange-500">Construction Tracking</span>
-            </h1>
-            <p className="text-lg md:text-xl text-gray-300 mb-8 leading-relaxed">
-              The single source of truth for status, ownership, and accountability—so nothing falls through the cracks.
-            </p>
-            <Link href="/signup">
-              <Button size="lg" className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-6 text-lg">
-                Get Started
-              </Button>
-            </Link>
-          </div>
+          <motion.div
+            className="max-w-xl"
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+          >
+            <motion.h1
+              className="text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-tight mb-6"
+              variants={itemVariants}
+            >
+              {heroContent.headline}{" "}
+              <span className="text-orange-500">{heroContent.highlightedText}</span>
+            </motion.h1>
+            <motion.p
+              className="text-lg md:text-xl text-gray-300 mb-8 leading-relaxed"
+              variants={itemVariants}
+            >
+              {heroContent.subheadline}
+            </motion.p>
+            <motion.div variants={itemVariants}>
+              <Link href={heroContent.ctaLink}>
+                <motion.div
+                  whileHover={shouldAnimate ? { scale: 1.05 } : {}}
+                  whileTap={shouldAnimate ? { scale: 0.98 } : {}}
+                  transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                >
+                  <Button size="lg" className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-6 text-lg shadow-lg shadow-orange-500/25 hover:shadow-orange-500/40 transition-shadow">
+                    {heroContent.ctaText}
+                  </Button>
+                </motion.div>
+              </Link>
+            </motion.div>
+          </motion.div>
 
           {/* Right Content - App Preview */}
-          <div className="hidden lg:flex justify-end">
+          <motion.div
+            className="hidden lg:flex justify-end"
+            variants={previewVariants}
+            initial="hidden"
+            animate="visible"
+          >
             <div className="relative w-full max-w-lg">
               {/* Laptop Frame */}
               <div className="relative bg-slate-800 rounded-t-xl p-2 shadow-2xl">
@@ -88,7 +185,7 @@ export function Hero() {
               <div className="bg-slate-700 h-4 rounded-b-lg mx-8" />
               <div className="bg-slate-600 h-2 rounded-b-xl mx-16" />
             </div>
-          </div>
+          </motion.div>
         </div>
       </div>
     </section>

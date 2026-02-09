@@ -1,34 +1,20 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
 import {
-  Layout,
-  Menu,
-  theme,
   Card,
   Table,
   Button,
   Space,
   Tag,
-  message,
-  Spin,
   Input,
   Select,
   Modal,
   Form,
   Popconfirm,
-  Badge,
-  Dropdown,
+  App,
 } from "antd";
 import {
-  DashboardOutlined,
-  UserOutlined,
-  SettingOutlined,
-  LogoutOutlined,
-  FileTextOutlined,
-  BellOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
   LockOutlined,
@@ -39,12 +25,11 @@ import {
   SearchOutlined,
   ReloadOutlined,
   FileExcelOutlined,
+  KeyOutlined,
 } from "@ant-design/icons";
+import { normalizePhoneNumber, formatPhoneNumber } from "@/lib/phoneUtils";
 import { apiClient } from "@/lib/api/client";
 import * as XLSX from "xlsx";
-
-const { Header, Content, Footer, Sider } = Layout;
-const { Option } = Select;
 
 interface User {
   id: string;
@@ -52,6 +37,10 @@ interface User {
   name: string | null;
   role: string;
   emailVerified: string | null;
+  phone: string | null;
+  company: string | null;
+  jobTitle: string | null;
+  bio: string | null;
   isBlocked: boolean;
   blockedAt: string | null;
   blockedReason: string | null;
@@ -66,8 +55,7 @@ interface Pagination {
 }
 
 export default function UsersPage() {
-  const router = useRouter();
-  const [collapsed, setCollapsed] = useState(false);
+  const { message } = App.useApp();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState<Pagination>({
@@ -80,12 +68,11 @@ export default function UsersPage() {
   const [roleFilter, setRoleFilter] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState(false);
+  const [resetPasswordUserId, setResetPasswordUserId] = useState<string | null>(null);
   const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [unreadCount, setUnreadCount] = useState(0);
   const [form] = Form.useForm();
-  const {
-    token: { colorBgContainer, borderRadiusLG },
-  } = theme.useToken();
+  const [resetPasswordForm] = Form.useForm();
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -109,36 +96,11 @@ export default function UsersPage() {
       }));
     }
     setLoading(false);
-  }, [pagination.page, pagination.limit, searchText, roleFilter, statusFilter]);
-
-  const fetchNotifications = useCallback(async () => {
-    const result = await apiClient.getAdminNotifications({ unreadOnly: true });
-    if (result.data) {
-      setUnreadCount((result.data as any).notifications?.length || 0);
-    }
-  }, []);
+  }, [pagination.page, pagination.limit, searchText, roleFilter, statusFilter, message]);
 
   useEffect(() => {
-    // Check auth
-    apiClient.getCurrentUser().then((result) => {
-      if (result.error || !result.data) {
-        router.push("/login");
-        return;
-      }
-      const user = (result.data as any).user;
-      if (user.role !== "ADMIN") {
-        router.push("/app");
-        return;
-      }
-      fetchUsers();
-      fetchNotifications();
-    });
-  }, [fetchUsers, fetchNotifications, router]);
-
-  const handleLogout = async () => {
-    await apiClient.logout();
-    router.push("/login");
-  };
+    fetchUsers();
+  }, [fetchUsers]);
 
   const handleSearch = () => {
     setPagination((prev) => ({ ...prev, page: 1 }));
@@ -158,6 +120,9 @@ export default function UsersPage() {
         ID: user.id,
         Name: user.name,
         Email: user.email,
+        Phone: formatPhoneNumber(user.phone),
+        Company: user.company,
+        JobTitle: user.jobTitle,
         Role: user.role,
         Verified: user.emailVerified ? "Yes" : "No",
         Blocked: user.isBlocked ? "Yes" : "No",
@@ -214,6 +179,10 @@ export default function UsersPage() {
       email: user.email,
       name: user.name,
       role: user.role,
+      phone: formatPhoneNumber(user.phone), // Format for display in edit
+      company: user.company,
+      jobTitle: user.jobTitle,
+      bio: user.bio,
     });
     setIsModalOpen(true);
   };
@@ -222,12 +191,47 @@ export default function UsersPage() {
     try {
       const values = await form.validateFields();
 
+      // Normalize phone number before saving
+      const normalizedPhone = normalizePhoneNumber(values.phone);
+      // Optional: You might want to warn if normalization fails but user entered something
+      // For now, if normalization returns null, we can treat it as null/empty if the field was optional
+      // or error if required. The current usage implies optional phone.
+
+      const payload = {
+        ...values,
+        phone: normalizedPhone || values.phone // Fallback to raw if normalization fails, or handle error? 
+        // normalizePhoneNumber returns null if invalid. If field has value but is invalid, we might want to error?
+        // But let's follow the util: if it returns null, it's invalid.
+        // Let's assume we pass the valid one or if it's null and input was not empty, maybe validation failed?
+        // Actually, let's just pass the normalized one.
+      };
+
+      // Better: if values.phone has content but normalized is null, it's an invalid number. 
+      if (values.phone && !normalizedPhone) {
+        form.setFields([
+          {
+            name: 'phone',
+            errors: ['Invalid phone number format'],
+          },
+        ]);
+        return;
+      }
+
+      const saveData = {
+        ...values,
+        phone: normalizedPhone,
+      };
+
       if (editingUser) {
-        // Update user
         const result = await apiClient.updateAdminUser(editingUser.id, {
-          email: values.email,
-          name: values.name,
-          role: values.role,
+          email: saveData.email,
+          name: saveData.name,
+          role: saveData.role,
+          phone: saveData.phone,
+          company: saveData.company,
+          jobTitle: saveData.jobTitle,
+          bio: saveData.bio,
+          emailVerified: saveData.emailVerified,
         });
         if (result.error) {
           message.error(result.error);
@@ -235,13 +239,16 @@ export default function UsersPage() {
         }
         message.success("User updated successfully");
       } else {
-        // Create user
         const result = await apiClient.createAdminUser({
-          email: values.email,
+          email: saveData.email,
           password: values.password,
-          name: values.name,
-          role: values.role,
-          emailVerified: values.emailVerified,
+          name: saveData.name,
+          role: saveData.role,
+          emailVerified: saveData.emailVerified,
+          phone: saveData.phone,
+          company: saveData.company,
+          jobTitle: saveData.jobTitle,
+          bio: saveData.bio,
         });
         if (result.error) {
           message.error(result.error);
@@ -258,6 +265,31 @@ export default function UsersPage() {
     }
   };
 
+  const handleResetPassword = (userId: string) => {
+    setResetPasswordUserId(userId);
+    resetPasswordForm.resetFields();
+    setIsResetPasswordModalOpen(true);
+  };
+
+  const handleResetPasswordOk = async () => {
+    try {
+      const values = await resetPasswordForm.validateFields();
+      if (resetPasswordUserId) {
+        const result = await apiClient.resetAdminUserPassword(resetPasswordUserId, values.password);
+        if (result.error) {
+          message.error(result.error);
+          return;
+        }
+        message.success("Password reset successfully");
+        setIsResetPasswordModalOpen(false);
+        resetPasswordForm.resetFields();
+        setResetPasswordUserId(null);
+      }
+    } catch {
+      // Validation failed
+    }
+  };
+
   const columns = [
     {
       title: "Name",
@@ -269,6 +301,12 @@ export default function UsersPage() {
       title: "Email",
       dataIndex: "email",
       key: "email",
+    },
+    {
+      title: "Phone",
+      dataIndex: "phone",
+      key: "phone",
+      render: (phone: string | null) => formatPhoneNumber(phone) || "-",
     },
     {
       title: "Role",
@@ -316,6 +354,12 @@ export default function UsersPage() {
             icon={<EditOutlined />}
             onClick={() => handleEditUser(record)}
           />
+          <Button
+            size="small"
+            icon={<KeyOutlined />}
+            onClick={() => handleResetPassword(record.id)}
+            title="Reset Password"
+          />
           {record.isBlocked ? (
             <Button
               size="small"
@@ -350,206 +394,102 @@ export default function UsersPage() {
     },
   ];
 
-  const menuItems = [
-    {
-      key: "dashboard",
-      icon: <DashboardOutlined />,
-      label: <Link href="/admin">Dashboard</Link>,
-    },
-    {
-      key: "users",
-      icon: <UserOutlined />,
-      label: <Link href="/admin/users">Users</Link>,
-    },
-    {
-      key: "pages",
-      icon: <FileTextOutlined />,
-      label: <Link href="/admin/pages">Manage Pages</Link>,
-    },
-    {
-      key: "settings",
-      icon: <SettingOutlined />,
-      label: "Settings",
-    },
-  ];
-
   return (
-    <Layout style={{ minHeight: "100vh" }}>
-      <Sider
-        collapsible
-        collapsed={collapsed}
-        onCollapse={(value) => setCollapsed(value)}
-        theme="dark"
-        width={250}
-        style={{
-          overflow: "auto",
-          height: "100vh",
-          position: "fixed",
-          left: 0,
-          top: 0,
-          bottom: 0,
-        }}
-      >
-        <div
-          style={{
-            height: 64,
-            margin: 16,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: collapsed ? "center" : "flex-start",
-            gap: 8,
-          }}
-        >
-          <Link href="/admin" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center">
-              <svg
-                className="w-5 h-5 text-white"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <path d="M3 21h18M3 7v1a3 3 0 0 0 6 0V7m0 1a3 3 0 0 0 6 0V7m0 1a3 3 0 0 0 6 0V7H3l2-4h14l2 4M4 21V10.5M20 21V10.5" />
-              </svg>
-            </div>
-            {!collapsed && <span className="text-xl font-bold text-white">Admin</span>}
-          </Link>
-        </div>
-        <Menu
-          theme="dark"
-          defaultSelectedKeys={["users"]}
-          mode="inline"
-          items={menuItems}
-        />
-      </Sider>
-      <Layout style={{ marginLeft: collapsed ? 80 : 250, transition: "margin-left 0.2s" }}>
-        <Header
-          style={{
-            padding: "0 24px",
-            background: colorBgContainer,
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
-          <div>
-            <span className="text-lg font-semibold">User Management</span>
-          </div>
-          <Space size="middle">
-            <Badge count={unreadCount} size="small">
-              <Button type="text" icon={<BellOutlined />} onClick={() => router.push("/admin")} />
-            </Badge>
-            <Button type="text" icon={<LogoutOutlined />} onClick={handleLogout}>
-              Logout
-            </Button>
-          </Space>
-        </Header>
-        <Content style={{ margin: "24px 16px 0", overflow: "initial" }}>
-          <div
-            style={{
-              padding: 24,
-              minHeight: 360,
-              background: colorBgContainer,
-              borderRadius: borderRadiusLG,
+    <>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold">Users</h2>
+        <Space>
+          <Button icon={<FileExcelOutlined />} onClick={handleDownloadExcel}>
+            Download Excel
+          </Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleCreateUser}>
+            Add User
+          </Button>
+        </Space>
+      </div>
+
+      {/* Filters */}
+      <Card className="mb-6">
+        <Space wrap>
+          <Input
+            placeholder="Search by name or email"
+            prefix={<SearchOutlined />}
+            value={searchText}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchText(e.target.value)}
+            onPressEnter={handleSearch}
+            style={{ width: 250 }}
+          />
+          <Select
+            placeholder="Role"
+            allowClear
+            style={{ width: 120 }}
+            value={roleFilter || undefined}
+            onChange={(value: string) => setRoleFilter(value || "")}
+            options={[
+              { value: "USER", label: "User" },
+              { value: "ADMIN", label: "Admin" },
+            ]}
+          />
+          <Select
+            placeholder="Status"
+            allowClear
+            style={{ width: 120 }}
+            value={statusFilter || undefined}
+            onChange={(value: string) => setStatusFilter(value || "")}
+            options={[
+              { value: "verified", label: "Verified" },
+              { value: "unverified", label: "Unverified" },
+              { value: "blocked", label: "Blocked" },
+            ]}
+          />
+          <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>
+            Search
+          </Button>
+          <Button
+            icon={<ReloadOutlined />}
+            onClick={() => {
+              setSearchText("");
+              setRoleFilter("");
+              setStatusFilter("");
+              setPagination((prev) => ({ ...prev, page: 1 }));
+              fetchUsers();
             }}
           >
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold">Users</h2>
-              <Space>
-                <Button icon={<FileExcelOutlined />} onClick={handleDownloadExcel}>
-                  Download Excel
-                </Button>
-                <Button type="primary" icon={<PlusOutlined />} onClick={handleCreateUser}>
-                  Add User
-                </Button>
-              </Space>
-            </div>
+            Reset
+          </Button>
+        </Space>
+      </Card>
 
-            {/* Filters */}
-            <Card className="mb-6">
-              <Space wrap>
-                <Input
-                  placeholder="Search by name or email"
-                  prefix={<SearchOutlined />}
-                  value={searchText}
-                  onChange={(e) => setSearchText(e.target.value)}
-                  onPressEnter={handleSearch}
-                  style={{ width: 250 }}
-                />
-                <Select
-                  placeholder="Role"
-                  allowClear
-                  style={{ width: 120 }}
-                  value={roleFilter || undefined}
-                  onChange={(value) => setRoleFilter(value || "")}
-                >
-                  <Option value="USER">User</Option>
-                  <Option value="ADMIN">Admin</Option>
-                </Select>
-                <Select
-                  placeholder="Status"
-                  allowClear
-                  style={{ width: 120 }}
-                  value={statusFilter || undefined}
-                  onChange={(value) => setStatusFilter(value || "")}
-                >
-                  <Option value="verified">Verified</Option>
-                  <Option value="unverified">Unverified</Option>
-                  <Option value="blocked">Blocked</Option>
-                </Select>
-                <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>
-                  Search
-                </Button>
-                <Button
-                  icon={<ReloadOutlined />}
-                  onClick={() => {
-                    setSearchText("");
-                    setRoleFilter("");
-                    setStatusFilter("");
-                    setPagination((prev) => ({ ...prev, page: 1 }));
-                    fetchUsers();
-                  }}
-                >
-                  Reset
-                </Button>
-              </Space>
-            </Card>
-
-            {/* Users Table */}
-            <Card>
-              <Table
-                dataSource={users}
-                columns={columns}
-                rowKey="id"
-                loading={loading}
-                pagination={{
-                  current: pagination.page,
-                  pageSize: pagination.limit,
-                  total: pagination.total,
-                  showSizeChanger: true,
-                  showTotal: (total) => `Total ${total} users`,
-                  onChange: (page, pageSize) => {
-                    setPagination((prev) => ({
-                      ...prev,
-                      page,
-                      limit: pageSize || 10,
-                    }));
-                  },
-                }}
-              />
-            </Card>
-          </div>
-        </Content>
-        <Footer style={{ textAlign: "center" }}>
-          BuildTrack Admin &copy;{new Date().getFullYear()}
-        </Footer>
-      </Layout>
+      {/* Users Table */}
+      <Card>
+        <Table
+          dataSource={users}
+          columns={columns}
+          rowKey="id"
+          loading={loading}
+          pagination={{
+            current: pagination.page,
+            pageSize: pagination.limit,
+            total: pagination.total,
+            showSizeChanger: true,
+            showTotal: (total: number) => `Total ${total} users`,
+            onChange: (page: number, pageSize: number) => {
+              setPagination((prev) => ({
+                ...prev,
+                page,
+                limit: pageSize || 10,
+              }));
+            },
+          }}
+        />
+      </Card>
 
       {/* Create/Edit User Modal */}
       <Modal
         title={editingUser ? "Edit User" : "Create User"}
         open={isModalOpen}
         onOk={handleModalOk}
+        forceRender
         onCancel={() => {
           setIsModalOpen(false);
           form.resetFields();
@@ -585,33 +525,87 @@ export default function UsersPage() {
             <Input />
           </Form.Item>
 
+          <Form.Item name="phone" label="Phone">
+            <Input
+              placeholder="e.g. +1 312 285 6334"
+              onBlur={(e) => {
+                const formatted = formatPhoneNumber(e.target.value);
+                if (formatted) {
+                  form.setFieldsValue({ phone: formatted });
+                }
+              }}
+            />
+          </Form.Item>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Form.Item name="company" label="Company">
+              <Input />
+            </Form.Item>
+
+            <Form.Item name="jobTitle" label="Job Title">
+              <Input />
+            </Form.Item>
+          </div>
+
+          <Form.Item name="bio" label="Bio">
+            <Input.TextArea rows={3} />
+          </Form.Item>
+
           <Form.Item
             name="role"
             label="Role"
             initialValue="USER"
             rules={[{ required: true, message: "Please select role" }]}
           >
-            <Select>
-              <Option value="USER">User</Option>
-              <Option value="ADMIN">Admin</Option>
-            </Select>
+            <Select
+              options={[
+                { value: "USER", label: "User" },
+                { value: "ADMIN", label: "Admin" },
+              ]}
+            />
           </Form.Item>
 
-          {!editingUser && (
-            <Form.Item
-              name="emailVerified"
-              label="Email Verified"
-              initialValue={false}
-              valuePropName="checked"
-            >
-              <Select>
-                <Option value={true}>Yes (Skip verification)</Option>
-                <Option value={false}>No (Require verification)</Option>
-              </Select>
-            </Form.Item>
-          )}
+          <Form.Item
+            name="emailVerified"
+            label="Email Verified"
+            initialValue={false}
+          >
+            <Select
+              options={[
+                { value: true, label: "Yes (Verified)" },
+                { value: false, label: "No (Unverified)" },
+              ]}
+            />
+          </Form.Item>
         </Form>
       </Modal>
-    </Layout>
+
+      {/* Reset Password Modal */}
+      <Modal
+        title="Reset User Password"
+        open={isResetPasswordModalOpen}
+        onOk={handleResetPasswordOk}
+        onCancel={() => {
+          setIsResetPasswordModalOpen(false);
+          resetPasswordForm.resetFields();
+          setResetPasswordUserId(null);
+        }}
+        okText="Reset Password"
+        okButtonProps={{ danger: true }}
+      >
+        <Form form={resetPasswordForm} layout="vertical" className="mt-4">
+          <Form.Item
+            name="password"
+            label="New Password"
+            rules={[
+              { required: true, message: "Please enter new password" },
+              { min: 8, message: "Password must be at least 8 characters" },
+            ]}
+          >
+            <Input.Password placeholder="Enter new password" />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </>
   );
 }
