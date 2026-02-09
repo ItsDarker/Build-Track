@@ -5,6 +5,7 @@ export interface AuthRequest extends Request {
   user?: {
     userId: string;
     email: string;
+    role: string;
   };
 }
 
@@ -18,7 +19,7 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
     }
 
     // Verify token
-    const payload = verifyAccessToken(token);
+    const payload = verifyAccessToken(token) as any;
     req.user = payload;
 
     next();
@@ -32,7 +33,7 @@ export function optionalAuth(req: AuthRequest, res: Response, next: NextFunction
     const token = req.cookies.accessToken;
 
     if (token) {
-      const payload = verifyAccessToken(token);
+      const payload = verifyAccessToken(token) as any;
       req.user = payload;
     }
   } catch (error) {

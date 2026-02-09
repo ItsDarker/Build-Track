@@ -6,6 +6,11 @@ import { config } from './config/env';
 import authRoutes from './routes/auth.routes';
 import adminRoutes from './routes/admin.routes';
 import cmsRoutes from './routes/cms.routes';
+import clientRoutes from './routes/client.routes';
+import projectRoutes from './routes/project.routes';
+import taskRoutes from './routes/task.routes';
+import teamRoutes from './routes/team.routes';
+import dashboardRoutes from './routes/dashboard.routes';
 
 const app = express();
 
@@ -31,6 +36,11 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/cms', cmsRoutes);
+app.use('/api/clients', clientRoutes);
+app.use('/api/projects', projectRoutes);
+app.use('/api/tasks', taskRoutes);
+app.use('/api/teams', teamRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 // Error handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

@@ -15,7 +15,7 @@ const createUserSchema = z.object({
   email: z.string().email(),
   name: z.string().optional(),
   password: z.string().min(10),
-  role: z.enum(['USER', 'ADMIN']).optional(),
+  role: z.enum(['ADMIN', 'PM', 'SUBCONTRACTOR', 'CLIENT']).optional(),
   emailVerified: z.boolean().optional(),
   phone: z.string().optional(),
   company: z.string().optional(),
@@ -26,7 +26,7 @@ const createUserSchema = z.object({
 const updateUserSchema = z.object({
   email: z.string().email().optional(),
   name: z.string().optional(),
-  role: z.enum(['USER', 'ADMIN']).optional(),
+  role: z.enum(['ADMIN', 'PM', 'SUBCONTRACTOR', 'CLIENT']).optional(),
   phone: z.string().optional(),
   company: z.string().optional(),
   jobTitle: z.string().optional(),
@@ -171,6 +171,27 @@ router.delete('/users/:id', async (req: AdminRequest, res: Response) => {
     }
     console.error('Error deleting user:', error);
     res.status(500).json({ error: 'Failed to delete user' });
+  }
+});
+
+/**
+ * POST /api/admin/users/:id/reset-password
+ * Reset user password (admin only)
+ */
+router.post('/users/:id/reset-password', async (req: Request, res: Response) => {
+  try {
+    const { password } = resetPasswordSchema.parse(req.body);
+    await adminService.resetPassword(req.params.id, password);
+    res.json({ success: true, message: 'Password reset successfully' });
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: error.errors[0].message });
+    }
+    if (error.message === 'User not found') {
+      return res.status(404).json({ error: error.message });
+    }
+    console.error('Error resetting password:', error);
+    res.status(500).json({ error: 'Failed to reset password' });
   }
 });
 

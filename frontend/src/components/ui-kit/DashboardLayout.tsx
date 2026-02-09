@@ -12,6 +12,8 @@ import {
   TeamOutlined,
   BarChartOutlined,
   SettingOutlined,
+  ProjectOutlined,
+  PartitionOutlined,
 } from "@ant-design/icons";
 import { useRouter } from "next/navigation";
 import { apiClient } from "@/lib/api/client";
@@ -23,6 +25,7 @@ interface User {
   id: string;
   email: string;
   name?: string;
+  role: string;
 }
 
 interface DashboardLayoutProps {
@@ -35,6 +38,8 @@ const navItems = [
   { key: "/app/profile", icon: <UserOutlined />, label: "My Profile" },
   { key: "/app/team", icon: <TeamOutlined />, label: "Team" },
   { key: "/app/clients", icon: <CheckSquareOutlined />, label: "Clients" },
+  { key: "/app/projects", icon: <ProjectOutlined />, label: "Projects" },
+  { key: "/app/tasks", icon: <PartitionOutlined />, label: "Tasks" },
   { key: "/app/reports", icon: <BarChartOutlined />, label: "Reports", disabled: true },
   { key: "/app/settings", icon: <SettingOutlined />, label: "Settings", disabled: true },
 ];
@@ -76,7 +81,17 @@ export function DashboardLayout({ user, children }: DashboardLayoutProps) {
     },
   ];
 
-  const menuItems = navItems.map((item) => ({
+  const filteredNavItems = navItems.filter((item) => {
+    if (user.role === "CLIENT") {
+      return ["/app", "/app/profile", "/app/projects"].includes(item.key);
+    }
+    if (user.role === "SUBCONTRACTOR") {
+      return ["/app", "/app/profile", "/app/projects", "/app/tasks"].includes(item.key);
+    }
+    return true; // ADMIN and PM see all
+  });
+
+  const menuItems = filteredNavItems.map((item) => ({
     key: item.key,
     icon: item.icon,
     label: item.disabled ? (
@@ -91,7 +106,7 @@ export function DashboardLayout({ user, children }: DashboardLayoutProps) {
   }));
 
   const handleMenuClick = ({ key }: { key: string }) => {
-    const item = navItems.find((i) => i.key === key);
+    const item = filteredNavItems.find((i) => i.key === key);
     if (!item?.disabled) {
       router.push(key);
     }

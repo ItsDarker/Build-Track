@@ -8,7 +8,7 @@ import {
   Input,
   Form,
   Modal,
-  message,
+  App,
   Spin,
   Typography,
   Avatar,
@@ -47,14 +47,14 @@ interface User {
 }
 
 const roleColors: Record<string, string> = {
-  PM: "blue",
   ADMIN: "red",
-  CONTRACTOR: "orange",
-  OWNER: "green",
-  USER: "default",
+  PM: "blue",
+  SUBCONTRACTOR: "orange",
+  CLIENT: "green",
 };
 
 export default function TeamPage() {
+  const { message } = App.useApp();
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [members, setMembers] = useState<TeamMember[]>([]);
@@ -164,8 +164,8 @@ export default function TeamPage() {
               <EditOutlined className="text-green-500 text-lg" />
             </div>
             <div>
-              <Text type="secondary" className="text-xs block">Contractors</Text>
-              <Text strong className="text-xl">{members.filter((m) => m.role === "CONTRACTOR").length}</Text>
+              <Text type="secondary" className="text-xs block">Subcontractors</Text>
+              <Text strong className="text-xl">{members.filter((m) => m.role === "SUBCONTRACTOR").length}</Text>
             </div>
           </div>
         </Card>
@@ -247,12 +247,12 @@ export default function TeamPage() {
             name="role"
             label="Role"
             rules={[{ required: true, message: "Please select a role" }]}
-            initialValue="CONTRACTOR"
+            initialValue="SUBCONTRACTOR"
           >
             <select className="w-full h-10 px-3 border border-gray-300 rounded-md">
               <option value="PM">Project Manager</option>
-              <option value="CONTRACTOR">Contractor</option>
-              <option value="OWNER">Owner / Builder</option>
+              <option value="SUBCONTRACTOR">Subcontractor</option>
+              <option value="CLIENT">Client Portal Access</option>
             </select>
           </Form.Item>
           <div className="flex justify-end gap-2">

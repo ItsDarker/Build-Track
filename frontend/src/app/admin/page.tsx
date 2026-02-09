@@ -11,7 +11,7 @@ import {
   Button,
   Space,
   Tag,
-  message,
+  App,
   Skeleton,
   Typography,
 } from "antd";
@@ -21,6 +21,7 @@ import {
   LockOutlined,
   UnlockOutlined,
   ReloadOutlined,
+  BellOutlined,
 } from "@ant-design/icons";
 import { apiClient } from "@/lib/api/client";
 import { useAdminContext } from "./layout";
@@ -47,6 +48,7 @@ interface Stats {
 }
 
 export default function AdminDashboardPage() {
+  const { message } = App.useApp();
   const { notifications, markNotificationRead, clearAllNotifications } = useAdminContext();
   const [stats, setStats] = useState<Stats | null>(null);
   const [users, setUsers] = useState<User[]>([]);
@@ -234,21 +236,28 @@ export default function AdminDashboardPage() {
       </Row>
 
       {/* Recent Notifications */}
-      {notifications.length > 0 && (
-        <Card
-          title="Recent Notifications"
-          className="mb-6"
-          extra={
+      <Card
+        title="Recent Notifications"
+        className="mb-6"
+        extra={
+          notifications.length > 0 && (
             <Space>
               <Button type="link" danger onClick={clearAllNotifications}>
-                Clear
+                Clear All
               </Button>
               <Link href="/admin/notifications">
                 <Button type="link">View All</Button>
               </Link>
             </Space>
-          }
-        >
+          )
+        }
+      >
+        {notifications.length === 0 ? (
+          <div className="text-center py-8 text-gray-400">
+            <BellOutlined style={{ fontSize: 48, marginBottom: 16 }} />
+            <p>No notifications at the moment</p>
+          </div>
+        ) : (
           <div className="divide-y divide-gray-100">
             {notifications.slice(0, 3).map((item) => (
               <div
@@ -287,8 +296,8 @@ export default function AdminDashboardPage() {
               </div>
             ))}
           </div>
-        </Card>
-      )}
+        )}
+      </Card>
 
       {/* Recent Users Table */}
       <Card

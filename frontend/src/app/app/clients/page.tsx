@@ -8,7 +8,7 @@ import {
   Input,
   Form,
   Modal,
-  message,
+  App,
   Spin,
   Typography,
   Empty,
@@ -53,6 +53,7 @@ interface User {
 }
 
 export default function ClientsPage() {
+  const { message } = App.useApp();
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
@@ -318,7 +319,7 @@ export default function ClientsPage() {
                 prefix={<PhoneOutlined />}
                 placeholder="e.g. +1 312 285 6334"
                 size="large"
-                onBlur={(e) => {
+                onBlur={(e: React.FocusEvent<HTMLInputElement>) => {
                   const formatted = formatPhoneNumber(e.target.value);
                   if (formatted) {
                     form.setFieldsValue({ phone: formatted });

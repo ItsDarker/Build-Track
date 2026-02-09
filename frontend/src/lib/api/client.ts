@@ -198,6 +198,16 @@ class ApiClient {
     return this.request(`/api/admin/users/${userId}`, { method: 'GET' });
   }
 
+  // Dashboard & Team Assignments
+  async getDashboardStats() {
+    return this.request('/api/dashboard/stats', { method: 'GET' });
+  }
+
+  async getAssignableUsers(role?: string) {
+    const url = role ? `/api/teams/assignable?role=${role}` : '/api/teams/assignable';
+    return this.request(url, { method: 'GET' });
+  }
+
   async createAdminUser(data: {
     email: string;
     password: string;
@@ -350,6 +360,93 @@ class ApiClient {
 
   async deleteImage(imageId: string) {
     return this.request(`/api/cms/images/${imageId}`, { method: 'DELETE' });
+  }
+  // Project endpoints
+  async getProjects(params?: { status?: string; clientId?: string }) {
+    const searchParams = new URLSearchParams();
+    if (params?.status) searchParams.set('status', params.status);
+    if (params?.clientId) searchParams.set('clientId', params.clientId);
+    return this.request(`/api/projects?${searchParams.toString()}`, { method: 'GET' });
+  }
+
+  async getProject(projectId: string) {
+    return this.request(`/api/projects/${projectId}`, { method: 'GET' });
+  }
+
+  async createProject(data: {
+    name: string;
+    code?: string;
+    description?: string;
+    status?: string;
+    startDate?: string;
+    endDate?: string;
+    clientId?: string;
+    managerId?: string;
+  }) {
+    return this.request('/api/projects', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateProject(projectId: string, data: {
+    name?: string;
+    code?: string;
+    description?: string;
+    status?: string;
+    startDate?: string;
+    endDate?: string;
+    clientId?: string;
+    managerId?: string;
+  }) {
+    return this.request(`/api/projects/${projectId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteProject(projectId: string) {
+    return this.request(`/api/projects/${projectId}`, { method: 'DELETE' });
+  }
+
+  // Task endpoints
+  async getTasks(params: { projectId: string }) {
+    const searchParams = new URLSearchParams();
+    searchParams.set('projectId', params.projectId);
+    return this.request(`/api/tasks?${searchParams.toString()}`, { method: 'GET' });
+  }
+
+  async createTask(data: {
+    title: string;
+    description?: string;
+    status?: string;
+    priority?: string;
+    dueDate?: string;
+    projectId: string;
+    assigneeId?: string;
+  }) {
+    return this.request('/api/tasks', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateTask(taskId: string, data: {
+    title?: string;
+    description?: string;
+    status?: string;
+    priority?: string;
+    dueDate?: string;
+    assigneeId?: string;
+  }) {
+    return this.request(`/api/tasks/${taskId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteTask(taskId: string) {
+    return this.request(`/api/tasks/${taskId}`, { method: 'DELETE' });
   }
 }
 

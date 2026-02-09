@@ -554,13 +554,15 @@ export default function UsersPage() {
           <Form.Item
             name="role"
             label="Role"
-            initialValue="USER"
+            initialValue="SUBCONTRACTOR"
             rules={[{ required: true, message: "Please select role" }]}
           >
             <Select
               options={[
-                { value: "USER", label: "User" },
-                { value: "ADMIN", label: "Admin" },
+                { value: "ADMIN", label: "Admin - Full System Access" },
+                { value: "PM", label: "Project Manager - Manage Projects & Tasks" },
+                { value: "SUBCONTRACTOR", label: "Subcontractor - Update Assigned Tasks" },
+                { value: "CLIENT", label: "Client - View Projects (Read-Only)" },
               ]}
             />
           </Form.Item>

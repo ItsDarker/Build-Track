@@ -9,7 +9,12 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// UserRole: 'USER' | 'ADMIN' (SQLite doesn't support enums, using String)
+// User Roles: 'ADMIN' | 'PM' (Project Manager) | 'SUBCONTRACTOR' | 'CLIENT'
+// ADMIN: Full system access
+// PM: Manage assigned projects and tasks
+// SUBCONTRACTOR: View and update assigned tasks
+// CLIENT: Read-only access to their projects
+
 
 model User {
   id                String    @id @default(cuid())
@@ -17,7 +22,7 @@ model User {
   email             String    @unique
   passwordHash      String?   @map("password_hash")
   emailVerified     DateTime? @map("email_verified_at")
-  role              String    @default("USER") // 'USER' | 'ADMIN'
+  role              String    @default("SUBCONTRACTOR") // 'ADMIN' | 'PM' | 'SUBCONTRACTOR' | 'CLIENT'
   phone             String?
   company           String?
   jobTitle          String?   @map("job_title")
@@ -32,6 +37,10 @@ model User {
   refreshTokens     RefreshToken[]
   verificationTokens VerificationToken[]
   loginAttempts     LoginAttempt[]
+
+  // Relations
+  managedProjects   Project[] @relation("ProjectManager")
+  assignedTasks     Task[]    @relation("TaskAssignee")
 
   @@map("users")
 }
@@ -124,4 +133,76 @@ model ContentImage {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("content_images")
+}
+
+// CRM Client (Organization or Individual)
+model Client {
+  id        String   @id @default(cuid())
+  name      String
+  email     String?
+  phone     String?
+  company   String?
+  address   String?
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  projects  Project[]
+
+  @@map("clients")
+}
+
+// Construction Project
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  code        String?  // e.g. "PRJ-001"
+  description String?
+  status      String   @default("PLANNING") // PLANNING, IN_PROGRESS, ON_HOLD, COMPLETED, CANCELLED
+  startDate   DateTime? @map("start_date")
+  endDate     DateTime? @map("end_date")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  clientId    String?   @map("client_id")
+  client      Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  managerId   String?   @map("manager_id")
+  manager     User?     @relation("ProjectManager", fields: [managerId], references: [id], onDelete: SetNull)
+
+  tasks       Task[]
+
+  @@map("projects")
+}
+
+// Project Task
+model Task {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  status      String   @default("TODO") // TODO, IN_PROGRESS, REVIEW, DONE
+  priority    String   @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  dueDate     DateTime? @map("due_date")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  projectId   String   @map("project_id")
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  assigneeId  String?  @map("assignee_id")
+  assignee    User?    @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+
+  @@map("tasks")
+}
+
+model Invitation {
+  id        String   @id @default(cuid())
+  email     String
+  role      String   @default("SUBCONTRACTOR")
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  status    String   @default("PENDING") // PENDING, ACCEPTED, EXPIRED
+
+  @@map("invitations")
 }
