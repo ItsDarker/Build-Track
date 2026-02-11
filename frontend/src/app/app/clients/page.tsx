@@ -26,9 +26,11 @@ import {
   EnvironmentOutlined,
   SearchOutlined,
   UserOutlined,
+  DownloadOutlined,
 } from "@ant-design/icons";
 import { normalizePhoneNumber, formatPhoneNumber } from "@/lib/phoneUtils";
 import { apiClient } from "@/lib/api/client";
+import { downloadExcel } from "@/lib/downloadExcel";
 import { DashboardLayout } from "@/components/ui-kit/DashboardLayout";
 
 const { Title, Text } = Typography;
@@ -161,14 +163,36 @@ export default function ClientsPage() {
           <Title level={3} className="mb-0">Customer / Client Profiles</Title>
           <Text type="secondary">Manage your clients and their information</Text>
         </div>
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={() => setIsModalOpen(true)}
-          size="large"
-        >
-          Add Client
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            icon={<DownloadOutlined />}
+            size="large"
+            onClick={() => {
+              downloadExcel(
+                clients.map((c) => ({
+                  Name: c.name,
+                  Email: c.email || "",
+                  Phone: c.phone ? formatPhoneNumber(c.phone) : "",
+                  Company: c.company || "",
+                  Address: c.address || "",
+                  Notes: c.notes || "",
+                })),
+                undefined,
+                "clients"
+              );
+            }}
+          >
+            Download Excel
+          </Button>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => setIsModalOpen(true)}
+            size="large"
+          >
+            Add Client
+          </Button>
+        </div>
       </div>
 
       {/* Stats */}

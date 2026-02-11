@@ -1,0 +1,10 @@
+"use client";
+
+import { ModulePage } from "@/components/modules/ModulePage";
+import { getModuleBySlug } from "@/config/buildtrack.config";
+
+export default function InspectionsPage() {
+  const module = getModuleBySlug("quality-control");
+  if (!module) return <div>Module not found</div>;
+  return <ModulePage module={module} />;
+}

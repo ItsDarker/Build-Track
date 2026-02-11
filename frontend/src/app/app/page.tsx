@@ -1,110 +1,139 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Loader2, Plus, AlertCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { ProjectCard } from "@/components/ui-kit/ProjectCard";
-import { QuickStats } from "@/components/ui-kit/QuickStats";
-import { Tooltip as AntdTooltip, Empty, Skeleton, Card } from "antd";
-import { apiClient } from "@/lib/api/client";
+import Link from "next/link";
+import { getAllModules } from "@/config/buildtrack.config";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  ArrowRight,
+  ClipboardList,
+  FolderKanban,
+  CalendarDays,
+  TrendingUp,
+} from "lucide-react";
 
-export default function AppPage() {
-  const [projects, setProjects] = useState<any[]>([]);
-  const [stats, setStats] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+export default function DashboardPage() {
+  const modules = getAllModules();
 
-  useEffect(() => {
-    async function fetchDashboardData() {
-      setLoading(true);
-      setError(null);
-      try {
-        const [projectsRes, statsRes] = await Promise.all([
-          apiClient.getProjects(),
-          apiClient.getDashboardStats(),
-        ]);
-
-        if (projectsRes.data) {
-          setProjects((projectsRes.data as any).projects || []);
-        }
-
-        if (statsRes.data) {
-          const s = (statsRes.data as any).stats;
-          setStats([
-            { label: "Active Tasks", value: s.activeTasks, color: "orange" },
-            { label: "Overdue Issues", value: s.overdueIssues, color: "red" },
-            { label: "Team Members", value: s.teamMembers, color: "blue" },
-          ]);
-        }
-      } catch (err) {
-        setError("Failed to load dashboard data");
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchDashboardData();
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="space-y-8">
-        <Skeleton active paragraph={{ rows: 1 }} />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[1, 2, 3].map(i => <Skeleton.Button key={i} active style={{ height: 200, width: '100%' }} />)}
-        </div>
-        <Skeleton active />
-      </div>
-    );
-  }
+  // Quick stats (mock data - TODO: connect to backend)
+  const stats = [
+    { label: "Active Leads", value: 12, color: "text-orange-500", bg: "bg-orange-50" },
+    { label: "Open Work Orders", value: 8, color: "text-blue-500", bg: "bg-blue-50" },
+    { label: "Pending Deliveries", value: 5, color: "text-green-500", bg: "bg-green-50" },
+    { label: "Active Projects", value: 3, color: "text-purple-500", bg: "bg-purple-50" },
+  ];
 
   return (
-    <>
+    <div className="space-y-8">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+      <div>
         <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
-        <AntdTooltip title="Use the Projects page to manage projects">
-          <Button
-            className="bg-orange-500 hover:bg-orange-600 text-white gap-2"
-            onClick={() => window.location.href = '/app/projects'}
-          >
-            <Plus className="w-4 h-4" />
-            Manage Projects
-          </Button>
-        </AntdTooltip>
+        <p className="text-gray-500 mt-1">
+          Welcome back! Here&apos;s your BuildTrack overview.
+        </p>
       </div>
 
-      {error && (
-        <div className="mb-6 p-4 bg-red-50 text-red-600 rounded-lg flex items-center gap-2">
-          <AlertCircle className="w-5 h-5" />
-          {error}
-        </div>
-      )}
+      {/* Quick Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {stats.map((stat) => (
+          <Card key={stat.label} className="border-0 shadow-sm">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-500">{stat.label}</p>
+                  <p className={`text-3xl font-bold mt-1 ${stat.color}`}>
+                    {stat.value}
+                  </p>
+                </div>
+                <div className={`p-3 rounded-full ${stat.bg}`}>
+                  <TrendingUp className={`w-5 h-5 ${stat.color}`} />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
 
-      {/* Projects Grid */}
-      <h2 className="text-lg font-semibold mb-4">My Active Projects</h2>
-      {projects.length === 0 ? (
-        <Card className="p-8 text-center mb-8">
-          <Empty description="No projects found. Creating a project to get started!" />
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          {projects.slice(0, 6).map((project) => (
-            <ProjectCard
-              key={project.id}
-              title={project.name}
-              progress={project.status === 'COMPLETED' ? 100 : 0} // Future: calculate progress from tasks
-              dueDate={project.endDate ? new Date(project.endDate).toLocaleDateString() : 'No date'}
-            />
+      {/* Quick Navigation */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <Link href="/app/tasks">
+          <Card className="hover:shadow-md transition-shadow cursor-pointer border-orange-200 bg-orange-50/50">
+            <CardContent className="pt-6 flex items-center gap-3">
+              <ClipboardList className="w-8 h-8 text-orange-500" />
+              <div>
+                <p className="font-semibold text-slate-900">My Tasks</p>
+                <p className="text-sm text-gray-500">Leads, Work Orders, Deliveries</p>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/app/projects">
+          <Card className="hover:shadow-md transition-shadow cursor-pointer border-blue-200 bg-blue-50/50">
+            <CardContent className="pt-6 flex items-center gap-3">
+              <FolderKanban className="w-8 h-8 text-blue-500" />
+              <div>
+                <p className="font-semibold text-slate-900">My Projects</p>
+                <p className="text-sm text-gray-500">Manage active projects</p>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/app/calendar">
+          <Card className="hover:shadow-md transition-shadow cursor-pointer border-green-200 bg-green-50/50">
+            <CardContent className="pt-6 flex items-center gap-3">
+              <CalendarDays className="w-8 h-8 text-green-500" />
+              <div>
+                <p className="font-semibold text-slate-900">My Calendar</p>
+                <p className="text-sm text-gray-500">Scheduled items &amp; deadlines</p>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+      </div>
+
+      {/* Workflow Modules */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-slate-900">
+            Workflow Modules
+          </h2>
+          <Link
+            href="/app/modules"
+            className="text-sm text-orange-500 hover:text-orange-600 flex items-center gap-1"
+          >
+            View All <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-3">
+          {modules.slice(0, 8).map((mod, idx) => (
+            <Link key={mod.slug} href={`/app/modules/${mod.slug}`}>
+              <Card className="hover:shadow-sm transition-shadow cursor-pointer h-full">
+                <CardContent className="pt-4 pb-3">
+                  <div className="flex items-start justify-between mb-1">
+                    <p className="text-sm font-medium text-slate-900 leading-tight">
+                      {mod.name}
+                    </p>
+                    <span className="text-xs text-gray-300 font-mono">
+                      {idx + 1}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {["Admin", ...mod.accessRoles].slice(0, 3).map((role) => (
+                      <Badge
+                        key={role}
+                        variant="secondary"
+                        className="text-[10px] px-1.5 py-0"
+                      >
+                        {role}
+                      </Badge>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
           ))}
         </div>
-      )}
-
-      {/* Quick Stats */}
-      <h2 className="text-lg font-semibold mb-4">Performance Overview</h2>
-      <QuickStats stats={stats} />
-    </>
+      </div>
+    </div>
   );
 }
-

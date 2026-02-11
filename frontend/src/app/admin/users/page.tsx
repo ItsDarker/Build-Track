@@ -528,7 +528,7 @@ export default function UsersPage() {
           <Form.Item name="phone" label="Phone">
             <Input
               placeholder="e.g. +1 312 285 6334"
-              onBlur={(e) => {
+              onBlur={(e: React.FocusEvent<HTMLInputElement>) => {
                 const formatted = formatPhoneNumber(e.target.value);
                 if (formatted) {
                   form.setFieldsValue({ phone: formatted });

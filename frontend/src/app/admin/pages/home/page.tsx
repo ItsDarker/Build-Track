@@ -547,7 +547,6 @@ export default function HomePageEditor() {
         }}
         okText="Update"
         width={800}
-        forceRender
       >
         <Form form={form} layout="vertical" className="mt-4">
           <Form.Item
@@ -597,7 +596,6 @@ export default function HomePageEditor() {
         }}
         okText="Add Section"
         width={700}
-        forceRender
       >
         <Form form={addForm} layout="vertical" className="mt-4">
           <Form.Item

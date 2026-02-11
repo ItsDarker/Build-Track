@@ -145,7 +145,7 @@ export default function ProfilePage() {
                 prefix={<PhoneOutlined />}
                 placeholder="e.g. +1 312 285 6334"
                 size="large"
-                onBlur={(e) => {
+                onBlur={(e: React.FocusEvent<HTMLInputElement>) => {
                   const formatted = formatPhoneNumber(e.target.value);
                   if (formatted) {
                     profileForm.setFieldsValue({ phone: formatted });

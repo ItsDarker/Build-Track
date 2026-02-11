@@ -11,6 +11,8 @@ const env_1 = require("../config/env");
 const jwt_1 = require("../utils/jwt");
 const emailValidation_1 = require("../utils/emailValidation");
 const emailService_1 = require("./emailService");
+const MAX_FAILED_ATTEMPTS = 10;
+const ATTEMPT_WINDOW_HOURS = 1;
 function hashToken(token) {
     return (0, crypto_1.createHash)('sha256').update(token).digest('hex');
 }
@@ -82,6 +84,10 @@ class AuthService {
             });
             throw new Error('Invalid credentials');
         }
+        // Check if user is blocked
+        if (user.isBlocked) {
+            throw new Error('Your account has been blocked. Please contact support.');
+        }
         if (!user.emailVerified) {
             throw new Error('Please verify your email before logging in');
         }
@@ -91,6 +97,8 @@ class AuthService {
             await prisma_1.prisma.loginAttempt.create({
                 data: { email, ip, success: false, userId: user.id },
             });
+            // Check for auto-block
+            await this.checkAndAutoBlock(user.id, email);
             throw new Error('Invalid credentials');
         }
         // Log successful attempt
@@ -118,8 +126,43 @@ class AuthService {
                 email: user.email,
                 name: user.name,
                 emailVerified: user.emailVerified,
+                role: user.role,
             },
         };
+    }
+    /**
+     * Check and auto-block user after too many failed attempts
+     */
+    async checkAndAutoBlock(userId, email) {
+        const windowStart = new Date();
+        windowStart.setHours(windowStart.getHours() - ATTEMPT_WINDOW_HOURS);
+        const failedAttempts = await prisma_1.prisma.loginAttempt.count({
+            where: {
+                userId,
+                success: false,
+                createdAt: { gte: windowStart },
+            },
+        });
+        if (failedAttempts >= MAX_FAILED_ATTEMPTS) {
+            // Auto-block the user
+            await prisma_1.prisma.user.update({
+                where: { id: userId },
+                data: {
+                    isBlocked: true,
+                    blockedAt: new Date(),
+                    blockedReason: `Automatically blocked after ${MAX_FAILED_ATTEMPTS} failed login attempts`,
+                },
+            });
+            // Create admin notification
+            await prisma_1.prisma.adminNotification.create({
+                data: {
+                    type: 'auto_blocked',
+                    title: 'User Auto-Blocked',
+                    message: `User ${email} was automatically blocked after ${MAX_FAILED_ATTEMPTS} failed login attempts within ${ATTEMPT_WINDOW_HOURS} hour(s).`,
+                    data: JSON.stringify({ userId, email, failedAttempts }),
+                },
+            });
+        }
     }
     async verifyEmail(token) {
         const tokenHash = hashToken(token);
@@ -222,6 +265,8 @@ class AuthService {
                 email: true,
                 name: true,
                 emailVerified: true,
+                role: true,
+                isBlocked: true,
                 createdAt: true,
             },
         });

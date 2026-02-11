@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { Table, Button, Card, Tag, Space, Modal, Form, Input, Select, DatePicker, App } from "antd";
-import { PlusOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
+import { PlusOutlined, EditOutlined, DeleteOutlined, DownloadOutlined } from "@ant-design/icons";
 import { apiClient } from "@/lib/api/client";
+import { downloadExcel } from "@/lib/downloadExcel";
 import dayjs from "dayjs";
 
 export default function ProjectsPage() {
@@ -168,9 +169,32 @@ export default function ProjectsPage() {
         <div className="space-y-6">
             <div className="flex justify-between items-center">
                 <h1 className="text-2xl font-bold">Projects</h1>
-                <Button type="primary" icon={<PlusOutlined />} onClick={() => openModal()}>
-                    New Project
-                </Button>
+                <Space>
+                    <Button
+                        icon={<DownloadOutlined />}
+                        onClick={() => {
+                            downloadExcel(
+                                projects.map((p: any) => ({
+                                    Name: p.name,
+                                    Code: p.code || "",
+                                    Client: p.client?.name || "",
+                                    Manager: p.manager?.name || "",
+                                    Status: p.status?.replace("_", " ") || "",
+                                    "Start Date": p.startDate ? new Date(p.startDate).toLocaleDateString() : "",
+                                    "End Date": p.endDate ? new Date(p.endDate).toLocaleDateString() : "",
+                                    Description: p.description || "",
+                                })),
+                                undefined,
+                                "projects"
+                            );
+                        }}
+                    >
+                        Download Excel
+                    </Button>
+                    <Button type="primary" icon={<PlusOutlined />} onClick={() => openModal()}>
+                        New Project
+                    </Button>
+                </Space>
             </div>
 
             <Card>

@@ -1,0 +1,657 @@
+{
+  "navigation": {
+    "topNav": [
+      "PROFILE",
+      "Search",
+      "Reports",
+      "Contacts",
+      "Support"
+    ],
+    "sidebar": [
+      {
+        "label": "My Dashboard",
+        "path": "/app/dashboard"
+      },
+      {
+        "label": "My Projects",
+        "path": "/app/projects"
+      },
+      {
+        "label": "My Calendar",
+        "path": "/app/calendar"
+      },
+      {
+        "label": "My Tasks",
+        "path": "/app/tasks",
+        "children": [
+          {
+            "label": "Leads",
+            "path": "/app/tasks/leads"
+          },
+          {
+            "label": "Design Requests",
+            "path": "/app/tasks/design-requests"
+          },
+          {
+            "label": "Work Orders",
+            "path": "/app/tasks/work-orders"
+          },
+          {
+            "label": "Inspections",
+            "path": "/app/tasks/inspections"
+          },
+          {
+            "label": "Deliveries",
+            "path": "/app/tasks/deliveries"
+          }
+        ]
+      }
+    ]
+  },
+  "roles": {
+    "Admin": {
+      "label": "Admin",
+      "description": "Full system access. Manages users, settings and all modules."
+    },
+    "Project Manager": {
+      "label": "Project Manager",
+      "description": "Oversees projects, coordinates teams, manages requirements and scheduling."
+    },
+    "Sales": {
+      "label": "Sales",
+      "description": "Manages leads, quotations, contracts and client relationships."
+    },
+    "Client": {
+      "label": "Client",
+      "description": "External customer. Submits inquiries, reviews designs, approves quotes."
+    },
+    "Design Team": {
+      "label": "Design Team",
+      "description": "Creates layouts, selects materials and prepares design packages."
+    },
+    "Production Team": {
+      "label": "Production Team",
+      "description": "Handles manufacturing, assembly, quality control and packaging."
+    },
+    "Finance": {
+      "label": "Finance",
+      "description": "Manages billing, invoicing, payments and financial reporting."
+    },
+    "Procurement": {
+      "label": "Procurement",
+      "description": "Handles material planning, purchase orders and supplier management."
+    },
+    "Quality Control": {
+      "label": "Quality Control",
+      "description": "Performs inspections, manages QC checklists and defect reports."
+    },
+    "Logistics": {
+      "label": "Logistics",
+      "description": "Schedules deliveries, manages installation and fulfilment."
+    },
+    "Support": {
+      "label": "Support",
+      "description": "Handles warranty claims, service tickets and aftersales requests."
+    }
+  },
+  "modules": {
+    "crm-leads": {
+      "name": "CRM / Leads",
+      "slug": "crm-leads",
+      "description": "Customer submits inquiry/request\n Sales logs new project",
+      "who": "Sales",
+      "mvpUser": "Client",
+      "process": "Inquiry/Project Request",
+      "screens": "Leads Dashboard (New / Contacted / Converted)\nInquiry Detail Page",
+      "accessRoles": [
+        "Client",
+        "Sales"
+      ],
+      "fields": [
+        "Created at",
+        "Created by",
+        "Update at",
+        "Updated by",
+        "Task Status (New, In Progress, Completed)",
+        "Lead ID",
+        "Lead Status (New, Contacted, Qualified, Closed)",
+        "Customer Name (text)",
+        "Project Name / Reference",
+        "Project Type (dropdown: Kitchen, Bathroom, Office, Other)",
+        "Site Address (street/city/province/postal)",
+        "Primary Contact Name",
+        "Contact Phone, Contact Email",
+        "Requested Target Date",
+        "Source (Website, Referral, Walk-in, Ads, Other)",
+        "Notes",
+        "Attachments (photos)",
+        "Optional:",
+        "Budget range",
+        "Priority"
+      ]
+    },
+    "project-requirements": {
+      "name": "Project Requirements",
+      "slug": "project-requirements",
+      "description": "Meet client\n Collect requirements (measurements, preferences, scope)",
+      "who": "Project Coordinator",
+      "mvpUser": "Admin",
+      "process": "Consultation and Requirements Gathering",
+      "screens": "Consultation Form\nRequirements Checklist",
+      "accessRoles": [
+        "Project Manager"
+      ],
+      "fields": [
+        "Created at",
+        "Created by",
+        "Update at",
+        "Updated by",
+        "Task Status (New, In Progress, Completed)",
+        "Requirement Record ID",
+        "Linked Project ID",
+        "Site Visit Date",
+        "Requirement Summary",
+        "Measurements (freeform notes or structured fields)",
+        "Constraints (e.g., plumbing location, electrical, access)",
+        "Preferences (style notes)",
+        "Internal Notes",
+        "Actual Design (Attachments photos)",
+        "Optional",
+        "Measurement table (area/item, width/height/depth, comments)",
+        "Room list (Kitchen/Bath/etc.)",
+        "Site photos categorized"
+      ]
+    },
+    "design-configurator": {
+      "name": "Design Configurator",
+      "slug": "design-configurator",
+      "description": "Create layout/drawings\n Select materials, colors, finishes\n Prepare initial design package",
+      "who": "Design Team",
+      "mvpUser": "Prod Team",
+      "process": "Design and Configuration",
+      "screens": "Design Draft Workspace\nProduct Configurator (colors/materials)",
+      "accessRoles": [
+        "Design Team"
+      ],
+      "fields": [
+        "Created at",
+        "Created by",
+        "Update at",
+        "Updated by",
+        "Task Status (New, In Progress, Completed)",
+        "Design ID",
+        "Linked Project ID",
+        "Design Version #",
+        "Design Status (Draft, Sent for Review, Revision Requested, Approved, Archived)",
+        "Product/Style (dropdown)",
+        "Material/Finish (dropdown)",
+        "Color/Finish Code (text or dropdown)",
+        "Hardware/Accessories (multi-select)",
+        "Design Notes",
+        "File Links / Attachments (renderings, drawings)",
+        "Sent to Client Date (for tracking)",
+        "Owner (Designer)",
+        "Optional",
+        "Parametric configuration (components list)",
+        "Design change log (auto)"
+      ]
+    },
+    "quoting-contracts": {
+      "name": "Quoting & Contracts",
+      "slug": "quoting-contracts",
+      "description": "Estimate pricing\n Generate quote + timeline proposal",
+      "who": "Sales/Finance/Admin",
+      "mvpUser": "Admin",
+      "process": "Quotation and Proposal",
+      "screens": "Quote Builder\nProposal PDF Preview",
+      "accessRoles": [
+        "Finance",
+        "Sales"
+      ],
+      "fields": [
+        "Created at",
+        "Created by",
+        "Update at",
+        "Updated by",
+        "Task Status (New, In Progress, Completed)",
+        "Quote ID",
+        "Linked Project ID",
+        "Quote Version #",
+        "Quote Status (Draft, Sent, Revised, Accepted, Rejected, Expired)",
+        "Quote Date",
+        "Valid Until",
+        "Line Items (table):",
+        "Item Name",
+        "Description",
+        "Qty",
+        "Unit",
+        "Unit Price",
+        "Line Total",
+        "Subtotal",
+        "Discount (amount or %)",
+        "Tax",
+        "Total",
+        "Payment Terms (deposit %, milestones)",
+        "Lead Time / Estimated Delivery Window",
+        "Prepared By",
+        "Optional",
+        "Cost breakdown (materials/labor/overhead)",
+        "PDF snapshot storage"
+      ]
+    },
+    "approval-workflow": {
+      "name": "Approval Workflow",
+      "slug": "approval-workflow",
+      "description": "Decision: Approved?\n If No → revisions by Design Team\n If Yes → sign-off",
+      "who": "Customer/Design/Sales",
+      "mvpUser": "Client",
+      "process": "Client Review and Approval Loop",
+      "screens": "Approval Status Board\nClient Feedback Page",
+      "accessRoles": [
+        "Client",
+        "Design Team",
+        "Sales"
+      ],
+      "fields": [
+        "Created at",
+        "Created by",
+        "Update at",
+        "Updated by",
+        "Task Status (New, In Progress, Completed)",
+        "Approval ID",
+        "Linked Project ID",
+        "Approval Type (Design, Quote, Change Order)",
+        "Related Record (Design ID / Quote ID)",
+        "Status (Pending, Approved, Rejected)",
+        "Approver (internal user)",
+        "Decision Date",
+        "Comments / Reason",
+        "Optional",
+        "Multi-step approvals (Finance + Manager)",
+        "Required checklist before approval"
+      ]
+    },
+    "job-confirmation": {
+      "name": "Job Confirmation",
+      "slug": "job-confirmation",
+      "description": "Convert approved quote into Sales Order\n Collect deposit/payment\n Issue Work Order",
+      "who": "Sales / Finance / Project Coordinator",
+      "mvpUser": "Admin",
+      "process": "Order Confirmation and Work Authorization",
+      "screens": "Sales Order Detail\nWork Authorization Form",
+      "accessRoles": [
+        "Finance",
+        "Project Manager",
+        "Sales"
+      ],
+      "fields": [
+        "Created at",
+        "Created by",
+        "Update at",
+        "Updated by",
+        "Task Status (New, In Progress, Completed)",
+        "Order ID",
+        "Linked Project ID",
+        "Status (Open, In Production, Ready, Delivered, Closed)",
+        "Accepted Quote ID",
+        "Order Date",
+        "Target Delivery Date",
+        "Deposit Required (Y/N), Deposit Amount",
+        "Special Terms / Notes",
+        "Customer Reference (PO # if B2B)",
+        "Internal Owner (Project Coordinator)",
+        "Optional",
+        "Change order linkages"
+      ]
+    },
+    "work-orders": {
+      "name": "Work Orders",
+      "slug": "work-orders",
+      "description": "Convert approved quote into Sales Order\n Collect deposit/payment\n Issue Work Order",
+      "who": "Sales / Finance / Project Coordinator",
+      "mvpUser": "Admin",
+      "process": "Order Confirmation and Work Authorization",
+      "screens": "Sales Order Detail\nWork Authorization Form",
+      "accessRoles": [
+        "Finance",
+        "Project Manager",
+        "Sales"
+      ],
+      "fields": [
+        "Created at",
+        "Created by",
+        "Update at",
+        "Updated by",
+        "Task Status (New, In Progress, Completed)",
+        "Work Order ID",
+        "Linked Sales Order ID",
+        "Work Order Status (Created, Scheduled, In Progress, On Hold, Complete)",
+        "Priority",
+        "Due Date",
+        "Assigned Team (Production)",
+        "Assigned Lead/Operator",
+        "Instructions / Build Notes",
+        "Attachments (drawings/spec sheets)",
+        "Created By / Created Date",
+        "Optional",
+        "Operation routing (sequence of steps)"
+      ]
+    },
+    "bom-materials-planning": {
+      "name": "BOM / Materials Planning",
+      "slug": "bom-materials-planning",
+      "description": "Create BOM (Bill of Materials)\n Check material availability",
+      "who": "Production Planning",
+      "mvpUser": "Admin",
+      "process": "Material Planning and Availability Check",
+      "screens": "Bill of Materials List\nMaterial Availability Checker",
+      "accessRoles": [
+        "Production Team"
+      ],
+      "fields": [
+        "Created at",
+        "Created by",
+        "Update at",
+        "Updated by",
+        "Task Status (New, In Progress, Completed)",
+        "BOM ID",
+        "Linked Work Order ID",
+        "BOM Version",
+        "BOM Status (Draft, Final)",
+        "Items (table):",
+        "Material/Component Name",
+        "SKU/Code",
+        "Qty Required",
+        "Unit",
+        "Stock Available (calculated)",
+        "Qty to Purchase (calculated/manual)",
+        "Notes",
+        "Planner (user)",
+        "Date Finalized",
+        "Optional",
+        "Substitute items allowed",
+        "Lot/batch requirements",
+        "Inventory (Stock)",
+        "MVP fields",
+        "Item ID / SKU",
+        "Item Name",
+        "Category (Material, Hardware, Consumable)",
+        "Unit of Measure",
+        "On-hand Qty",
+        "Reorder Point",
+        "Default Supplier",
+        "Storage Location",
+        "Status (Active/Inactive)",
+        "Optional",
+        "Multiple locations / warehouses",
+        "Lot/batch tracking"
+      ]
+    },
+    "procurement": {
+      "name": "Procurement",
+      "slug": "procurement",
+      "description": "If Needed\n Purchase missing materials\n Receive deliveries\n Update stock levels",
+      "who": "Procurement / Inventory",
+      "mvpUser": "Admin",
+      "process": "Procurement and Supplier Fulfillment",
+      "screens": "Purchase Orders List\nSupplier Directory\nStock Management View",
+      "accessRoles": [
+        "Procurement"
+      ],
+      "fields": [
+        "Created at",
+        "Created by",
+        "Update at",
+        "Updated by",
+        "Task Status (New, In Progress, Completed)",
+        "Purchase Order (PO)",
+        "PO Number",
+        "Supplier",
+        "PO Status (Draft, Sent, Partially Received, Received, Closed)",
+        "Order Date",
+        "Expected Delivery Date",
+        "Linked Work Order(s) (optional)",
+        "PO Lines (table):",
+        "Item/SKU",
+        "Description",
+        "Qty Ordered",
+        "Unit",
+        "Unit Cost",
+        "Line Total",
+        "Subtotal/Tax/Total",
+        "Notes",
+        "Receiving",
+        "Receiving ID",
+        "PO Number",
+        "Received Date",
+        "Received By",
+        "Items received (qty received, notes)",
+        "Exceptions (damaged/missing)"
+      ]
+    },
+    "production-scheduling": {
+      "name": "Production Scheduling",
+      "slug": "production-scheduling",
+      "description": "Assign job to production calendar\n Allocate machines and labor",
+      "who": "Production Planning",
+      "mvpUser": "Admin",
+      "process": "Production Scheduling",
+      "screens": "Production Calendar\nJob Queue Board",
+      "accessRoles": [
+        "Production Team"
+      ],
+      "fields": [
+        "Created at",
+        "Created by",
+        "Update at",
+        "Updated by",
+        "Task Status (New, In Progress, Completed)",
+        "Schedule Entry ID",
+        "Work Order ID",
+        "Work Center / Station (e.g., Cutting, Assembly, Finishing)",
+        "Planned Start",
+        "Planned End",
+        "Assigned Crew / Operator",
+        "Status (Planned, Scheduled, In Progress, Done, Delayed)",
+        "Notes / Reason for delay",
+        "Optional",
+        "Capacity limits per station",
+        "Drag-drop calendar UI support data"
+      ]
+    },
+    "manufacturing": {
+      "name": "Manufacturing",
+      "slug": "manufacturing",
+      "description": "Cut, assemble, finish product\n Track job progress",
+      "who": "Manufacturing Team",
+      "mvpUser": "Prod Team",
+      "process": "Manufacturing / Fabrication / Assembly",
+      "screens": "Work Order Execution View\nTask Checklist",
+      "accessRoles": [
+        "Production Team"
+      ],
+      "fields": [
+        "Created at",
+        "Created by",
+        "Update at",
+        "Updated by",
+        "Task Status (New, In Progress, Completed)",
+        "Execution Log ID",
+        "Work Order ID",
+        "Current Step / Station",
+        "Actual Start / Actual End",
+        "Operator",
+        "Quantity Completed",
+        "Scrap Qty (if any)",
+        "Issue Flags (Y/N)",
+        "Issue Notes",
+        "Time Logs (optional simple: hours)",
+        "Optional",
+        "Pause/resume reasons",
+        "Downtime categories"
+      ]
+    },
+    "quality-control": {
+      "name": "Quality Control",
+      "slug": "quality-control",
+      "description": "Decision: QC Passed?\n Yes → proceed\n No → return to Manufacturing for rework",
+      "who": "Quality Control",
+      "mvpUser": "Prod Team",
+      "process": "Quality Control and Inspection",
+      "screens": "QC Checklist\nDefect Report Page",
+      "accessRoles": [
+        "Quality Control"
+      ],
+      "fields": [
+        "Created at",
+        "Created by",
+        "Update at",
+        "Updated by",
+        "Task Status (New, In Progress, Completed)",
+        "QC Record ID",
+        "Work Order ID",
+        "Inspection Date",
+        "Inspector",
+        "QC Result (Pass/Fail)",
+        "Checklist Items (simple list or table)",
+        "Defect Description (if fail)",
+        "Severity (Low/Med/High)",
+        "Disposition (Rework, Scrap, Accept-as-is)",
+        "Rework Assigned To (user/team)",
+        "Photos/Attachments"
+      ]
+    },
+    "packaging": {
+      "name": "Packaging",
+      "slug": "packaging",
+      "description": "Package finished goods\n Prepare shipment documents",
+      "who": "Manufacturing + Inventory/Warehouse",
+      "mvpUser": "Prod Team",
+      "process": "Packaging and Job Completion",
+      "screens": "Finished Goods Inventory\nPackaging Checklist",
+      "accessRoles": [
+        "Procurement",
+        "Production Team"
+      ],
+      "fields": [
+        "Created at",
+        "Created by",
+        "Update at",
+        "Updated by",
+        "Task Status (New, In Progress, Completed)",
+        "Packing ID",
+        "Work Order ID",
+        "Packing Status (Not Packed, Packed, Staged)",
+        "Pack Date",
+        "Packed By",
+        "Package Count",
+        "Labels/Tracking Ref (internal)",
+        "Staging Location",
+        "Notes"
+      ]
+    },
+    "delivery-installation": {
+      "name": "Delivery & Installation",
+      "slug": "delivery-installation",
+      "description": "Schedule delivery\n Install on-site if required\n Confirm completion",
+      "who": "Logistics / Installation Team",
+      "mvpUser": "Prod Team",
+      "process": "Delivery / Installation / Fullfillment",
+      "screens": "Delivery Schedule Board\nInstallation Task Sheet",
+      "accessRoles": [
+        "Logistics"
+      ],
+      "fields": [
+        "Created at",
+        "Created by",
+        "Update at",
+        "Updated by",
+        "Task Status (New, In Progress, Completed)",
+        "Delivery Job ID",
+        "Linked Sales Order / Work Order ID",
+        "Delivery Type (Delivery only, Install)",
+        "Address (site)",
+        "Scheduled Date/Time Window",
+        "Assigned Driver/Installer",
+        "Status (Scheduled, Out for Delivery, Delivered, Installed, Failed Attempt)",
+        "Completion Date/Time",
+        "Completion Notes",
+        "Proof of Delivery (signature/photo)",
+        "Optional",
+        "Route planning fields"
+      ]
+    },
+    "billing-invoicing": {
+      "name": "Billing &Invoicing",
+      "slug": "billing-invoicing",
+      "description": "Customer signs off\n Final invoice issued\n Project closed",
+      "who": "Customer + Sales + Finance",
+      "mvpUser": "Client",
+      "process": "Client Acceptance and Project Closure",
+      "screens": "Invoice Management\nProject Closure Form",
+      "accessRoles": [
+        "Client",
+        "Finance",
+        "Sales"
+      ],
+      "fields": [
+        "Created at",
+        "Created by",
+        "Update at",
+        "Updated by",
+        "Task Status (New, In Progress, Completed)",
+        "Invoice ID",
+        "Sales Order ID",
+        "Invoice Status (Draft, Sent, Paid, Partially Paid, Overdue)",
+        "Invoice Date",
+        "Due Date",
+        "Line Items (can mirror quote or milestone-based)",
+        "Subtotal/Tax/Total",
+        "Payments (table: date, method, amount, reference)",
+        "Balance Due",
+        "Notes"
+      ]
+    },
+    "closure": {
+      "name": "Closure",
+      "slug": "closure",
+      "description": "Customer signs off\n Final invoice issued\n Project closed",
+      "who": "Customer + Sales + Finance",
+      "mvpUser": "Client",
+      "process": "Client Acceptance and Project Closure",
+      "screens": "Invoice Management\nProject Closure Form",
+      "accessRoles": [
+        "Client",
+        "Finance",
+        "Sales"
+      ],
+      "fields": [
+        "Closure Record ID",
+        "Sales Order ID",
+        "Close Date",
+        "Close Reason (Completed, Cancelled)",
+        "Final Checklist (simple: delivery confirmed, invoice paid)",
+        "Closed By",
+        "Lessons Learned / Notes (optional)"
+      ]
+    }
+  },
+  "moduleOrder": [
+    "crm-leads",
+    "project-requirements",
+    "design-configurator",
+    "quoting-contracts",
+    "approval-workflow",
+    "job-confirmation",
+    "work-orders",
+    "bom-materials-planning",
+    "procurement",
+    "production-scheduling",
+    "manufacturing",
+    "quality-control",
+    "packaging",
+    "delivery-installation",
+    "billing-invoicing",
+    "closure"
+  ]
+}
