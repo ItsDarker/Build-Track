@@ -8,7 +8,7 @@ import { downloadExcel } from "@/lib/downloadExcel";
 import dayjs from "dayjs";
 
 export default function ProjectsPage() {
-    const { message } = App.useApp();
+    const { message, modal } = App.useApp();
     const [projects, setProjects] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -75,7 +75,7 @@ export default function ProjectsPage() {
     };
 
     const handleDelete = async (id: string) => {
-        Modal.confirm({
+        modal.confirm({
             title: "Delete Project",
             content: "Are you sure? This will delete all tasks associated with this project.",
             onOk: async () => {

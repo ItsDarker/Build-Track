@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { Table, Drawer, Button as AntButton, Tag, Empty, Modal, Tooltip } from "antd";
+import { Table, Drawer, Button as AntButton, Tag, Empty, Tooltip, App } from "antd";
 import {
   PlusOutlined,
   EyeOutlined,
@@ -146,6 +146,7 @@ function getMockValue(field: string, index: number, mod: ModuleConfig): string {
 }
 
 export function ModulePage({ module }: ModulePageProps) {
+  const { modal } = App.useApp();
   const [records, setRecords] = useState<Record<string, string>[]>(() =>
     generateMockRecords(module)
   );
@@ -183,18 +184,18 @@ export function ModulePage({ module }: ModulePageProps) {
           if (lower.includes("status")) {
             const color =
               text.toLowerCase().includes("complete") ||
-              text.toLowerCase().includes("approved") ||
-              text.toLowerCase().includes("pass")
+                text.toLowerCase().includes("approved") ||
+                text.toLowerCase().includes("pass")
                 ? "green"
                 : text.toLowerCase().includes("progress") ||
                   text.toLowerCase().includes("sent") ||
                   text.toLowerCase().includes("scheduled")
-                ? "blue"
-                : text.toLowerCase().includes("reject") ||
-                  text.toLowerCase().includes("fail") ||
-                  text.toLowerCase().includes("overdue")
-                ? "red"
-                : "orange";
+                  ? "blue"
+                  : text.toLowerCase().includes("reject") ||
+                    text.toLowerCase().includes("fail") ||
+                    text.toLowerCase().includes("overdue")
+                    ? "red"
+                    : "orange";
             return <Tag color={color}>{text}</Tag>;
           }
           if (lower.includes("priority")) {
@@ -232,8 +233,8 @@ export function ModulePage({ module }: ModulePageProps) {
             <AntButton
               icon={<DeleteOutlined />}
               size="small"
-              danger
               onClick={() => handleDelete(record._id)}
+              danger
             />
           </Tooltip>
         </div>
@@ -296,7 +297,7 @@ export function ModulePage({ module }: ModulePageProps) {
   };
 
   const handleDelete = (id: string) => {
-    Modal.confirm({
+    modal.confirm({
       title: "Delete Record",
       content: "Are you sure you want to delete this record? This action cannot be undone.",
       okText: "Delete",
@@ -306,6 +307,7 @@ export function ModulePage({ module }: ModulePageProps) {
       },
     });
   };
+
 
   const handleDownloadExcel = () => {
     // Build export data from all non-section fields
@@ -323,8 +325,8 @@ export function ModulePage({ module }: ModulePageProps) {
     drawerMode === "create"
       ? `Create New ${module.name}`
       : drawerMode === "edit"
-      ? `Edit ${module.name}`
-      : `${module.name} — Record Details`;
+        ? `Edit ${module.name}`
+        : `${module.name} — Record Details`;
 
   const allRoles = ["Admin", ...module.accessRoles];
 

@@ -6,7 +6,6 @@ import {
   Card,
   Button,
   Space,
-  message,
   Input,
   Modal,
   Form,
@@ -16,6 +15,7 @@ import {
   Collapse,
   Typography,
   Drawer,
+  App,
 } from "antd";
 import {
   ArrowLeftOutlined,
@@ -142,6 +142,7 @@ function PreviewSection({ section }: { section: Section }) {
 }
 
 export default function HomePageEditor() {
+  const { message, modal } = App.useApp();
   const [sections, setSections] = useState<Section[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -241,7 +242,7 @@ export default function HomePageEditor() {
   };
 
   const handleDeleteSection = (sectionId: string) => {
-    Modal.confirm({
+    modal.confirm({
       title: "Delete Section",
       content: "Are you sure you want to delete this section?",
       okText: "Delete",
