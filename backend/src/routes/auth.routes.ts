@@ -1,3 +1,5 @@
+import { prisma } from "../lib/prisma";
+import { OAuth2Client } from "google-auth-library";
 import { Router } from 'express';
 import { authService } from '../services/authService';
 import { rateLimiter } from '../middleware/rateLimiter';
@@ -10,8 +12,28 @@ import {
   validate,
 } from '../utils/validation';
 import { config } from '../config/env';
-
 const router = Router();
+
+import type { Response } from "express";
+
+function setAuthCookies(res: Response, accessToken: string, refreshToken: string) {
+  res.cookie("accessToken", accessToken, {
+    httpOnly: true,
+    secure: config.cookie.secure,
+    sameSite: config.cookie.sameSite,
+    maxAge: 15 * 60 * 1000,
+    domain: config.cookie.domain === "localhost" ? undefined : config.cookie.domain,
+  });
+
+  res.cookie("refreshToken", refreshToken, {
+    httpOnly: true,
+    secure: config.cookie.secure,
+    sameSite: config.cookie.sameSite,
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    domain: config.cookie.domain === "localhost" ? undefined : config.cookie.domain,
+  });
+}
+
 
 // Signup
 router.post('/signup', rateLimiter('signup'), async (req, res) => {
@@ -157,5 +179,88 @@ router.get('/me', authenticate, async (req: AuthRequest, res) => {
     res.status(500).json({ error: 'Failed to get user' });
   }
 });
+// --- Google OAuth ---
+router.get("/oauth/google", (req, res) => {
+  const { clientId, redirectUri } = config.google;
+
+  if (!clientId || clientId === "__PENDING__") {
+    return res.status(500).json({
+      error: "Google OAuth not configured: missing GOOGLE_CLIENT_ID",
+    });
+  }
+
+  const client = new OAuth2Client(clientId, undefined, redirectUri);
+
+  const url = client.generateAuthUrl({
+    access_type: "offline",
+    prompt: "consent",
+    scope: ["openid", "email", "profile"],
+  });
+
+  return res.redirect(url);
+});
+
+router.get("/oauth/google/callback", async (req, res) => {
+  try {
+    const code = req.query.code as string | undefined;
+    if (!code) return res.status(400).json({ error: "Missing code" });
+
+    const { clientId, clientSecret, redirectUri } = config.google;
+
+    if (
+      !clientId || clientId === "__PENDING__" ||
+      !clientSecret || clientSecret === "__PENDING__"
+    ) {
+      return res.status(500).json({
+        error: "Google OAuth not configured: missing GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET",
+      });
+    }
+
+    const client = new OAuth2Client(clientId, clientSecret, redirectUri);
+
+    const { tokens } = await client.getToken(code);
+    client.setCredentials(tokens);
+
+    const idToken = tokens.id_token;
+    if (!idToken) return res.status(400).json({ error: "Missing id_token from Google" });
+
+    const ticket = await client.verifyIdToken({ idToken, audience: clientId });
+
+    const payload = ticket.getPayload();
+    const email = payload?.email;
+    const name = payload?.name || payload?.given_name || "User";
+
+    if (!email) return res.status(400).json({ error: "Google account did not provide an email" });
+
+    // 1) Find or create user
+    let user = await prisma.user.findUnique({ where: { email } });
+
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          email,
+          name,
+          emailVerified: new Date(),
+          role: "SUBCONTRACTOR",
+        },
+      });
+    }
+
+    // 2) Issue tokens using your existing auth service
+    const result = await authService.loginWithOAuth(user.id);
+
+    // 3) Set cookies
+    setAuthCookies(res, result.accessToken, result.refreshToken);
+
+    // 4) Redirect to app (or admin)
+    const dest = result.user?.role === "ADMIN" ? "/admin" : "/app";
+    return res.redirect(`${config.frontendUrl}${dest}`);
+  } catch (error: any) {
+    console.error("Google OAuth error:", error);
+    return res.status(500).json({ error: error.message || "Google OAuth failed" });
+  }
+});
+
+
 
 export default router;
