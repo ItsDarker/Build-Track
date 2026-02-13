@@ -207,15 +207,6 @@ router.get("/oauth/google/callback", async (req, res) => {
 
     const { clientId, clientSecret, redirectUri } = config.google;
 
-    if (
-      !clientId || clientId === "__PENDING__" ||
-      !clientSecret || clientSecret === "__PENDING__"
-    ) {
-      return res.status(500).json({
-        error: "Google OAuth not configured: missing GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET",
-      });
-    }
-
     const client = new OAuth2Client(clientId, clientSecret, redirectUri);
 
     const { tokens } = await client.getToken(code);
@@ -232,27 +223,13 @@ router.get("/oauth/google/callback", async (req, res) => {
 
     if (!email) return res.status(400).json({ error: "Google account did not provide an email" });
 
-    // 1) Find or create user
-    let user = await prisma.user.findUnique({ where: { email } });
+    // 1) Issue tokens using your existing auth service (handles find-or-create)
+    const result = await authService.loginWithOAuth(email, name);
 
-    if (!user) {
-      user = await prisma.user.create({
-        data: {
-          email,
-          name,
-          emailVerified: new Date(),
-          role: "SUBCONTRACTOR",
-        },
-      });
-    }
-
-    // 2) Issue tokens using your existing auth service
-    const result = await authService.loginWithOAuth(user.id);
-
-    // 3) Set cookies
+    // 2) Set cookies
     setAuthCookies(res, result.accessToken, result.refreshToken);
 
-    // 4) Redirect to app (or admin)
+    // 3) Redirect to app (or admin)
     const dest = result.user?.role === "ADMIN" ? "/admin" : "/app";
     return res.redirect(`${config.frontendUrl}${dest}`);
   } catch (error: any) {

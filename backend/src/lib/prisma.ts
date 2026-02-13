@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { config } from "../config/env";
 
 declare global {
   // Prevent multiple instances in dev (hot reload)
@@ -8,9 +9,9 @@ declare global {
 export const prisma =
   global.prisma ||
   new PrismaClient({
-    log: ["query", "error", "warn"],
+    log: config.nodeEnv === "development" ? ["query", "error", "warn"] : ["error"],
   });
 
-if (process.env.NODE_ENV !== "production") {
+if (config.nodeEnv !== "production") {
   global.prisma = prisma;
 }

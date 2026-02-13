@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { authenticate } from '../middleware/auth';
 import { requireRole } from '../middleware/rbac';
 import { teamService } from '../services/teamService';
-import { prisma } from '../config/prisma';
+import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 
 const router = Router();

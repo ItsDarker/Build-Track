@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { randomBytes, createHash } from 'crypto';
-import { prisma } from '../config/prisma';
+import { prisma } from '../lib/prisma';
 import { config } from '../config/env';
 import { generateAccessToken, generateRefreshToken } from '../utils/jwt';
 import { isDisposableEmail, isLikelySpamDomain } from '../utils/emailValidation';
@@ -55,7 +55,7 @@ export class AuthService {
       }
     }
 
-    
+
 
     // Hash password
     const passwordHash = await bcrypt.hash(password, 12);
@@ -97,37 +97,43 @@ export class AuthService {
     };
   }
 
-    async loginWithOAuth(userId: string): Promise<AuthTokens & { user: any }> {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
+  async loginWithOAuth(email: string, name: string): Promise<AuthTokens & { user: any }> {
+    // 1) Find or create user
+    let user = await prisma.user.findUnique({
+      where: { email },
     });
 
-    if (!user) throw new Error("User not found");
-
-    // Optional safety checks (match your normal login behavior)
-    if (user.isBlocked) {
-      throw new Error("Your account has been blocked. Please contact support.");
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          email,
+          name,
+          emailVerified: new Date(),
+          role: 'SUBCONTRACTOR',
+        },
+      });
     }
 
-    // If you want OAuth users to be considered verified automatically:
-    // (Google already verified the email)
-   let emailVerified = user.emailVerified;
-   
-   if (!emailVerified) {
-    emailVerified = new Date();
-    await prisma.user.update({
-      
-      where: { id: user.id },
-      data: { emailVerified },
-    });
-  }
- 
+    // Optional safety checks
+    if (user.isBlocked) {
+      throw new Error('Your account has been blocked. Please contact support.');
+    }
 
-    // Generate tokens (same style as your existing login())
+    // Google already verified the email
+    let emailVerified = user.emailVerified;
+    if (!emailVerified) {
+      emailVerified = new Date();
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { emailVerified },
+      });
+    }
+
+    // Generate tokens
     const accessToken = generateAccessToken({ userId: user.id, email: user.email });
     const refreshToken = generateRefreshToken({ userId: user.id, email: user.email });
 
-    // Store refresh token (same as login())
+    // Store refresh token
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
 
@@ -146,7 +152,7 @@ export class AuthService {
         id: user.id,
         email: user.email,
         name: user.name,
-        emailVerified: emailVerified,
+        emailVerified,
         role: user.role,
       },
     };

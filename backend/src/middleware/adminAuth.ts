@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { prisma } from '../config/prisma';
+import { prisma } from '../lib/prisma';
 
 export interface AdminRequest extends Request {
   admin?: {

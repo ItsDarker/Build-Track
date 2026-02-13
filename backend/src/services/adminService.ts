@@ -1,4 +1,4 @@
-import { prisma } from '../config/prisma';
+import { prisma } from '../lib/prisma';
 import bcrypt from 'bcryptjs';
 
 export interface AdminStats {
