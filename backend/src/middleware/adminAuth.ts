@@ -29,7 +29,7 @@ export const requireAdmin = async (
     // Get user from database to check role
     const dbUser = await prisma.user.findUnique({
       where: { id: user.userId },
-      select: { id: true, email: true, role: true, isBlocked: true },
+      select: { id: true, email: true, role: { select: { name: true } }, isBlocked: true },
     });
 
     if (!dbUser) {
@@ -40,7 +40,7 @@ export const requireAdmin = async (
       return res.status(403).json({ error: 'Account is blocked' });
     }
 
-    if (dbUser.role !== 'ADMIN') {
+    if (dbUser.role?.name !== 'SUPER_ADMIN') {
       return res.status(403).json({ error: 'Admin access required' });
     }
 

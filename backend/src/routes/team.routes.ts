@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth';
-import { requireRole } from '../middleware/rbac';
+import { requirePermission } from '../middleware/rbac';
 import { teamService } from '../services/teamService';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
@@ -32,7 +32,7 @@ router.get('/members', async (req, res) => {
  * POST /api/teams/invite
  * Invite a new member (ADMIN and PM only)
  */
-router.post('/invite', requireRole(['ADMIN', 'PM']), async (req, res) => {
+router.post('/invite', requirePermission('create', 'users'), async (req, res) => {
     try {
         const { email, role } = inviteSchema.parse(req.body);
         const invitation = await teamService.createInvitation(email, role);
@@ -54,14 +54,14 @@ router.post('/invite', requireRole(['ADMIN', 'PM']), async (req, res) => {
  * GET /api/teams/assignable
  * Get users that can be assigned to projects or tasks (ADMIN and PM only)
  */
-router.get('/assignable', requireRole(['ADMIN', 'PM']), async (req, res) => {
+router.get('/assignable', requirePermission('read', 'users'), async (req, res) => {
     try {
         const role = req.query.role as string;
         const roles = role ? role.split(',') : ['ADMIN', 'PM', 'SUBCONTRACTOR'];
 
         const users = await prisma.user.findMany({
             where: {
-                role: { in: roles },
+                role: { name: { in: roles } },
                 isBlocked: false
             },
             select: {
@@ -83,7 +83,7 @@ router.get('/assignable', requireRole(['ADMIN', 'PM']), async (req, res) => {
  * DELETE /api/teams/members/:id
  * Remove a team member (ADMIN only)
  */
-router.delete('/members/:id', requireRole(['ADMIN']), async (req, res) => {
+router.delete('/members/:id', requirePermission('delete', 'users'), async (req, res) => {
     try {
         await teamService.removeMember(req.params.id);
         res.json({ success: true });

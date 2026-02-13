@@ -37,7 +37,10 @@ interface UserProfile {
   company?: string;
   jobTitle?: string;
   bio?: string;
-  role: string;
+  role: {
+    name: string;
+    displayName: string;
+  };
   createdAt?: string;
 }
 
@@ -237,7 +240,7 @@ export default function ProfilePage() {
             </div>
             <div className="p-4 bg-gray-50 rounded-lg">
               <Text type="secondary" className="text-xs block">Role</Text>
-              <Text strong className="capitalize">{user.role?.toLowerCase()}</Text>
+              <Text strong className="capitalize">{user.role?.displayName}</Text>
             </div>
             <div className="p-4 bg-gray-50 rounded-lg">
               <Text type="secondary" className="text-xs block">Account ID</Text>

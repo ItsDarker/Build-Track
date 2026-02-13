@@ -34,7 +34,10 @@ interface CurrentUser {
   id: string;
   email: string;
   name: string | null;
-  role: string;
+  role: {
+    name: string;
+    displayName: string;
+  };
 }
 
 interface Notification {
@@ -98,7 +101,9 @@ function AdminLayoutInner({ children }: { children: ReactNode }) {
       }
 
       const user = (result.data as any).user;
-      if (user.role !== "ADMIN") {
+      // Allow SUPER_ADMIN and ORG_ADMIN to access admin panel
+      const allowedRoles = ["SUPER_ADMIN", "ORG_ADMIN"];
+      if (!user.role?.name || !allowedRoles.includes(user.role.name)) {
         message.error("Access denied. Admin privileges required.");
         router.push("/app");
         return;

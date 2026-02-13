@@ -104,12 +104,13 @@ export class AuthService {
     });
 
     if (!user) {
+      const defaultRole = await prisma.role.findUnique({ where: { name: 'SUBCONTRACTOR' } });
       user = await prisma.user.create({
         data: {
           email,
           name,
           emailVerified: new Date(),
-          role: 'SUBCONTRACTOR',
+          roleId: defaultRole?.id,
         },
       });
     }
@@ -153,7 +154,7 @@ export class AuthService {
         email: user.email,
         name: user.name,
         emailVerified,
-        role: user.role,
+        role: user.role, // Now an object or null
       },
     };
   }
@@ -390,7 +391,7 @@ export class AuthService {
         email: true,
         name: true,
         emailVerified: true,
-        role: true,
+        role: { select: { name: true, displayName: true } },
         isBlocked: true,
         createdAt: true,
       },

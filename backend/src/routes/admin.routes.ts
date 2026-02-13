@@ -15,7 +15,7 @@ const createUserSchema = z.object({
   email: z.string().email(),
   name: z.string().optional(),
   password: z.string().min(10),
-  role: z.enum(['ADMIN', 'PM', 'SUBCONTRACTOR', 'CLIENT']).optional(),
+  role: z.string().optional(), // Role name will be validated against database
   emailVerified: z.boolean().optional(),
   phone: z.string().optional(),
   company: z.string().optional(),
@@ -26,7 +26,7 @@ const createUserSchema = z.object({
 const updateUserSchema = z.object({
   email: z.string().email().optional(),
   name: z.string().optional(),
-  role: z.enum(['ADMIN', 'PM', 'SUBCONTRACTOR', 'CLIENT']).optional(),
+  role: z.string().optional(), // Role name will be validated against database
   phone: z.string().optional(),
   company: z.string().optional(),
   jobTitle: z.string().optional(),
@@ -304,6 +304,20 @@ router.delete('/notifications', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error clearing notifications:', error);
     res.status(500).json({ error: 'Failed to clear notifications' });
+  }
+});
+
+/**
+ * GET /api/admin/roles
+ * Get all available roles
+ */
+router.get('/roles', async (req: Request, res: Response) => {
+  try {
+    const roles = await adminService.getRoles();
+    res.json({ roles });
+  } catch (error) {
+    console.error('Error getting roles:', error);
+    res.status(500).json({ error: 'Failed to get roles' });
   }
 });
 

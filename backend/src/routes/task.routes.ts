@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth';
-import { requireRole, requireTaskAccess } from '../middleware/rbac';
+import { requirePermission, requireTaskAccess } from '../middleware/rbac';
 import { taskService, createTaskSchema, updateTaskSchema } from '../services/taskService';
 import { z } from 'zod';
 
@@ -25,7 +25,7 @@ router.get('/', async (req, res) => {
 });
 
 // Create task (ADMIN and PM only)
-router.post('/', requireRole(['ADMIN', 'PM']), async (req, res) => {
+router.post('/', requirePermission('create', 'work_orders'), async (req, res) => {
     try {
         const data = createTaskSchema.parse(req.body);
         const task = await taskService.createTask(data);

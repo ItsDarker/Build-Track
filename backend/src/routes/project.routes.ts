@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth';
-import { requirePM, requireProjectAccess } from '../middleware/rbac';
+import { requirePermission, requireProjectAccess } from '../middleware/rbac';
 import { projectService, createProjectSchema, updateProjectSchema } from '../services/projectService';
 import { z } from 'zod';
 
@@ -10,7 +10,7 @@ const router = Router();
 router.use(authenticate);
 
 // Get all projects (ADMIN sees all, PM sees only their projects)
-router.get('/', requirePM(), async (req: any, res) => {
+router.get('/', requirePermission('read', 'project'), async (req: any, res) => {
     try {
         const status = req.query.status as string;
         const clientId = req.query.clientId as string;
@@ -37,7 +37,7 @@ router.get('/:id', requireProjectAccess, async (req, res) => {
 });
 
 // Create project (ADMIN and PM only)
-router.post('/', requirePM(), async (req, res) => {
+router.post('/', requirePermission('create', 'project'), async (req, res) => {
     try {
         const data = createProjectSchema.parse(req.body);
         const project = await projectService.createProject(data);

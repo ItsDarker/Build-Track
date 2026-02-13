@@ -60,7 +60,7 @@ class AdminService {
       prisma.user.count(),
       prisma.user.count({ where: { isBlocked: true } }),
       prisma.user.count({ where: { emailVerified: { not: null } } }),
-      prisma.user.count({ where: { role: 'ADMIN' } }),
+      prisma.user.count({ where: { role: { name: 'SUPER_ADMIN' } } }),
       prisma.user.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
     ]);
 
@@ -91,7 +91,7 @@ class AdminService {
     }
 
     if (role) {
-      where.role = role;
+      where.role = { name: role };
     }
 
     if (status === 'blocked') {
@@ -113,7 +113,7 @@ class AdminService {
           id: true,
           email: true,
           name: true,
-          role: true,
+          role: { select: { name: true, displayName: true } },
           emailVerified: true,
           phone: true,
           company: true,
@@ -156,7 +156,7 @@ class AdminService {
         id: true,
         email: true,
         name: true,
-        role: true,
+        role: { select: { name: true, displayName: true } },
         emailVerified: true,
         phone: true,
         company: true,
@@ -178,7 +178,7 @@ class AdminService {
         id: true,
         email: true,
         name: true,
-        role: true,
+        role: { select: { name: true, displayName: true } },
         emailVerified: true,
         phone: true,
         company: true,
@@ -219,12 +219,15 @@ class AdminService {
 
     const passwordHash = await bcrypt.hash(password, 12);
 
+    // Look up role ID
+    const roleRecord = await prisma.role.findUnique({ where: { name: role } });
+
     const user = await prisma.user.create({
       data: {
         email,
         name,
         passwordHash,
-        role,
+        roleId: roleRecord?.id, // If role not found, this will default to null/undefined, might throw if required
         emailVerified: emailVerified ? new Date() : null,
         phone,
         company,
@@ -235,7 +238,7 @@ class AdminService {
         id: true,
         email: true,
         name: true,
-        role: true,
+        role: { select: { name: true, displayName: true } },
         emailVerified: true,
         phone: true,
         company: true,
@@ -275,6 +278,15 @@ class AdminService {
       updateData.emailVerified = data.emailVerified ? new Date() : null;
     }
 
+    // Handle role update
+    if (data.role) {
+      const roleRecord = await prisma.role.findUnique({ where: { name: data.role } });
+      if (roleRecord) {
+        updateData.role = undefined;
+        updateData.roleId = roleRecord.id;
+      }
+    }
+
     const user = await prisma.user.update({
       where: { id: userId },
       data: updateData,
@@ -282,7 +294,7 @@ class AdminService {
         id: true,
         email: true,
         name: true,
-        role: true,
+        role: { select: { name: true, displayName: true } },
         emailVerified: true,
         phone: true,
         company: true,
@@ -316,7 +328,7 @@ class AdminService {
   async deleteUser(userId: string) {
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { email: true, role: true },
+      select: { email: true, role: { select: { name: true } } },
     });
 
     if (!user) {
@@ -324,8 +336,8 @@ class AdminService {
     }
 
     // Prevent deleting the last admin
-    if (user.role === 'ADMIN') {
-      const adminCount = await prisma.user.count({ where: { role: 'ADMIN' } });
+    if (user.role?.name === 'SUPER_ADMIN') {
+      const adminCount = await prisma.user.count({ where: { role: { name: 'SUPER_ADMIN' } } });
       if (adminCount <= 1) {
         throw new Error('Cannot delete the last admin user');
       }
@@ -506,6 +518,20 @@ class AdminService {
         message: data.message,
         data: data.data ? JSON.stringify(data.data) : null,
       },
+    });
+  }
+
+  /**
+   * Get all available roles
+   */
+  async getRoles() {
+    return prisma.role.findMany({
+      select: {
+        name: true,
+        displayName: true,
+        isSystem: true,
+      },
+      orderBy: { displayName: 'asc' },
     });
   }
 }

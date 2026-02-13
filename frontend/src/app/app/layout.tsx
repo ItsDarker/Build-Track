@@ -10,7 +10,10 @@ interface User {
     id: string;
     email: string;
     name?: string;
-    role: string;
+    role: {
+        name: string;
+        displayName: string;
+    };
     emailVerified?: string;
 }
 

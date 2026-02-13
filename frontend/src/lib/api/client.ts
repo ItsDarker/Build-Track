@@ -291,6 +291,13 @@ class ApiClient {
     return this.request(`/api/admin/login-attempts?${searchParams.toString()}`, { method: 'GET' });
   }
 
+  // Admin - Roles
+  async getRoles() {
+    return this.request('/api/admin/roles', {
+      method: 'GET',
+    });
+  }
+
   // CMS endpoints
   async getPageContent(page: string) {
     return this.request(`/api/cms/content/${page}`, { method: 'GET' });

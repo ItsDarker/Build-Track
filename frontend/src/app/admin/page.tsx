@@ -32,7 +32,10 @@ interface User {
   id: string;
   email: string;
   name: string | null;
-  role: string;
+  role: {
+    name: string;
+    displayName: string;
+  } | null;
   emailVerified: string | null;
   isBlocked: boolean;
   createdAt: string;
@@ -115,8 +118,10 @@ export default function AdminDashboardPage() {
       title: "Role",
       dataIndex: "role",
       key: "role",
-      render: (role: string) => (
-        <Tag color={role === "ADMIN" ? "purple" : "blue"}>{role}</Tag>
+      render: (role: { name: string; displayName: string } | null) => (
+        <Tag color={role?.name === "SUPER_ADMIN" ? "purple" : "blue"}>
+          {role?.displayName || 'No Role'}
+        </Tag>
       ),
     },
     {
@@ -158,7 +163,7 @@ export default function AdminDashboardPage() {
               danger
               icon={<LockOutlined />}
               onClick={() => handleBlockUser(record.id)}
-              disabled={record.role === "ADMIN"}
+              disabled={record.role?.name === "SUPER_ADMIN"}
             >
               Block
             </Button>

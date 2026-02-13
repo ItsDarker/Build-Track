@@ -35,7 +35,10 @@ interface User {
   id: string;
   email: string;
   name: string | null;
-  role: string;
+  role: {
+    name: string;
+    displayName: string;
+  } | null;
   emailVerified: string | null;
   phone: string | null;
   company: string | null;
@@ -71,6 +74,7 @@ export default function UsersPage() {
   const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState(false);
   const [resetPasswordUserId, setResetPasswordUserId] = useState<string | null>(null);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [roles, setRoles] = useState<{ name: string; displayName: string; isSystem: boolean }[]>([]);
   const [form] = Form.useForm();
   const [resetPasswordForm] = Form.useForm();
 
@@ -102,6 +106,17 @@ export default function UsersPage() {
     fetchUsers();
   }, [fetchUsers]);
 
+  useEffect(() => {
+    // Fetch available roles
+    const loadRoles = async () => {
+      const result = await apiClient.getRoles();
+      if (result.data) {
+        setRoles((result.data as any).roles || []);
+      }
+    };
+    loadRoles();
+  }, []);
+
   const handleSearch = () => {
     setPagination((prev) => ({ ...prev, page: 1 }));
     fetchUsers();
@@ -123,7 +138,7 @@ export default function UsersPage() {
         Phone: formatPhoneNumber(user.phone),
         Company: user.company,
         JobTitle: user.jobTitle,
-        Role: user.role,
+        Role: user.role?.displayName || 'N/A',
         Verified: user.emailVerified ? "Yes" : "No",
         Blocked: user.isBlocked ? "Yes" : "No",
         "Created At": new Date(user.createdAt).toLocaleString(),
@@ -178,7 +193,7 @@ export default function UsersPage() {
     form.setFieldsValue({
       email: user.email,
       name: user.name,
-      role: user.role,
+      role: user.role?.name || '',
       phone: formatPhoneNumber(user.phone), // Format for display in edit
       company: user.company,
       jobTitle: user.jobTitle,
@@ -312,8 +327,10 @@ export default function UsersPage() {
       title: "Role",
       dataIndex: "role",
       key: "role",
-      render: (role: string) => (
-        <Tag color={role === "ADMIN" ? "purple" : "blue"}>{role}</Tag>
+      render: (role: { name: string; displayName: string } | null) => (
+        <Tag color={role?.name === "SUPER_ADMIN" ? "purple" : "blue"}>
+          {role?.displayName || 'No Role'}
+        </Tag>
       ),
     },
     {
@@ -372,7 +389,7 @@ export default function UsersPage() {
               danger
               icon={<LockOutlined />}
               onClick={() => handleBlockUser(record.id)}
-              disabled={record.role === "ADMIN"}
+              disabled={record.role?.name === "SUPER_ADMIN"}
             />
           )}
           <Popconfirm
@@ -386,7 +403,7 @@ export default function UsersPage() {
               size="small"
               danger
               icon={<DeleteOutlined />}
-              disabled={record.role === "ADMIN"}
+              disabled={record.role?.name === "SUPER_ADMIN"}
             />
           </Popconfirm>
         </Space>
@@ -558,12 +575,10 @@ export default function UsersPage() {
             rules={[{ required: true, message: "Please select role" }]}
           >
             <Select
-              options={[
-                { value: "ADMIN", label: "Admin - Full System Access" },
-                { value: "PM", label: "Project Manager - Manage Projects & Tasks" },
-                { value: "SUBCONTRACTOR", label: "Subcontractor - Update Assigned Tasks" },
-                { value: "CLIENT", label: "Client - View Projects (Read-Only)" },
-              ]}
+              options={roles.map(role => ({
+                value: role.name,
+                label: `${role.displayName}${role.isSystem ? ' (System)' : ''}`,
+              }))}
             />
           </Form.Item>
 
