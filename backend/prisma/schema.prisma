@@ -8,30 +8,50 @@ datasource db {
 }
 
 model User {
-  id                 String              @id @default(cuid())
-  name               String?
-  email              String              @unique
-  passwordHash       String?             @map("password_hash")
-  emailVerified      DateTime?           @map("email_verified_at")
-  phone              String?
-  company            String?
-  jobTitle           String?             @map("job_title")
-  bio                String?
-  isBlocked          Boolean             @default(false) @map("is_blocked")
-  blockedAt          DateTime?           @map("blocked_at")
-  blockedReason      String?             @map("blocked_reason")
-  createdAt          DateTime            @default(now()) @map("created_at")
-  updatedAt          DateTime            @updatedAt @map("updated_at")
-  roleId             String?             @map("role_id")
-  loginAttempts      LoginAttempt[]
-  oauthAccounts      OAuthAccount[]
-  managedProjects    Project[]           @relation("ProjectManager")
-  refreshTokens      RefreshToken[]
-  assignedTasks      Task[]              @relation("TaskAssignee")
-  role               Role?               @relation(fields: [roleId], references: [id])
-  verificationTokens VerificationToken[]
+  id                   String              @id @default(cuid())
+  name                 String?
+  email                String              @unique
+  passwordHash         String?             @map("password_hash")
+  emailVerified        DateTime?           @map("email_verified_at")
+  phone                String?
+  company              String?
+  jobTitle             String?             @map("job_title")
+  bio                  String?
+  isBlocked            Boolean             @default(false) @map("is_blocked")
+  blockedAt            DateTime?           @map("blocked_at")
+  blockedReason        String?             @map("blocked_reason")
+  createdAt            DateTime            @default(now()) @map("created_at")
+  updatedAt            DateTime            @updatedAt @map("updated_at")
+  roleId               String?             @map("role_id")
+  loginAttempts        LoginAttempt[]
+  oauthAccounts        OAuthAccount[]
+  managedProjects      Project[]           @relation("ProjectManager")
+  refreshTokens        RefreshToken[]
+  assignedTasks        Task[]              @relation("TaskAssignee")
+  role                 Role?               @relation(fields: [roleId], references: [id])
+  verificationTokens   VerificationToken[]
+  createdModuleRecords ModuleRecord[]      @relation("ModuleRecordCreatedBy")
+  updatedModuleRecords ModuleRecord[]      @relation("ModuleRecordUpdatedBy")
 
   @@map("users")
+}
+
+model ModuleRecord {
+  id         String @id @default(cuid())
+  moduleSlug String @map("module_slug")
+  data       Json   @default("{}")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  createdById String? @map("created_by_id")
+  updatedById String? @map("updated_by_id")
+
+  createdBy User? @relation("ModuleRecordCreatedBy", fields: [createdById], references: [id])
+  updatedBy User? @relation("ModuleRecordUpdatedBy", fields: [updatedById], references: [id])
+
+  @@index([moduleSlug])
+  @@map("module_records")
 }
 
 model Role {
