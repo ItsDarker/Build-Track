@@ -165,15 +165,20 @@ router.get('/me', authenticate, async (req: AuthRequest, res) => {
   try {
     if (!req.user) {
       return res.status(401).json({ error: 'Not authenticated' });
+      console.log("ME req.user =", (req as any).user);
+
     }
 
-    const user = await authService.getUserById(req.user.userId);
-
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    res.json({ user });
+    
+  const userId = (req as any).user?.userId ?? (req as any).user?.id;
+  const user = await authService.getUserById(userId);
+  
+  if (!user) {
+    return res.status(404).json({ error: "User not found" });
+  }
+  
+  return res.json({ user });
+  
   } catch (error: any) {
     console.error('Get user error:', error);
     res.status(500).json({ error: 'Failed to get user' });
@@ -230,7 +235,7 @@ router.get("/oauth/google/callback", async (req, res) => {
     setAuthCookies(res, result.accessToken, result.refreshToken);
 
     // 3) Redirect to app (or admin)
-    const dest = result.user?.role === "ADMIN" ? "/admin" : "/app";
+    const dest = result.user?.role?.name === "ADMIN" ? "/admin" : "/app";
     return res.redirect(`${config.frontendUrl}${dest}`);
   } catch (error: any) {
     console.error("Google OAuth error:", error);
