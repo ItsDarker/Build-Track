@@ -45,3 +45,7 @@ yarn-error.log*
 # Temp files
 tmpclaude-*
 
+
+# Build output
+backend/dist/
+
