@@ -98,139 +98,155 @@ export class AuthService {
   }
 
   async loginWithOAuth(email: string, name: string): Promise<AuthTokens & { user: any }> {
-    // 1) Find or create user
-    let user = await prisma.user.findUnique({
-      where: { email },
-    });
+  // 1) Find user (include role so caller can check role.name)
+  let user = await prisma.user.findUnique({
+    where: { email },
+    include: { role: true },
+  });
 
-    if (!user) {
-      const defaultRole = await prisma.role.findUnique({ where: { name: 'SUBCONTRACTOR' } });
-      user = await prisma.user.create({
-        data: {
-          email,
-          name,
-          emailVerified: new Date(),
-          roleId: defaultRole?.id,
-        },
-      });
-    }
+  //  If user exists but role is missing, assign default role
+  if (user && !user.roleId) {
+  const defaultRole = await prisma.role.findUnique({ where: { name: "VENDOR" } });
+  if (!defaultRole) throw new Error("Default role VENDOR not found in roles table");
 
-    // Optional safety checks
-    if (user.isBlocked) {
-      throw new Error('Your account has been blocked. Please contact support.');
-    }
+  user = await prisma.user.update({
+    where: { id: user.id },
+    data: { roleId: defaultRole.id },
+    include: { role: true },
+  });
+}
 
-    // Google already verified the email
-    let emailVerified = user.emailVerified;
-    if (!emailVerified) {
-      emailVerified = new Date();
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { emailVerified },
-      });
-    }
+  // 2) Create if missing
+  if (!user) {
+    // Pick your default role here (you used VENDOR; that's fine if that's intended)
+    const defaultRole = await prisma.role.findUnique({ where: { name: "VENDOR" } });
+    if (!defaultRole) throw new Error("Default role VENDOR not found in roles table");
 
-    // Generate tokens
-    const accessToken = generateAccessToken({ userId: user.id, email: user.email });
-    const refreshToken = generateRefreshToken({ userId: user.id, email: user.email });
-
-    // Store refresh token
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7);
-
-    await prisma.refreshToken.create({
+    user = await prisma.user.create({
       data: {
-        userId: user.id,
-        token: refreshToken,
-        expiresAt,
+        email,
+        name,
+        emailVerified: new Date(),
+        roleId: defaultRole.id,
       },
+      include: { role: true }, // IMPORTANT: so user.role is populated
     });
-
-    return {
-      accessToken,
-      refreshToken,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        emailVerified,
-        role: user.role, // Now an object or null
-      },
-    };
   }
+
+
+  // 3) Safety checks
+  if (user.isBlocked) {
+    throw new Error("Your account has been blocked. Please contact support.");
+  }
+
+  // 4) Ensure verified (Google verifies email)
+  let emailVerified = user.emailVerified;
+  if (!emailVerified) {
+    emailVerified = new Date();
+    user = await prisma.user.update({
+      where: { id: user.id },
+      data: { emailVerified },
+      include: { role: true }, // keep role in returned user
+    });
+  }
+
+  // 5) Generate tokens
+  const accessToken = generateAccessToken({ userId: user.id, email: user.email });
+  const refreshToken = generateRefreshToken({ userId: user.id, email: user.email });
+
+  // 6) Store refresh token
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 7);
+
+  await prisma.refreshToken.create({
+    data: {
+      userId: user.id,
+      token: refreshToken,
+      expiresAt,
+    },
+  });
+
+  return {
+    accessToken,
+    refreshToken,
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      emailVerified: user.emailVerified,
+      role: user.role, // Role object or null
+    },
+  };
+}
 
 
   async login(data: LoginData, ip: string): Promise<AuthTokens & { user: any }> {
-    const { email, password } = data;
+  const { email, password } = data;
 
-    const user = await prisma.user.findUnique({
-      where: { email },
-    });
+  // INCLUDE role so your return { role: user.role } isn't undefined
+  const user = await prisma.user.findUnique({
+    where: { email },
+    include: { role: true },
+  });
 
-    if (!user || !user.passwordHash) {
-      // Log failed attempt
-      await prisma.loginAttempt.create({
-        data: { email, ip, success: false },
-      });
-      throw new Error('Invalid credentials');
-    }
-
-    // Check if user is blocked
-    if (user.isBlocked) {
-      throw new Error('Your account has been blocked. Please contact support.');
-    }
-
-    if (!user.emailVerified) {
-      throw new Error('Please verify your email before logging in');
-    }
-
-    // Verify password
-    const isValid = await bcrypt.compare(password, user.passwordHash);
-
-    if (!isValid) {
-      await prisma.loginAttempt.create({
-        data: { email, ip, success: false, userId: user.id },
-      });
-
-      // Check for auto-block
-      await this.checkAndAutoBlock(user.id, email);
-
-      throw new Error('Invalid credentials');
-    }
-
-    // Log successful attempt
+  if (!user || !user.passwordHash) {
     await prisma.loginAttempt.create({
-      data: { email, ip, success: true, userId: user.id },
+      data: { email, ip, success: false },
     });
-
-    // Generate tokens
-    const accessToken = generateAccessToken({ userId: user.id, email: user.email });
-    const refreshToken = generateRefreshToken({ userId: user.id, email: user.email });
-
-    // Store refresh token
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7); // 7 days
-
-    await prisma.refreshToken.create({
-      data: {
-        userId: user.id,
-        token: refreshToken,
-        expiresAt,
-      },
-    });
-
-    return {
-      accessToken,
-      refreshToken,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        emailVerified: user.emailVerified,
-        role: user.role,
-      },
-    };
+    throw new Error("Invalid credentials");
   }
+
+  if (user.isBlocked) {
+    throw new Error("Your account has been blocked. Please contact support.");
+  }
+
+  if (!user.emailVerified) {
+    throw new Error("Please verify your email before logging in");
+  }
+
+  const isValid = await bcrypt.compare(password, user.passwordHash);
+
+  if (!isValid) {
+    await prisma.loginAttempt.create({
+      data: { email, ip, success: false, userId: user.id },
+    });
+
+    await this.checkAndAutoBlock(user.id, email);
+
+    throw new Error("Invalid credentials");
+  }
+
+  await prisma.loginAttempt.create({
+    data: { email, ip, success: true, userId: user.id },
+  });
+
+  const accessToken = generateAccessToken({ userId: user.id, email: user.email });
+  const refreshToken = generateRefreshToken({ userId: user.id, email: user.email });
+
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 7);
+
+  await prisma.refreshToken.create({
+    data: {
+      userId: user.id,
+      token: refreshToken,
+      expiresAt,
+    },
+  });
+
+  return {
+    accessToken,
+    refreshToken,
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      emailVerified: user.emailVerified,
+      role: user.role,
+    },
+  };
+}
+
 
   /**
    * Check and auto-block user after too many failed attempts
@@ -269,6 +285,50 @@ export class AuthService {
       });
     }
   }
+
+  async loginWithOAuthById(userId: string): Promise<AuthTokens & { user: any }> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { role: true },
+  });
+
+  if (!user) throw new Error("User not found");
+
+  if (user.isBlocked) {
+    throw new Error("Your account has been blocked. Please contact support.");
+  }
+
+  if (!user.emailVerified) {
+    throw new Error("Please verify your email before logging in");
+  }
+
+  const accessToken = generateAccessToken({ userId: user.id, email: user.email });
+  const refreshToken = generateRefreshToken({ userId: user.id, email: user.email });
+
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 7);
+
+  await prisma.refreshToken.create({
+    data: {
+      userId: user.id,
+      token: refreshToken,
+      expiresAt,
+    },
+  });
+
+  return {
+    accessToken,
+    refreshToken,
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      emailVerified: user.emailVerified,
+      role: user.role,
+    },
+  };
+}
+ 
 
   async verifyEmail(token: string): Promise<{ message: string }> {
     const tokenHash = hashToken(token);

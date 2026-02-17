@@ -24,6 +24,20 @@ const nextConfig = {
     ],
   },
 
+  // ✅ Proxy backend API to Express on :4000 (avoids cookie/CORS issues)
+  async rewrites() {
+    return [
+      {
+        source: '/backend-api/:path*',
+        destination: 'http://localhost:4000/api/:path*',
+      },
+      {
+        source: '/backend-uploads/:path*',
+        destination: 'http://localhost:4000/uploads/:path*',
+      },
+    ];
+  },
+
   // Disable server actions warning for now
   experimental: {
     serverActions: {
@@ -33,3 +47,4 @@ const nextConfig = {
 }
 
 module.exports = nextConfig
+

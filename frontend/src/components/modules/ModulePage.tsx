@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Table, Drawer, Button as AntButton, Tag, Empty, Tooltip, App } from "antd";
 import {
   PlusOutlined,
@@ -147,14 +147,50 @@ function getMockValue(field: string, index: number, mod: ModuleConfig): string {
 
 export function ModulePage({ module }: ModulePageProps) {
   const { modal } = App.useApp();
-  const [records, setRecords] = useState<Record<string, string>[]>(() =>
-    generateMockRecords(module)
-  );
+  const [records, setRecords] = useState<Record<string, any>[]>([]);
+  const [loading, setLoading] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerMode, setDrawerMode] = useState<FormMode>("create");
   const [activeRecordId, setActiveRecordId] = useState<string | null>(null);
   const [formValues, setFormValues] = useState<Record<string, string>>({});
   const [formFiles, setFormFiles] = useState<Record<string, File[]>>({});
+
+ useEffect(() => {
+  let cancelled = false;
+
+  (async () => {
+    try {
+      setLoading(true);
+      const res = await fetch(`/backend-api/modules/${module.slug}/records`, {
+        credentials: "include"
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+
+      const mapped = (data.records ?? []).map((r: any) => ({
+        _id: r.id,
+        ...(r.data ?? {}),
+        "Created at": r.createdAt ? String(r.createdAt).slice(0, 16) : "",
+        "Update at": r.updatedAt ? String(r.updatedAt).slice(0, 16) : "",
+        "Created by": r.createdById ?? "",
+        "Updated by": r.updatedById ?? "",
+      }));
+
+      if (!cancelled) setRecords(mapped);
+    } catch (e) {
+      console.error("Failed to load module records:", e);
+      if (!cancelled) setRecords([]);
+    } finally {
+      if (!cancelled) setLoading(false);
+    }
+  })();
+
+  return () => {
+    cancelled = true;
+  };
+}, [module.slug]);
+ 
 
   // Key fields for table columns (first 5 non-section, non-audit fields)
   const tableFields = useMemo(() => {
@@ -265,46 +301,111 @@ export function ModulePage({ module }: ModulePageProps) {
     setFormFiles((prev) => ({ ...prev, [field]: files }));
   };
 
-  const handleCreate = () => {
-    const now = new Date().toISOString().slice(0, 16);
-    const newRecord: Record<string, string> = {
-      ...formValues,
-      _id: `${module.slug}-${Date.now()}`,
-      "Created at": now,
-      "Created by": "Current User",
-      "Update at": now,
-      "Updated by": "Current User",
-    };
-    setRecords((prev) => [newRecord, ...prev]);
-    setFormValues({});
-    setFormFiles({});
-    setDrawerOpen(false);
+  const handleCreate = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch(`/backend-api/modules/${module.slug}/records`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(formValues), // store only dynamic fields
+        });
+        
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const { record } = await res.json();
+      
+      const mapped: Record<string, any> = {
+        _id: record.id,
+        ...(record.data ?? {}),
+        "Created at": String(record.createdAt).slice(0, 16),
+        "Update at": String(record.updatedAt).slice(0, 16),
+        "Created by": record.createdById ?? "",
+        "Updated by": record.updatedById ?? "",
+      };
+      
+      setRecords((prev) => [mapped, ...prev]);
+      setFormValues({});
+      setFormFiles({});
+      setDrawerOpen(false);
+    } catch (e) {
+      console.error("Create failed:", e);
+      modal.error({ title: "Create failed", content: String(e) });
+    }finally{
+      setLoading(false);
+    }
   };
 
-  const handleEdit = () => {
-    if (!activeRecordId) return;
-    const now = new Date().toISOString().slice(0, 16);
-    setRecords((prev) =>
-      prev.map((r) =>
-        r._id === activeRecordId
-          ? { ...formValues, _id: activeRecordId, "Update at": now, "Updated by": "Current User" }
-          : r
-      )
+  const handleEdit = async () => {
+  if (!activeRecordId) return;
+
+  try {
+    setLoading(true);
+    const res = await fetch(
+      `/backend-api/modules/${module.slug}/records/${activeRecordId}`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(formValues),
+      }
     );
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const { record } = await res.json();
+
+    const mapped: Record<string, any> = {
+      _id: record.id,
+      ...(record.data ?? {}),
+      "Created at": String(record.createdAt).slice(0, 16),
+      "Update at": String(record.updatedAt).slice(0, 16),
+      "Created by": record.createdById ?? "",
+      "Updated by": record.updatedById ?? "",
+    };
+
+    setRecords((prev) => prev.map((r) => (r._id === activeRecordId ? mapped : r)));
     setFormValues({});
     setFormFiles({});
     setDrawerOpen(false);
-  };
+  } catch (e) {
+    console.error("Update failed:", e);
+    modal.error({ title: "Update failed", content: String(e) });
+  }finally {
+    setLoading(false);
+  }
+};
+
+  
 
   const handleDelete = (id: string) => {
     modal.confirm({
       title: "Delete Record",
       content: "Are you sure you want to delete this record? This action cannot be undone.",
       okText: "Delete",
-      okButtonProps: { danger: true },
-      onOk: () => {
-        setRecords((prev) => prev.filter((r) => r._id !== id));
-      },
+      okButtonProps: { danger: true, loading },
+      onOk: async () => {
+  try {
+    setLoading(true);
+
+    const res = await fetch(
+      `/backend-api/modules/${module.slug}/records/${id}`,
+      {
+        method: "DELETE",
+        credentials: "include",
+      }
+    );
+
+    if (!res.ok && res.status !== 204) throw new Error(`HTTP ${res.status}`);
+
+    setRecords((prev) => prev.filter((r) => r._id !== id));
+  } catch (e) {
+    console.error("Delete failed:", e);
+    modal.error({ title: "Delete failed", content: String(e) });
+    throw e; // optional but recommended (keeps confirm open on failure)
+  } finally {
+    setLoading(false);
+  }
+},
+
     });
   };
 
@@ -382,6 +483,7 @@ export function ModulePage({ module }: ModulePageProps) {
           </div>
         ) : (
           <Table
+            loading={loading}
             columns={columns}
             dataSource={records}
             rowKey="_id"

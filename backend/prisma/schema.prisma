@@ -1,5 +1,3 @@
-// Prisma schema for BuildTrack Backend
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,69 +7,74 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// User Roles: 'ADMIN' | 'PM' (Project Manager) | 'SUBCONTRACTOR' | 'CLIENT'
-// ADMIN: Full system access
-// PM: Manage assigned projects and tasks
-// SUBCONTRACTOR: View and update assigned tasks
-// CLIENT: Read-only access to their projects
-
-
 model User {
-  id                String    @id @default(cuid())
-  name              String?
-  email             String    @unique
-  passwordHash      String?   @map("password_hash")
-  emailVerified     DateTime? @map("email_verified_at")
-  
-  // RBAC Relations
-  roleId            String?   @map("role_id")
-  role              Role?     @relation(fields: [roleId], references: [id])
-
-  phone             String?
-  company           String?
-  jobTitle          String?   @map("job_title")
-  bio               String?
-  isBlocked         Boolean   @default(false) @map("is_blocked")
-  blockedAt         DateTime? @map("blocked_at")
-  blockedReason     String?   @map("blocked_reason")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
-
-  oauthAccounts     OAuthAccount[]
-  refreshTokens     RefreshToken[]
-  verificationTokens VerificationToken[]
-  loginAttempts     LoginAttempt[]
-
-  // Relations
-  managedProjects   Project[] @relation("ProjectManager")
-  assignedTasks     Task[]    @relation("TaskAssignee")
+  id                   String              @id @default(cuid())
+  name                 String?
+  email                String              @unique
+  passwordHash         String?             @map("password_hash")
+  emailVerified        DateTime?           @map("email_verified_at")
+  phone                String?
+  company              String?
+  jobTitle             String?             @map("job_title")
+  bio                  String?
+  isBlocked            Boolean             @default(false) @map("is_blocked")
+  blockedAt            DateTime?           @map("blocked_at")
+  blockedReason        String?             @map("blocked_reason")
+  createdAt            DateTime            @default(now()) @map("created_at")
+  updatedAt            DateTime            @updatedAt @map("updated_at")
+  roleId               String?             @map("role_id")
+  loginAttempts        LoginAttempt[]
+  oauthAccounts        OAuthAccount[]
+  managedProjects      Project[]           @relation("ProjectManager")
+  refreshTokens        RefreshToken[]
+  assignedTasks        Task[]              @relation("TaskAssignee")
+  role                 Role?               @relation(fields: [roleId], references: [id])
+  verificationTokens   VerificationToken[]
+  createdModuleRecords ModuleRecord[]      @relation("ModuleRecordCreatedBy")
+  updatedModuleRecords ModuleRecord[]      @relation("ModuleRecordUpdatedBy")
 
   @@map("users")
 }
 
-model Role {
-  id          String   @id @default(cuid())
-  name        String   @unique // e.g., 'SUPER_ADMIN', 'PROJECT_MANAGER'
-  displayName String   @map("display_name") // e.g., 'Super Admin', 'Project Manager'
-  description String?
-  isSystem    Boolean  @default(false) @map("is_system") // If true, cannot be deleted
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+model ModuleRecord {
+  id         String @id @default(cuid())
+  moduleSlug String @map("module_slug")
+  data       Json   @default("{}")
 
-  users       User[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  createdById String? @map("created_by_id")
+  updatedById String? @map("updated_by_id")
+
+  createdBy User? @relation("ModuleRecordCreatedBy", fields: [createdById], references: [id])
+  updatedBy User? @relation("ModuleRecordUpdatedBy", fields: [updatedById], references: [id])
+
+  @@index([moduleSlug])
+  @@map("module_records")
+}
+
+model Role {
+  id          String           @id @default(cuid())
+  name        String           @unique
+  displayName String           @map("display_name")
+  description String?
+  isSystem    Boolean          @default(false) @map("is_system")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
   permissions RolePermission[]
+  users       User[]
 
   @@map("roles")
 }
 
 model Permission {
-  id          String   @id @default(cuid())
-  action      String   // e.g., 'create', 'read', 'update', 'delete', 'approve'
-  resource    String   // e.g., 'project', 'work_order', 'finance'
+  id          String           @id @default(cuid())
+  action      String
+  resource    String
   description String?
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
   roles       RolePermission[]
 
   @@unique([action, resource])
@@ -83,26 +86,24 @@ model RolePermission {
   roleId       String     @map("role_id")
   permissionId String     @map("permission_id")
   createdAt    DateTime   @default(now()) @map("created_at")
-
-  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
   permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   @@unique([roleId, permissionId])
   @@map("role_permissions")
 }
 
 model OAuthAccount {
-  id                String  @id @default(cuid())
-  userId            String  @map("user_id")
-  provider          String  // "google" | "microsoft"
-  providerAccountId String  @map("provider_account_id")
-  accessToken       String? @map("access_token")
-  refreshToken      String? @map("refresh_token")
-  expiresAt         Int?    @map("expires_at")
+  id                String   @id @default(cuid())
+  userId            String   @map("user_id")
+  provider          String
+  providerAccountId String   @map("provider_account_id")
+  accessToken       String?  @map("access_token")
+  refreshToken      String?  @map("refresh_token")
+  expiresAt         Int?     @map("expires_at")
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
   @@map("oauth_accounts")
@@ -114,8 +115,7 @@ model RefreshToken {
   token     String   @unique
   expiresAt DateTime @map("expires_at")
   createdAt DateTime @default(now()) @map("created_at")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("refresh_tokens")
 }
@@ -127,8 +127,7 @@ model VerificationToken {
   tokenHash String   @unique @map("token_hash")
   expiresAt DateTime @map("expires_at")
   createdAt DateTime @default(now()) @map("created_at")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("verification_tokens")
 }
@@ -139,9 +138,8 @@ model LoginAttempt {
   ip        String
   success   Boolean  @default(false)
   createdAt DateTime @default(now()) @map("created_at")
-
   userId    String?  @map("user_id")
-  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user      User?    @relation(fields: [userId], references: [id])
 
   @@index([email, createdAt])
   @@index([ip, createdAt])
@@ -150,10 +148,10 @@ model LoginAttempt {
 
 model AdminNotification {
   id        String   @id @default(cuid())
-  type      String   // 'user_blocked', 'failed_attempts', 'new_user', etc.
+  type      String
   title     String
   message   String
-  data      String?  // JSON string for additional data (SQLite doesn't support Json natively)
+  data      String?
   read      Boolean  @default(false)
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -162,81 +160,72 @@ model AdminNotification {
 
 model SiteContent {
   id        String   @id @default(cuid())
-  page      String   @unique // 'home', 'about', etc.
-  sections  String   // JSON string of section configs
+  page      String   @unique
+  sections  String
   updatedAt DateTime @updatedAt @map("updated_at")
-  updatedBy String?  @map("updated_by") // Admin user ID who last updated
+  updatedBy String?  @map("updated_by")
 
   @@map("site_content")
 }
 
 model ContentImage {
   id        String   @id @default(cuid())
-  filename  String   // Original filename
-  path      String   // Path in public/uploads/
+  filename  String
+  path      String
   mimeType  String   @map("mime_type")
-  size      Int      // File size in bytes
+  size      Int
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("content_images")
 }
 
-// CRM Client (Organization or Individual)
 model Client {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   name      String
   email     String?
   phone     String?
   company   String?
   address   String?
   notes     String?
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
   projects  Project[]
 
   @@map("clients")
 }
 
-// Construction Project
 model Project {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   name        String
-  code        String?  // e.g. "PRJ-001"
+  code        String?
   description String?
-  status      String   @default("PLANNING") // PLANNING, IN_PROGRESS, ON_HOLD, COMPLETED, CANCELLED
+  status      String    @default("PLANNING")
   startDate   DateTime? @map("start_date")
   endDate     DateTime? @map("end_date")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
   clientId    String?   @map("client_id")
-  client      Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
-
   managerId   String?   @map("manager_id")
-  manager     User?     @relation("ProjectManager", fields: [managerId], references: [id], onDelete: SetNull)
-
+  client      Client?   @relation(fields: [clientId], references: [id])
+  manager     User?     @relation("ProjectManager", fields: [managerId], references: [id])
   tasks       Task[]
 
   @@map("projects")
 }
 
-// Project Task
 model Task {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   title       String
   description String?
-  status      String   @default("TODO") // TODO, IN_PROGRESS, REVIEW, DONE
-  priority    String   @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  status      String    @default("TODO")
+  priority    String    @default("MEDIUM")
   dueDate     DateTime? @map("due_date")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  projectId   String   @map("project_id")
-  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  assigneeId  String?  @map("assignee_id")
-  assignee    User?    @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  projectId   String    @map("project_id")
+  assigneeId  String?   @map("assignee_id")
+  assignee    User?     @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@map("tasks")
 }
@@ -248,7 +237,7 @@ model Invitation {
   token     String   @unique
   expiresAt DateTime @map("expires_at")
   createdAt DateTime @default(now()) @map("created_at")
-  status    String   @default("PENDING") // PENDING, ACCEPTED, EXPIRED
+  status    String   @default("PENDING")
 
   @@map("invitations")
 }
