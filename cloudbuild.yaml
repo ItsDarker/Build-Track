@@ -1,0 +1,143 @@
+# Cloud Build configuration for BuildTrack
+# This file automatically builds and deploys both frontend and backend
+
+steps:
+  # ==========================================
+  # BUILD BACKEND IMAGE
+  # ==========================================
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-backend'
+    args:
+      - 'build'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/buildtrack-registry/backend:$SHORT_SHA'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/buildtrack-registry/backend:latest'
+      - '-f'
+      - 'backend/Dockerfile'
+      - '.'
+    env:
+      - 'DOCKER_BUILDKIT=1'
+
+  # ==========================================
+  # PUSH BACKEND IMAGE
+  # ==========================================
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-backend'
+    args:
+      - 'push'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/buildtrack-registry/backend:$SHORT_SHA'
+
+  # ==========================================
+  # BUILD FRONTEND IMAGE
+  # ==========================================
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-frontend'
+    args:
+      - 'build'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/buildtrack-registry/frontend:$SHORT_SHA'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/buildtrack-registry/frontend:latest'
+      - '-f'
+      - 'frontend/Dockerfile'
+      - '.'
+    env:
+      - 'DOCKER_BUILDKIT=1'
+
+  # ==========================================
+  # PUSH FRONTEND IMAGE
+  # ==========================================
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-frontend'
+    args:
+      - 'push'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/buildtrack-registry/frontend:$SHORT_SHA'
+
+  # ==========================================
+  # DEPLOY BACKEND TO CLOUD RUN
+  # ==========================================
+  - name: 'gcr.io/cloud-builders/run'
+    id: 'deploy-backend'
+    args:
+      - 'deploy'
+      - 'buildtrack-backend'
+      - '--image'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/buildtrack-registry/backend:$SHORT_SHA'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--service-account'
+      - 'buildtrack-cloudrun@$PROJECT_ID.iam.gserviceaccount.com'
+      - '--set-env-vars'
+      - 'NODE_ENV=production,PORT=4000,FRONTEND_URL=https://${FRONTEND_DOMAIN}'
+      - '--set-secrets'
+      - 'DATABASE_URL=buildtrack-db-url:latest,JWT_SECRET=buildtrack-jwt-secret:latest,JWT_REFRESH_SECRET=buildtrack-jwt-refresh-secret:latest,GOOGLE_CLIENT_ID=buildtrack-google-client-id:latest,GOOGLE_CLIENT_SECRET=buildtrack-google-client-secret:latest,MICROSOFT_CLIENT_ID=buildtrack-microsoft-client-id:latest,MICROSOFT_CLIENT_SECRET=buildtrack-microsoft-client-secret:latest,SMTP_HOST=buildtrack-smtp-host:latest,SMTP_PORT=buildtrack-smtp-port:latest,SMTP_USER=buildtrack-smtp-user:latest,SMTP_PASS=buildtrack-smtp-password:latest,SMTP_FROM=buildtrack-smtp-from:latest'
+      - '--add-cloudsql-instances'
+      - '$PROJECT_ID:us-central1:buildtrack-postgres'
+      - '--allow-unauthenticated'
+      - '--memory'
+      - '512Mi'
+      - '--cpu'
+      - '1'
+      - '--timeout'
+      - '3600s'
+      - '--max-instances'
+      - '10'
+      - '--min-instances'
+      - '0'
+
+  # ==========================================
+  # DEPLOY FRONTEND TO CLOUD RUN
+  # ==========================================
+  - name: 'gcr.io/cloud-builders/run'
+    id: 'deploy-frontend'
+    args:
+      - 'deploy'
+      - 'buildtrack-frontend'
+      - '--image'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/buildtrack-registry/frontend:$SHORT_SHA'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--service-account'
+      - 'buildtrack-cloudrun@$PROJECT_ID.iam.gserviceaccount.com'
+      - '--set-env-vars'
+      - 'NODE_ENV=production,NEXT_PUBLIC_API_URL=/api'
+      - '--allow-unauthenticated'
+      - '--memory'
+      - '512Mi'
+      - '--cpu'
+      - '1'
+      - '--timeout'
+      - '3600s'
+      - '--max-instances'
+      - '10'
+      - '--min-instances'
+      - '0'
+
+# ==========================================
+# BUILD OPTIONS
+# ==========================================
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: 'N1_HIGHCPU_8'
+
+# Images that will be pushed to Artifact Registry
+images:
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/buildtrack-registry/backend:$SHORT_SHA'
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/buildtrack-registry/backend:latest'
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/buildtrack-registry/frontend:$SHORT_SHA'
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/buildtrack-registry/frontend:latest'
+
+# Total build timeout
+timeout: '3600s'
+
+# Substitutions for custom variables
+substitutions:
+  _FRONTEND_DOMAIN: 'yourdomain.com'
+
+# Trigger configuration (set when creating trigger)
+# onFailure: send notifications, logs

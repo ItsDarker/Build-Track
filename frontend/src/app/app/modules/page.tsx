@@ -5,9 +5,19 @@ import { getAllModules } from "@/config/buildtrack.config";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowRight, ShieldCheck } from "lucide-react";
+import { useUser } from "@/lib/context/UserContext";
+import {
+  canAccessModule,
+  getAccessLevel,
+  MODULE_ACCESS,
+  REVERSE_ROLE_MAP,
+} from "@/config/rbac";
 
 export default function ModulesIndexPage() {
-  const modules = getAllModules();
+  const { role } = useUser();
+  const modules = getAllModules().filter((mod) =>
+    canAccessModule(role.name, mod.slug)
+  );
 
   return (
     <div className="space-y-6">
@@ -38,13 +48,24 @@ export default function ModulesIndexPage() {
                 )}
                 <div className="flex items-center flex-wrap gap-1 mb-3">
                   <ShieldCheck className="w-3.5 h-3.5 text-gray-400 mr-0.5" />
-                  {["Admin", ...mod.accessRoles].map((role) => (
+                  {[
+                    { roleName: "Admin", level: "R/W" as const },
+                    ...Object.entries(MODULE_ACCESS[mod.slug] ?? {}).map(
+                      ([dbRole, level]) => ({
+                        roleName: REVERSE_ROLE_MAP[dbRole] ?? dbRole,
+                        level,
+                      })
+                    ),
+                  ].map((entry) => (
                     <Badge
-                      key={role}
-                      variant={role === "Admin" ? "default" : "secondary"}
+                      key={entry.roleName}
+                      variant={
+                        entry.roleName === "Admin" ? "default" : "secondary"
+                      }
                       className="text-xs"
                     >
-                      {role}
+                      {entry.roleName}
+                      {entry.level === "R" ? " (view)" : ""}
                     </Badge>
                   ))}
                 </div>

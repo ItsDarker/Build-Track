@@ -34,7 +34,17 @@ import {
 import { apiClient } from "@/lib/api/client";
 import { Logo } from "./Logo";
 import { navigation, type SidebarItem } from "@/config/buildtrack.config";
+import { canAccessModule } from "@/config/rbac";
 import { cn } from "@/lib/utils";
+
+/** Map sidebar child paths to module slugs for RBAC filtering */
+const SIDEBAR_PATH_TO_MODULE: Record<string, string> = {
+  "/app/tasks/leads": "crm-leads",
+  "/app/tasks/design-requests": "design-configurator",
+  "/app/tasks/work-orders": "work-orders",
+  "/app/tasks/inspections": "quality-control",
+  "/app/tasks/deliveries": "delivery-installation",
+};
 
 const { Header, Content, Footer, Sider } = Layout;
 
@@ -83,6 +93,20 @@ export function DashboardLayout({ user, children }: DashboardLayoutProps) {
     pathname.startsWith("/app/tasks")
   );
   const [searchVisible, setSearchVisible] = useState(false);
+
+  // Filter sidebar items based on user role
+  const filteredSidebar = navigation.sidebar
+    .map((item) => {
+      if (!item.children) return item;
+      const filteredChildren = item.children.filter((child) => {
+        const moduleSlug = SIDEBAR_PATH_TO_MODULE[child.path];
+        if (!moduleSlug) return true; // No mapping = always show
+        return canAccessModule(user.role.name, moduleSlug);
+      });
+      if (filteredChildren.length === 0) return null;
+      return { ...item, children: filteredChildren };
+    })
+    .filter(Boolean) as SidebarItem[];
 
   const displayName = user.name || user.email.split("@")[0];
   const initials = displayName
@@ -161,7 +185,7 @@ export function DashboardLayout({ user, children }: DashboardLayoutProps) {
 
         {/* Navigation items from config */}
         <nav className="px-2 py-4 space-y-1">
-          {navigation.sidebar.map((item) => (
+          {filteredSidebar.map((item) => (
             <SidebarNavItem
               key={item.path}
               item={item}

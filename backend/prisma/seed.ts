@@ -75,24 +75,34 @@ const ROLE_PERMISSIONS: Record<string, { resource: string, action: string }[]> =
     ...p('scheduling', ['read', 'create', 'update']),
     ...p('qc', ['read']),
     ...p('finance', ['read']),
+    ...p('production', ['read']),        // manufacturing read
+    ...p('inventory', ['read']),         // BOM/procurement read
+    ...p('delivery', ['read']),          // delivery read
   ],
   SALES_MANAGER: [
     ...p('crm', ['read', 'create', 'update']),
     ...p('quoting', ['read', 'create', 'update']),
+    ...p('project', ['read']),          // approval-workflow, job-confirmation
+    ...p('finance', ['read']),           // billing-invoicing read access
   ],
   PROJECT_COORDINATOR: [
-    ...p('project', ['read', 'update']), // Requirements gathering
+    ...p('project', ['read', 'create', 'update']), // Requirements & design R/W
+    ...p('crm', ['read']),               // CRM read access
     ...p('work_orders', ['read', 'create', 'update']),
-    ...p('inventory', ['read']),
+    ...p('inventory', ['read']),         // procurement read
+    ...p('scheduling', ['read']),        // production-scheduling read
   ],
   PROCUREMENT_MANAGER: [
     ...p('inventory', ['read', 'create', 'update']),
     ...p('project', ['read']),
+    ...p('work_orders', ['read']),       // work-orders read
+    ...p('production', ['read']),        // packaging read
   ],
   PRODUCTION_MANAGER: [
-    ...p('work_orders', ['read', 'update']),
+    ...p('work_orders', ['read', 'create', 'update']), // work-orders R/W
     ...p('production', ['read', 'create', 'update']),
     ...p('scheduling', ['read', 'create', 'update']),
+    ...p('inventory', ['read']),         // BOM/procurement read
   ],
   QC_MANAGER: [
     ...p('work_orders', ['read']),
@@ -102,6 +112,7 @@ const ROLE_PERMISSIONS: Record<string, { resource: string, action: string }[]> =
     ...p('delivery', ['read', 'create', 'update']),
     ...p('work_orders', ['read']),
     ...p('project', ['read']),
+    ...p('scheduling', ['read']),        // production-scheduling read
   ],
   FINANCE_MANAGER: [
     ...p('finance', ['read', 'create', 'update', 'approve']),
@@ -192,13 +203,19 @@ async function main() {
     },
   });
 
-  // Demo Users for other roles
+  // Demo Users for all roles
   const demoUsers = [
     { email: 'pm@buildtrack.com', name: 'Project Manager', role: 'PROJECT_MANAGER' },
     { email: 'qc@buildtrack.com', name: 'QC User', role: 'QC_MANAGER' },
     { email: 'finance@buildtrack.com', name: 'Finance User', role: 'FINANCE_MANAGER' },
     { email: 'client@buildtrack.com', name: 'Client User', role: 'CLIENT' },
     { email: 'sales@buildtrack.com', name: 'Sales User', role: 'SALES_MANAGER' },
+    { email: 'orgadmin@buildtrack.com', name: 'Org Admin', role: 'ORG_ADMIN' },
+    { email: 'coordinator@buildtrack.com', name: 'Project Coordinator', role: 'PROJECT_COORDINATOR' },
+    { email: 'procurement@buildtrack.com', name: 'Procurement User', role: 'PROCUREMENT_MANAGER' },
+    { email: 'production@buildtrack.com', name: 'Production User', role: 'PRODUCTION_MANAGER' },
+    { email: 'logistics@buildtrack.com', name: 'Logistics User', role: 'LOGISTICS_MANAGER' },
+    { email: 'vendor@buildtrack.com', name: 'Vendor User', role: 'VENDOR' },
   ];
 
   for (const u of demoUsers) {

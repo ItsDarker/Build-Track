@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { DashboardLayout } from "@/components/ui-kit/DashboardLayout";
+import { UserProvider } from "@/lib/context/UserContext";
 import { apiClient } from "@/lib/api/client";
 
 interface User {
@@ -60,8 +61,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
 
     return (
-        <DashboardLayout user={user}>
-            {children}
-        </DashboardLayout>
+        <UserProvider user={user}>
+            <DashboardLayout user={user}>
+                {children}
+            </DashboardLayout>
+        </UserProvider>
     );
 }

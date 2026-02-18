@@ -11,9 +11,14 @@ import {
   CalendarDays,
   TrendingUp,
 } from "lucide-react";
+import { useUser } from "@/lib/context/UserContext";
+import { canAccessModule, MODULE_ACCESS, REVERSE_ROLE_MAP } from "@/config/rbac";
 
 export default function DashboardPage() {
-  const modules = getAllModules();
+  const { role } = useUser();
+  const modules = getAllModules().filter((mod) =>
+    canAccessModule(role.name, mod.slug)
+  );
 
   // Quick stats (mock data - TODO: connect to backend)
   const stats = [
@@ -118,15 +123,25 @@ export default function DashboardPage() {
                     </span>
                   </div>
                   <div className="flex flex-wrap gap-1 mt-1">
-                    {["Admin", ...mod.accessRoles].slice(0, 3).map((role) => (
-                      <Badge
-                        key={role}
-                        variant="secondary"
-                        className="text-[10px] px-1.5 py-0"
-                      >
-                        {role}
-                      </Badge>
-                    ))}
+                    {[
+                      { role: "Admin", level: "R/W" },
+                      ...Object.entries(MODULE_ACCESS[mod.slug] ?? {}).map(
+                        ([dbRole, level]) => ({
+                          role: REVERSE_ROLE_MAP[dbRole] ?? dbRole,
+                          level,
+                        })
+                      ),
+                    ]
+                      .slice(0, 3)
+                      .map((entry) => (
+                        <Badge
+                          key={entry.role}
+                          variant="secondary"
+                          className="text-[10px] px-1.5 py-0"
+                        >
+                          {entry.role}
+                        </Badge>
+                      ))}
                   </div>
                 </CardContent>
               </Card>

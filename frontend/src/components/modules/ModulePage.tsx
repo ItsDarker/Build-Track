@@ -16,6 +16,12 @@ import type { FormMode } from "./DynamicFormRenderer";
 import type { ModuleConfig } from "@/config/buildtrack.config";
 import { ShieldCheck } from "lucide-react";
 import { downloadExcel } from "@/lib/downloadExcel";
+import { useUser } from "@/lib/context/UserContext";
+import {
+  canWriteModule,
+  MODULE_ACCESS,
+  REVERSE_ROLE_MAP,
+} from "@/config/rbac";
 
 interface ModulePageProps {
   module: ModuleConfig;
@@ -147,6 +153,8 @@ function getMockValue(field: string, index: number, mod: ModuleConfig): string {
 
 export function ModulePage({ module }: ModulePageProps) {
   const { modal } = App.useApp();
+  const { role } = useUser();
+  const hasWriteAccess = canWriteModule(role.name, module.slug);
   const [records, setRecords] = useState<Record<string, any>[]>([]);
   const [loading, setLoading] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -258,21 +266,25 @@ export function ModulePage({ module }: ModulePageProps) {
               onClick={() => openDrawer("view", record)}
             />
           </Tooltip>
-          <Tooltip title="Edit">
-            <AntButton
-              icon={<EditOutlined />}
-              size="small"
-              onClick={() => openDrawer("edit", record)}
-            />
-          </Tooltip>
-          <Tooltip title="Delete">
-            <AntButton
-              icon={<DeleteOutlined />}
-              size="small"
-              onClick={() => handleDelete(record._id)}
-              danger
-            />
-          </Tooltip>
+          {hasWriteAccess && (
+            <Tooltip title="Edit">
+              <AntButton
+                icon={<EditOutlined />}
+                size="small"
+                onClick={() => openDrawer("edit", record)}
+              />
+            </Tooltip>
+          )}
+          {hasWriteAccess && (
+            <Tooltip title="Delete">
+              <AntButton
+                icon={<DeleteOutlined />}
+                size="small"
+                onClick={() => handleDelete(record._id)}
+                danger
+              />
+            </Tooltip>
+          )}
         </div>
       ),
     });
@@ -429,7 +441,15 @@ export function ModulePage({ module }: ModulePageProps) {
         ? `Edit ${module.name}`
         : `${module.name} — Record Details`;
 
-  const allRoles = ["Admin", ...module.accessRoles];
+  const accessBadges = [
+    { roleName: "Admin", level: "R/W" as const },
+    ...Object.entries(MODULE_ACCESS[module.slug] ?? {}).map(
+      ([dbRole, level]) => ({
+        roleName: REVERSE_ROLE_MAP[dbRole] ?? dbRole,
+        level,
+      })
+    ),
+  ];
 
   return (
     <div className="space-y-6">
@@ -445,13 +465,14 @@ export function ModulePage({ module }: ModulePageProps) {
           {/* Role access badges */}
           <div className="flex items-center flex-wrap gap-1.5 mt-3">
             <ShieldCheck className="w-4 h-4 text-gray-400 mr-0.5" />
-            {allRoles.map((role) => (
+            {accessBadges.map((entry) => (
               <Badge
-                key={role}
-                variant={role === "Admin" ? "default" : "secondary"}
+                key={entry.roleName}
+                variant={entry.roleName === "Admin" ? "default" : "secondary"}
                 className="text-xs"
               >
-                {role}
+                {entry.roleName}
+                {entry.level === "R" ? " (view)" : ""}
               </Badge>
             ))}
           </div>
@@ -465,13 +486,15 @@ export function ModulePage({ module }: ModulePageProps) {
             <DownloadOutlined />
             Download Excel
           </Button>
-          <Button
-            className="bg-orange-500 hover:bg-orange-600 text-white gap-2"
-            onClick={() => openDrawer("create")}
-          >
-            <PlusOutlined />
-            Create New
-          </Button>
+          {hasWriteAccess && (
+            <Button
+              className="bg-orange-500 hover:bg-orange-600 text-white gap-2"
+              onClick={() => openDrawer("create")}
+            >
+              <PlusOutlined />
+              Create New
+            </Button>
+          )}
         </div>
       </div>
 

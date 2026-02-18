@@ -3,20 +3,20 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files
+# Copy root package files
 COPY package*.json ./
-COPY prisma ./prisma/
 
-# Install dependencies including dev (for build)
-RUN npm install
+# Copy backend package files
+COPY backend/package*.json ./backend/
 
-# Copy source code
-COPY . .
+# Install all dependencies (including dev)
+RUN npm ci
 
-# Generate Prisma client
-RUN npx prisma generate
+# Copy backend source code
+COPY backend/ ./backend/
 
-# Build the application
+# Build TypeScript to JavaScript
+WORKDIR /app/backend
 RUN npm run build
 
 # Production stage
@@ -24,21 +24,29 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Copy package files for production install
+# Copy root package files
 COPY package*.json ./
 
+# Copy backend package files
+COPY backend/package*.json ./backend/
+
 # Install only production dependencies
-RUN npm install --only=production
+RUN npm ci --omit=dev
 
-# Copy built artifacts from builder
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/prisma ./prisma
+# Copy built application from builder stage
+COPY --from=builder /app/backend/dist ./backend/dist
 
-# Generate Prisma client for production
-RUN npx prisma generate
+# Create uploads directory for file storage
+RUN mkdir -p public/uploads
 
-# Expose port
+# Set environment to production
+ENV NODE_ENV=production
+ENV PORT=4000
+
+# Health check to ensure container is working
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:4000/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
+
 EXPOSE 4000
 
-# Start command
-CMD ["npm", "start"]
+CMD ["node", "backend/dist/index.js"]
