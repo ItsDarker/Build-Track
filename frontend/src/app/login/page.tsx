@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
@@ -17,7 +16,7 @@ export default function LoginPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [imgError, setImgError] = useState(false);
+  
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -60,22 +59,12 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen relative flex">
-      {/* Background Image */}
-      <div className="absolute inset-0 z-0">
-        {!imgError ? (
-          <Image
-            src="/brand/hero-bg.jpg"
-            alt="Construction site"
-            fill
-            className="object-cover"
-            priority
-            onError={() => setImgError(true)}
-          />
-        ) : (
-          <div className="w-full h-full bg-gradient-to-br from-slate-700 via-slate-600 to-orange-800" />
-        )}
+      {/* Background */}
+       <div className="absolute inset-0 z-0">
+        <div className="w-full h-full bg-gradient-to-br from-slate-700 via-slate-600 to-orange-800" />
         <div className="absolute inset-0 bg-slate-900/30" />
       </div>
+
 
       {/* Left Side - Branding */}
       <div className="hidden lg:flex flex-col justify-between relative z-10 w-full items-center justify-center lg:w-1/2 p-12">

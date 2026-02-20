@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
@@ -22,7 +21,7 @@ export default function SignupPage() {
   const [password, setPassword] = useState("");
   const [phone, setPhone] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
-  const [imgError, setImgError] = useState(false);
+ 
 
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -80,18 +79,7 @@ export default function SignupPage() {
       <div className="min-h-screen relative flex items-center justify-center">
         {/* Background */}
         <div className="absolute inset-0 z-0">
-          {!imgError ? (
-            <Image
-              src="/brand/hero-bg.jpg"
-              alt="Construction site"
-              fill
-              className="object-cover"
-              priority
-              onError={() => setImgError(true)}
-            />
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-slate-700 via-slate-600 to-orange-800" />
-          )}
+          <div className="w-full h-full bg-gradient-to-br from-slate-700 via-slate-600 to-orange-800" />
           <div className="absolute inset-0 bg-slate-900/30" />
         </div>
 
@@ -129,23 +117,6 @@ export default function SignupPage() {
 
   return (
     <div className="min-h-screen relative flex">
-      {/* Background Image */}
-      <div className="absolute inset-0 z-0">
-        {!imgError ? (
-          <Image
-            src="/brand/hero-bg.jpg"
-            alt="Construction site"
-            fill
-            className="object-cover"
-            priority
-            onError={() => setImgError(true)}
-          />
-        ) : (
-          <div className="w-full h-full bg-gradient-to-br from-slate-700 via-slate-600 to-orange-800" />
-        )}
-        <div className="absolute inset-0 bg-slate-900/30" />
-      </div>
-
       {/* Left Side - Branding */}
       <div className="hidden lg:flex flex-col justify-between relative z-10 w-full items-center justify-center lg:w-1/2 p-12">
         <div>
