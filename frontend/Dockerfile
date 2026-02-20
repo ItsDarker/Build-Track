@@ -1,54 +1,51 @@
-# Build stage
-FROM node:18-alpine AS builder
+# ============================================================
+# Stage 1: Build
+# ============================================================
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy root package files
+# Copy ALL workspace manifests so npm ci can resolve workspaces
 COPY package*.json ./
-
-# Copy frontend package files
 COPY frontend/package*.json ./frontend/
+COPY backend/package*.json ./backend/
 
-# Install all dependencies
+# Install all deps
 RUN npm ci
 
-# Copy frontend source code
+# Copy frontend source
 COPY frontend/ ./frontend/
 
-# Build Next.js application
+# Build Next.js
 WORKDIR /app/frontend
 ENV NODE_ENV=production
-ENV NEXT_PUBLIC_API_URL=/api
+# NEXT_PUBLIC_API_URL is baked in at build time via --build-arg
+ARG NEXT_PUBLIC_API_URL=https://buildtrack-backend-102021166885.us-central1.run.app
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+
 RUN npm run build
 
-# Production stage
-FROM node:18-alpine
+# ============================================================
+# Stage 2: Production runtime
+# ============================================================
+FROM node:20-alpine AS runner
 
 WORKDIR /app
 
-# Copy root package files
 COPY package*.json ./
-
-# Copy frontend package files
 COPY frontend/package*.json ./frontend/
+COPY backend/package*.json ./backend/
 
-# Install only production dependencies
-RUN npm ci --omit=dev --workspace=frontend
+RUN npm ci --omit=dev
 
-# Copy built Next.js application from builder
 COPY --from=builder /app/frontend/.next ./frontend/.next
 COPY --from=builder /app/frontend/public ./frontend/public
-COPY --from=builder /app/frontend/package.json ./frontend/package.json
+COPY frontend/next.config.js ./frontend/next.config.js
 
-# Set environment
 ENV NODE_ENV=production
-ENV NEXT_PUBLIC_API_URL=/api
 ENV PORT=3000
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD wget --quiet --tries=1 --spider http://localhost:3000 || exit 1
 
 EXPOSE 3000
 
-CMD ["npm", "start", "--workspace=frontend"]
+WORKDIR /app/frontend
+CMD ["node_modules/.bin/next", "start", "-p", "3000"]

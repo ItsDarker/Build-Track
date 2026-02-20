@@ -4,17 +4,13 @@ const nextConfig = {
 
   // Turbopack configuration (Next.js 16+)
   turbopack: {
-    // Resolve aliases for compatibility
     resolveAlias: {
-      // Ensure framer-motion works correctly
       'framer-motion': 'framer-motion',
     },
   },
 
-  // Transpile packages that need it
   transpilePackages: ['antd', '@ant-design/icons', 'framer-motion'],
 
-  // Image optimization config
   images: {
     remotePatterns: [
       {
@@ -24,21 +20,24 @@ const nextConfig = {
     ],
   },
 
-  // ✅ Proxy backend API to Express on :4000 (avoids cookie/CORS issues)
+  // ✅ In production, BACKEND_URL is set as an env var on the Cloud Run service.
+  // In local dev it falls back to localhost:4000.
+  // NOTE: BACKEND_URL (no NEXT_PUBLIC_ prefix) is read at Node.js runtime by
+  // Next.js rewrites — it is NOT baked into the browser bundle.
   async rewrites() {
+    const backendUrl = process.env.BACKEND_URL || 'http://localhost:4000';
     return [
       {
         source: '/backend-api/:path*',
-        destination: 'http://localhost:4000/api/:path*',
+        destination: `${backendUrl}/api/:path*`,
       },
       {
         source: '/backend-uploads/:path*',
-        destination: 'http://localhost:4000/uploads/:path*',
+        destination: `${backendUrl}/uploads/:path*`,
       },
     ];
   },
 
-  // Disable server actions warning for now
   experimental: {
     serverActions: {
       allowedOrigins: ['localhost:3000'],
@@ -47,4 +46,3 @@ const nextConfig = {
 }
 
 module.exports = nextConfig
-

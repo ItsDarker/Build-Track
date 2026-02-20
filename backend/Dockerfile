@@ -1,51 +1,56 @@
-# Build stage
-FROM node:18-alpine AS builder
+# ============================================================
+# Stage 1: Build
+# ============================================================
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy root package files
+# Copy ALL workspace manifests so npm ci can resolve workspaces
 COPY package*.json ./
-
-# Copy backend package files
 COPY backend/package*.json ./backend/
+COPY frontend/package*.json ./frontend/
 
-# Install all dependencies (including dev)
+# Install ALL deps (including devDeps needed for tsc + prisma generate)
 RUN npm ci
 
-# Copy backend source code
+# Copy backend source + prisma schema
 COPY backend/ ./backend/
 
-# Build TypeScript to JavaScript
+# Generate Prisma client, then compile TypeScript
 WORKDIR /app/backend
+RUN npx prisma generate
 RUN npm run build
 
-# Production stage
-FROM node:18-alpine
+# ============================================================
+# Stage 2: Production runtime
+# ============================================================
+FROM node:20-alpine AS runner
 
 WORKDIR /app
 
-# Copy root package files
+# Copy workspace manifests
 COPY package*.json ./
-
-# Copy backend package files
 COPY backend/package*.json ./backend/
+COPY frontend/package*.json ./frontend/
 
 # Install only production dependencies
 RUN npm ci --omit=dev
 
-# Copy built application from builder stage
+# Copy Prisma schema (needed for runtime client resolution)
+COPY backend/prisma ./backend/prisma
+
+# Copy compiled JS from builder
 COPY --from=builder /app/backend/dist ./backend/dist
 
-# Create uploads directory for file storage
+# Copy generated Prisma client
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+
+# Uploads directory (writable at runtime)
 RUN mkdir -p public/uploads
 
-# Set environment to production
 ENV NODE_ENV=production
 ENV PORT=4000
-
-# Health check to ensure container is working
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:4000/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
 
 EXPOSE 4000
 
