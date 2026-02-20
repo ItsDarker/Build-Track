@@ -34,7 +34,7 @@ export function Logo({
     <span className={`flex items-center gap-2 ${className}`}>
       <span className={`${s.container} rounded-lg overflow-hidden flex-shrink-0 bg-white`}>
         <Image
-          src="/brand/logo.jpeg"
+          src="/brand/logo-mark.png"
           alt="BuildTrack"
           width={s.image}
           height={s.image}
