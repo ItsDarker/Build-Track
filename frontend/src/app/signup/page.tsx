@@ -117,6 +117,12 @@ export default function SignupPage() {
 
   return (
     <div className="min-h-screen relative flex">
+      {/* Background */}
+      <div className="absolute inset-0 z-0">
+        <div className="w-full h-full bg-gradient-to-br from-slate-700 via-slate-600 to-orange-800" />
+        <div className="absolute inset-0 bg-slate-900/30" />
+      </div>
+
       {/* Left Side - Branding */}
       <div className="hidden lg:flex flex-col justify-between relative z-10 w-full items-center justify-center lg:w-1/2 p-12">
         <div>

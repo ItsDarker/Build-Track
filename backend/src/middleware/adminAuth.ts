@@ -48,7 +48,7 @@ export const requireAdmin = async (
     req.admin = {
       userId: dbUser.id,
       email: dbUser.email,
-      role: dbUser.role,
+      role: (dbUser.role as any)?.name || '',
     };
 
     next();

@@ -9,7 +9,7 @@ export const teamService = {
         return prisma.user.findMany({
             where: {
                 role: {
-                    in: ['ADMIN', 'PM', 'SUBCONTRACTOR']
+                    is: { name: { in: ['ADMIN', 'PM', 'SUBCONTRACTOR'] } }
                 }
             },
             select: {
@@ -58,7 +58,7 @@ export const teamService = {
         }
 
         // Don't allow deleting admins from the team page (use admin settings for that)
-        if (user.role === 'ADMIN') {
+        if ((user.role as any)?.name === 'ADMIN') {
             throw new Error('Admins cannot be removed from the team page. Use Admin settings.');
         }
 

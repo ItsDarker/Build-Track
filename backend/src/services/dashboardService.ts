@@ -47,7 +47,7 @@ export const dashboardService = {
         // 3. Team Members count (Visible to everyone for now)
         const teamCount = await prisma.user.count({
             where: {
-                role: { in: ['ADMIN', 'PM', 'SUBCONTRACTOR'] },
+                role: { is: { name: { in: ['ADMIN', 'PM', 'SUBCONTRACTOR'] } } },
                 isBlocked: false
             }
         });
