@@ -104,7 +104,7 @@ steps:
       - '--service-account'
       - 'buildtrack-cloudrun@$PROJECT_ID.iam.gserviceaccount.com'
       - '--set-env-vars'
-      - 'NODE_ENV=production,BACKEND_URL=https://buildtrack-backend-buildtrac-app.us-central1.run.app'
+      - 'NODE_ENV=production,BACKEND_URL=https://buildtrack-backend-102021166885.us-central1.run.app'
       - '--allow-unauthenticated'
       - '--port'
       - '3000'
