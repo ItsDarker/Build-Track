@@ -28,6 +28,9 @@ FROM node:20-slim AS runner
 
 WORKDIR /app
 
+# Install OpenSSL 1.1 (required by Prisma)
+RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+
 # Copy workspace manifests
 COPY package*.json ./
 COPY backend/package*.json ./backend/
