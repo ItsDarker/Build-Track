@@ -66,7 +66,7 @@ steps:
       - 'buildtrack-cloudrun@$PROJECT_ID.iam.gserviceaccount.com'
       - '--set-env-vars'
       - >-
-        NODE_ENV=production,PORT=4000,FRONTEND_URL=https://buildtrack-frontend-buildtrac-app.us-central1.run.app,JWT_EXPIRES_IN=15m,JWT_REFRESH_EXPIRES_IN=7d,MAIL_MODE=smtp,COOKIE_SECURE=true,COOKIE_SAME_SITE=none,COOKIE_DOMAIN=.run.app,MICROSOFT_TENANT_ID=common,GOOGLE_REDIRECT_URI=https://buildtrack-backend-buildtrac-app.us-central1.run.app/api/auth/oauth/google/callback,MICROSOFT_REDIRECT_URI=https://buildtrack-backend-buildtrac-app.us-central1.run.app/api/auth/oauth/microsoft/callback
+        NODE_ENV=production,FRONTEND_URL=https://buildtrack-frontend-buildtrac-app.us-central1.run.app,JWT_EXPIRES_IN=15m,JWT_REFRESH_EXPIRES_IN=7d,MAIL_MODE=smtp,COOKIE_SECURE=true,COOKIE_SAME_SITE=none,COOKIE_DOMAIN=.run.app,MICROSOFT_TENANT_ID=common,GOOGLE_REDIRECT_URI=https://buildtrack-backend-buildtrac-app.us-central1.run.app/api/auth/oauth/google/callback,MICROSOFT_REDIRECT_URI=https://buildtrack-backend-buildtrac-app.us-central1.run.app/api/auth/oauth/microsoft/callback
       - '--set-secrets'
       - >-
         DATABASE_URL=buildtrack-database-url:latest,JWT_SECRET=buildtrack-jwt-secret:latest,JWT_REFRESH_SECRET=buildtrack-jwt-refresh-secret:latest,GOOGLE_CLIENT_ID=buildtrack-google-client-id:latest,GOOGLE_CLIENT_SECRET=buildtrack-google-client-secret:latest,MICROSOFT_CLIENT_ID=buildtrack-microsoft-client-id:latest,MICROSOFT_CLIENT_SECRET=buildtrack-microsoft-client-secret:latest,SMTP_HOST=buildtrack-smtp-host:latest,SMTP_PORT=buildtrack-smtp-port:latest,SMTP_USER=buildtrack-smtp-user:latest,SMTP_PASS=buildtrack-smtp-password:latest,SMTP_FROM=buildtrack-smtp-from:latest
@@ -104,7 +104,7 @@ steps:
       - '--service-account'
       - 'buildtrack-cloudrun@$PROJECT_ID.iam.gserviceaccount.com'
       - '--set-env-vars'
-      - 'NODE_ENV=production,PORT=3000,BACKEND_URL=https://buildtrack-backend-buildtrac-app.us-central1.run.app'
+      - 'NODE_ENV=production,BACKEND_URL=https://buildtrack-backend-buildtrac-app.us-central1.run.app'
       - '--allow-unauthenticated'
       - '--port'
       - '3000'
