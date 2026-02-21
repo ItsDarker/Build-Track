@@ -34,7 +34,9 @@ steps:
       - '-t'
       - 'us-central1-docker.pkg.dev/$PROJECT_ID/buildtrack-registry/frontend:latest'
       - '--build-arg'
-      - 'NEXT_PUBLIC_API_URL=https://buildtrack-backend-buildtrac-app.us-central1.run.app' # UPDATE THIS AFTER FIRST DEPLOY (Step 10 in guide)
+      - 'NEXT_PUBLIC_API_URL=https://buildtrack-backend-102021166885.us-central1.run.app'
+      - '--build-arg'
+      - 'BACKEND_URL=https://buildtrack-backend-102021166885.us-central1.run.app'
       - '-f'
       - 'frontend/Dockerfile'
       - '.'
