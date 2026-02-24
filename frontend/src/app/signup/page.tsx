@@ -21,6 +21,9 @@ export default function SignupPage() {
   const [password, setPassword] = useState("");
   const [phone, setPhone] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
+  const EMAIL_VERIFICATION_DISABLED =
+  (process.env.NEXT_PUBLIC_DISABLE_EMAIL_VERIFICATION ?? "false") === "true";
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
  
 
 
@@ -93,8 +96,9 @@ export default function SignupPage() {
               </div>
               <h2 className="text-2xl font-bold text-slate-900 mb-2">Account Created!</h2>
               <p className="text-gray-600 mb-6">
-                We&apos;ve sent a verification email to your inbox. Please click the link to verify your account.
+                {successMessage ?? "Account created! You can now log in."}
               </p>
+            {!EMAIL_VERIFICATION_DISABLED && (
               <p className="text-sm text-gray-500 mb-6">
                 Didn&apos;t receive the email? Check your spam folder or{" "}
                 <Link href="/resend-verification" className="text-orange-600 hover:underline">
@@ -102,6 +106,7 @@ export default function SignupPage() {
                 </Link>
                 .
               </p>
+            )}
               <Button
                 className="w-full bg-orange-500 hover:bg-orange-600 text-white"
                 onClick={() => router.push("/login")}
