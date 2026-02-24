@@ -6,6 +6,9 @@ import { generateAccessToken, generateRefreshToken } from '../utils/jwt';
 import { isDisposableEmail, isLikelySpamDomain } from '../utils/emailValidation';
 import { sendVerificationEmail } from './emailService';
 
+const EMAIL_VERIFICATION_DISABLED =
+  (process.env.DISABLE_EMAIL_VERIFICATION ?? "false") === "true";
+
 const MAX_FAILED_ATTEMPTS = 10;
 const ATTEMPT_WINDOW_HOURS = 1;
 
@@ -55,47 +58,58 @@ export class AuthService {
       }
     }
 
-
-
     // Hash password
     const passwordHash = await bcrypt.hash(password, 12);
 
+    // Pick default role (same as OAuth flow)
+    const defaultRole = await prisma.role.findUnique({ where: { name: "VENDOR" } });
+    if (!defaultRole) throw new Error("Default role VENDOR not found in roles table");
+
     // Create user
-    const user = await prisma.user.create({
-      data: {
-        email,
-        name: name || null,
-        passwordHash,
-      },
-    });
+      const user = await prisma.user.create({
+        data: {
+          email,
+          name: name || null,
+          passwordHash,
+          roleId: defaultRole.id, 
+          emailVerified: EMAIL_VERIFICATION_DISABLED ? new Date() : null,
+    },
+  });
 
-    // Generate verification token
-    const token = randomBytes(32).toString('hex');
-    const tokenHash = hashToken(token);
-    const expiresAt = new Date();
-    expiresAt.setMinutes(expiresAt.getMinutes() + config.verificationTokenExpiresMinutes);
+    // MVP path: skip email verification
+      if (EMAIL_VERIFICATION_DISABLED) {
+        return { message: "Account created! You can now log in." };
+      }
 
-    await prisma.verificationToken.create({
-      data: {
-        userId: user.id,
-        email: user.email,
-        tokenHash,
-        expiresAt,
-      },
-    });
-
-    // Send verification email
-    const verificationUrl = `${config.frontendUrl}/verify-email?token=${token}`;
-    await sendVerificationEmail({
-      to: user.email,
-      name: user.name || undefined,
-      verificationUrl,
-    });
-
-    return {
-      message: 'Account created! Please check your email to verify your account.',
-    };
-  }
+    // Non-MVP path: generate token + send verification email
+      const token = randomBytes(32).toString("hex");
+      const tokenHash = hashToken(token);
+      const expiresAt = new Date();
+      expiresAt.setMinutes(
+        expiresAt.getMinutes() + config.verificationTokenExpiresMinutes
+      );
+      
+      await prisma.verificationToken.create({
+        data: {
+          userId: user.id,
+          email: user.email,
+          tokenHash,
+          expiresAt,
+        },
+      });
+      
+      const verificationUrl = `${config.frontendUrl}/verify-email?token=${token}`;
+      
+      await sendVerificationEmail({
+        to: user.email,
+        name: user.name || undefined,
+        verificationUrl,
+      });
+      
+      return {
+        message: "Account created! Please check your email to verify your account.",
+      }; 
+    }
 
   async loginWithOAuth(email: string, name: string): Promise<AuthTokens & { user: any }> {
   // 1) Find user (include role so caller can check role.name)
@@ -200,7 +214,7 @@ export class AuthService {
     throw new Error("Your account has been blocked. Please contact support.");
   }
 
-  if (!user.emailVerified) {
+  if (!EMAIL_VERIFICATION_DISABLED && !user.emailVerified) {
     throw new Error("Please verify your email before logging in");
   }
 

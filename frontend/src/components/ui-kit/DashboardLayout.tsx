@@ -101,7 +101,8 @@ export function DashboardLayout({ user, children }: DashboardLayoutProps) {
       const filteredChildren = item.children.filter((child) => {
         const moduleSlug = SIDEBAR_PATH_TO_MODULE[child.path];
         if (!moduleSlug) return true; // No mapping = always show
-        return canAccessModule(user.role.name, moduleSlug);
+        const roleName = user?.role?.name ?? "VENDOR";
+        return canAccessModule(roleName, moduleSlug);
       });
       if (filteredChildren.length === 0) return null;
       return { ...item, children: filteredChildren };
