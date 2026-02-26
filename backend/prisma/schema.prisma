@@ -11,6 +11,13 @@ datasource db {
 model User {
   id                   String              @id @default(cuid())
   name                 String?
+  firstName            String?             @map("first_name")
+  lastName             String?             @map("last_name")
+  displayName          String?             @map("display_name")
+  avatarUrl            String?             @map("avatar_url")
+  userType             String?             @map("user_type")
+  userStatus           String?             @default("Active") @map("user_status")
+  team                 String?
   email                String              @unique
   passwordHash         String?             @map("password_hash")
   emailVerified        DateTime?           @map("email_verified_at")
@@ -181,16 +188,21 @@ model ContentImage {
 }
 
 model Client {
-  id        String    @id @default(cuid())
-  name      String
-  email     String?
-  phone     String?
-  company   String?
-  address   String?
-  notes     String?
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  projects  Project[]
+  id                      String    @id @default(cuid())
+  name                    String
+  email                   String?
+  phone                   String?
+  altPhone                String?   @map("alt_phone")
+  company                 String?
+  role                    String?   // Owner | Manager | Purchasing
+  projectAddress          String?   @map("project_address")
+  billingAddress          String?   @map("billing_address")
+  address                 String?   // legacy — kept for backward compat
+  preferredApprovalMethod String?   @map("preferred_approval_method")
+  notes                   String?
+  createdAt               DateTime  @default(now()) @map("created_at")
+  updatedAt               DateTime  @updatedAt @map("updated_at")
+  projects                Project[]
 
   @@map("clients")
 }
@@ -229,6 +241,18 @@ model Task {
   project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@map("tasks")
+}
+
+// BT0006: Team entity — defines team groups (separate from the user's team field)
+model Team {
+  id        String   @id @default(cuid())
+  name      String
+  teamType  String?  @map("team_type")
+  status    String   @default("Active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("teams")
 }
 
 model Invitation {

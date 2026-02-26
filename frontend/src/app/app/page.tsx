@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { getAllModules } from "@/config/buildtrack.config";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +14,7 @@ import {
 } from "lucide-react";
 import { useUser } from "@/lib/context/UserContext";
 import { canAccessModule, MODULE_ACCESS, REVERSE_ROLE_MAP } from "@/config/rbac";
+import { apiClient } from "@/lib/api/client";
 
 export default function DashboardPage() {
   const { role } = useUser();
@@ -20,12 +22,34 @@ export default function DashboardPage() {
     canAccessModule(role.name, mod.slug)
   );
 
-  // Quick stats (mock data - TODO: connect to backend)
+  const [statsData, setStatsData] = useState({
+    activeProjects: 0,
+    openWorkOrders: 0,
+    activeTasks: 0,
+    overdueIssues: 0,
+  });
+
+  useEffect(() => {
+    apiClient.getDashboardStats().then((res: any) => {
+      if (res?.data?.stats) {
+        const s = res.data.stats;
+        setStatsData({
+          activeProjects: s.activeProjects ?? 0,
+          openWorkOrders: s.openWorkOrders ?? 0,
+          activeTasks: s.activeTasks ?? 0,
+          overdueIssues: s.overdueIssues ?? 0,
+        });
+      }
+    });
+  }, []);
+
+  // BT0002: Metric tiles reflect actual counts from backend
+  // BT0003: Each tile links to its corresponding module
   const stats = [
-    { label: "Active Leads", value: 12, color: "text-orange-500", bg: "bg-orange-50" },
-    { label: "Open Work Orders", value: 8, color: "text-blue-500", bg: "bg-blue-50" },
-    { label: "Pending Deliveries", value: 5, color: "text-green-500", bg: "bg-green-50" },
-    { label: "Active Projects", value: 3, color: "text-purple-500", bg: "bg-purple-50" },
+    { label: "Active Projects",  value: statsData.activeProjects,  color: "text-purple-500", bg: "bg-purple-50", href: "/app/projects" },
+    { label: "Open Work Orders", value: statsData.openWorkOrders,  color: "text-blue-500",   bg: "bg-blue-50",   href: "/app/tasks/work-orders" },
+    { label: "Active Tasks",     value: statsData.activeTasks,     color: "text-orange-500", bg: "bg-orange-50", href: "/app/tasks" },
+    { label: "Overdue Issues",   value: statsData.overdueIssues,   color: "text-red-500",    bg: "bg-red-50",    href: "/app/tasks" },
   ];
 
   return (
@@ -41,21 +65,23 @@ export default function DashboardPage() {
       {/* Quick Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat) => (
-          <Card key={stat.label} className="border-0 shadow-sm">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500">{stat.label}</p>
-                  <p className={`text-3xl font-bold mt-1 ${stat.color}`}>
-                    {stat.value}
-                  </p>
+          <Link key={stat.label} href={stat.href}>
+            <Card className="border-0 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-500">{stat.label}</p>
+                    <p className={`text-3xl font-bold mt-1 ${stat.color}`}>
+                      {stat.value}
+                    </p>
+                  </div>
+                  <div className={`p-3 rounded-full ${stat.bg}`}>
+                    <TrendingUp className={`w-5 h-5 ${stat.color}`} />
+                  </div>
                 </div>
-                <div className={`p-3 rounded-full ${stat.bg}`}>
-                  <TrendingUp className={`w-5 h-5 ${stat.color}`} />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </Link>
         ))}
       </div>
 

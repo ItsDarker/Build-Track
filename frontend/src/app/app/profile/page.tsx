@@ -7,6 +7,8 @@ import {
   Button,
   Input,
   Form,
+  Select,
+  Upload,
   message,
   Spin,
   Tabs,
@@ -22,25 +24,35 @@ import {
   SaveOutlined,
   BankOutlined,
   IdcardOutlined,
+  CameraOutlined,
 } from "@ant-design/icons";
+import type { UploadChangeParam, UploadFile } from "antd/es/upload";
 import { normalizePhoneNumber, formatPhoneNumber } from "@/lib/phoneUtils";
 import { apiClient } from "@/lib/api/client";
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
 
+const USER_TYPE_OPTIONS = ["Employee", "Contractor", "Customer", "Admin"];
+const USER_STATUS_OPTIONS = ["Active", "Inactive"];
+const TEAM_OPTIONS = ["Sales", "Designer", "Production", "QC", "Installer", "Finance", "Admin"];
+
 interface UserProfile {
   id: string;
   email: string;
   name: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  displayName?: string | null;
+  avatarUrl?: string | null;
+  userType?: string | null;
+  userStatus?: string | null;
+  team?: string | null;
   phone?: string;
   company?: string;
   jobTitle?: string;
   bio?: string;
-  role: {
-    name: string;
-    displayName: string;
-  };
+  role: { name: string; displayName: string };
   createdAt?: string;
 }
 
@@ -50,6 +62,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [profileForm] = Form.useForm();
   const [passwordForm] = Form.useForm();
 
@@ -62,27 +75,41 @@ export default function ProfilePage() {
       }
       const userData = (result.data as any).user;
       setUser(userData);
-      // Removed setFieldsValue here to avoid "Instance not connected" warning
-      // because Form is not rendered while loading=true
+      setAvatarPreview(userData.avatarUrl || null);
       setLoading(false);
     };
     fetchUser();
   }, [router]);
 
+  // Handle avatar file pick — store as base64 data URL, no server upload needed
+  const handleAvatarChange = (info: UploadChangeParam<UploadFile>) => {
+    const file = info.file.originFileObj ?? (info.file as any);
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      setAvatarPreview(dataUrl);
+      profileForm.setFieldsValue({ avatarUrl: dataUrl });
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSaveProfile = async (values: any) => {
     setSaving(true);
-
     const normalizedPhone = normalizePhoneNumber(values.phone);
-    const payload = { ...values, phone: normalizedPhone || values.phone };
-
+    const payload = {
+      ...values,
+      phone: normalizedPhone || values.phone,
+      avatarUrl: avatarPreview ?? undefined,
+    };
     const result = await apiClient.updateProfile(payload);
     if (result.error) {
       message.error(result.error);
     } else {
       message.success("Profile updated successfully");
-      setUser((prev) => prev ? { ...prev, ...values, phone: normalizedPhone || values.phone } : prev);
-
-      // Update form with formatted value
+      setUser((prev) =>
+        prev ? { ...prev, ...payload } : prev
+      );
       if (normalizedPhone) {
         profileForm.setFieldsValue({ phone: formatPhoneNumber(normalizedPhone) });
       }
@@ -113,7 +140,12 @@ export default function ProfilePage() {
     );
   }
 
-  const displayName = user.name || user.email.split("@")[0];
+  const displayName =
+    user.displayName ||
+    [user.firstName, user.lastName].filter(Boolean).join(" ") ||
+    user.name ||
+    user.email.split("@")[0];
+
   const initials = displayName
     .split(" ")
     .map((n) => n[0])
@@ -132,16 +164,60 @@ export default function ProfilePage() {
           onFinish={handleSaveProfile}
           className="max-w-2xl"
           initialValues={{
-            name: user.name || "",
+            firstName: user.firstName || "",
+            lastName: user.lastName || "",
+            displayName: user.displayName || "",
             phone: formatPhoneNumber(user.phone) || "",
+            userType: user.userType || undefined,
+            userStatus: user.userStatus || "Active",
+            team: user.team || undefined,
             company: user.company || "",
             jobTitle: user.jobTitle || "",
             bio: user.bio || "",
           }}
         >
+          {/* Avatar upload */}
+          <Form.Item label="Profile Photo" name="avatarUrl" className="mb-6">
+            <div className="flex items-center gap-4">
+              <Avatar
+                size={80}
+                src={avatarPreview || undefined}
+                style={{ backgroundColor: "#f97316", fontSize: 28, flexShrink: 0 }}
+              >
+                {!avatarPreview && initials}
+              </Avatar>
+              <Upload
+                accept="image/*"
+                showUploadList={false}
+                beforeUpload={() => false}
+                onChange={handleAvatarChange}
+              >
+                <Button icon={<CameraOutlined />}>Change Photo</Button>
+              </Upload>
+            </div>
+          </Form.Item>
+
+          <Divider className="my-4" />
+
+          {/* Name row */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Form.Item name="name" label="Full Name" rules={[{ required: true, message: "Please enter your name" }]}>
-              <Input prefix={<UserOutlined />} placeholder="John Doe" size="large" />
+            <Form.Item
+              name="firstName"
+              label="First Name"
+              rules={[{ required: true, message: "First name is required" }]}
+            >
+              <Input prefix={<UserOutlined />} placeholder="John" size="large" />
+            </Form.Item>
+            <Form.Item
+              name="lastName"
+              label="Last Name"
+              rules={[{ required: true, message: "Last name is required" }]}
+            >
+              <Input prefix={<UserOutlined />} placeholder="Doe" size="large" />
+            </Form.Item>
+
+            <Form.Item name="displayName" label="Display Name (optional)">
+              <Input prefix={<UserOutlined />} placeholder="e.g. JD or Johnny" size="large" />
             </Form.Item>
             <Form.Item name="phone" label="Phone Number">
               <Input
@@ -150,24 +226,54 @@ export default function ProfilePage() {
                 size="large"
                 onBlur={(e: React.FocusEvent<HTMLInputElement>) => {
                   const formatted = formatPhoneNumber(e.target.value);
-                  if (formatted) {
-                    profileForm.setFieldsValue({ phone: formatted });
-                  }
+                  if (formatted) profileForm.setFieldsValue({ phone: formatted });
                 }}
               />
             </Form.Item>
-            <Form.Item name="company" label="Company / Organization">
-              <Input prefix={<BankOutlined />} placeholder="Acme Construction" size="large" />
+
+            <Form.Item name="userType" label="User Type">
+              <Select size="large" placeholder="Select user type" allowClear>
+                {USER_TYPE_OPTIONS.map((t) => (
+                  <Select.Option key={t} value={t}>{t}</Select.Option>
+                ))}
+              </Select>
+            </Form.Item>
+            <Form.Item name="userStatus" label="Status">
+              <Select size="large" placeholder="Select status">
+                {USER_STATUS_OPTIONS.map((s) => (
+                  <Select.Option key={s} value={s}>{s}</Select.Option>
+                ))}
+              </Select>
+            </Form.Item>
+
+            <Form.Item name="team" label="Team">
+              <Select size="large" placeholder="Select team" allowClear>
+                {TEAM_OPTIONS.map((t) => (
+                  <Select.Option key={t} value={t}>{t}</Select.Option>
+                ))}
+              </Select>
             </Form.Item>
             <Form.Item name="jobTitle" label="Job Title">
               <Input prefix={<IdcardOutlined />} placeholder="Project Manager" size="large" />
             </Form.Item>
+
+            <Form.Item name="company" label="Company / Organization" className="md:col-span-2">
+              <Input prefix={<BankOutlined />} placeholder="Acme Construction" size="large" />
+            </Form.Item>
           </div>
+
           <Form.Item name="bio" label="Bio">
             <TextArea rows={3} placeholder="Tell us about yourself..." />
           </Form.Item>
+
           <Form.Item>
-            <Button type="primary" htmlType="submit" icon={<SaveOutlined />} loading={saving} size="large">
+            <Button
+              type="primary"
+              htmlType="submit"
+              icon={<SaveOutlined />}
+              loading={saving}
+              size="large"
+            >
               Save Changes
             </Button>
           </Form.Item>
@@ -220,7 +326,13 @@ export default function ProfilePage() {
               <Input.Password prefix={<LockOutlined />} placeholder="Confirm new password" size="large" />
             </Form.Item>
             <Form.Item>
-              <Button type="primary" htmlType="submit" icon={<LockOutlined />} loading={changingPassword} size="large">
+              <Button
+                type="primary"
+                htmlType="submit"
+                icon={<LockOutlined />}
+                loading={changingPassword}
+                size="large"
+              >
                 Change Password
               </Button>
             </Form.Item>
@@ -235,16 +347,16 @@ export default function ProfilePage() {
         <div className="max-w-2xl space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="p-4 bg-gray-50 rounded-lg">
-              <Text type="secondary" className="text-xs block">Email</Text>
+              <Text type="secondary" className="text-xs block">User ID</Text>
+              <Text code className="text-xs break-all">{user.id}</Text>
+            </div>
+            <div className="p-4 bg-gray-50 rounded-lg">
+              <Text type="secondary" className="text-xs block">Email (Login)</Text>
               <Text strong>{user.email}</Text>
             </div>
             <div className="p-4 bg-gray-50 rounded-lg">
               <Text type="secondary" className="text-xs block">Role</Text>
               <Text strong className="capitalize">{user.role?.displayName}</Text>
-            </div>
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <Text type="secondary" className="text-xs block">Account ID</Text>
-              <Text code className="text-xs">{user.id}</Text>
             </div>
             {user.createdAt && (
               <div className="p-4 bg-gray-50 rounded-lg">
@@ -262,8 +374,12 @@ export default function ProfilePage() {
     <>
       <div className="mb-6">
         <div className="flex items-center gap-4">
-          <Avatar size={64} style={{ backgroundColor: "#f97316", fontSize: 24 }}>
-            {initials}
+          <Avatar
+            size={64}
+            src={avatarPreview || undefined}
+            style={{ backgroundColor: "#f97316", fontSize: 24 }}
+          >
+            {!avatarPreview && initials}
           </Avatar>
           <div>
             <Title level={3} className="mb-0">{displayName}</Title>
@@ -271,7 +387,9 @@ export default function ProfilePage() {
               <MailOutlined /> <Text type="secondary">{user.email}</Text>
             </div>
             {user.jobTitle && (
-              <Text type="secondary">{user.jobTitle}{user.company ? ` at ${user.company}` : ""}</Text>
+              <Text type="secondary">
+                {user.jobTitle}{user.company ? ` at ${user.company}` : ""}
+              </Text>
             )}
           </div>
         </div>

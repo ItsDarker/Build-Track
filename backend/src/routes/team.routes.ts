@@ -14,6 +14,69 @@ const inviteSchema = z.object({
     role: z.enum(['PM', 'SUBCONTRACTOR', 'CLIENT']), // Roles that can be invited
 });
 
+// ── BT0006: Team entity CRUD ──────────────────────────────────────────────────
+
+/**
+ * GET /api/teams
+ * List all team definitions
+ */
+router.get('/', async (req, res) => {
+    try {
+        const teams = await teamService.listTeams();
+        res.json({ teams });
+    } catch (error) {
+        console.error('Error listing teams:', error);
+        res.status(500).json({ error: 'Failed to list teams' });
+    }
+});
+
+/**
+ * POST /api/teams
+ * Create a new team definition (ADMIN only)
+ */
+router.post('/', requirePermission('create', 'users'), async (req, res) => {
+    try {
+        const { name, teamType, status } = req.body;
+        if (!name) return res.status(400).json({ error: 'Team name is required' });
+        const team = await teamService.createTeam({ name, teamType, status });
+        res.status(201).json({ team });
+    } catch (error) {
+        console.error('Error creating team:', error);
+        res.status(500).json({ error: 'Failed to create team' });
+    }
+});
+
+/**
+ * PUT /api/teams/:id
+ * Update a team definition (ADMIN only)
+ */
+router.put('/:id', requirePermission('create', 'users'), async (req, res) => {
+    try {
+        const { name, teamType, status } = req.body;
+        const team = await teamService.updateTeam(req.params.id, { name, teamType, status });
+        res.json({ team });
+    } catch (error) {
+        console.error('Error updating team:', error);
+        res.status(500).json({ error: 'Failed to update team' });
+    }
+});
+
+/**
+ * DELETE /api/teams/:id
+ * Delete a team definition (ADMIN only)
+ */
+router.delete('/:id', requirePermission('delete', 'users'), async (req, res) => {
+    try {
+        await teamService.deleteTeam(req.params.id);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting team:', error);
+        res.status(500).json({ error: 'Failed to delete team' });
+    }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 /**
  * GET /api/teams/members
  * List all team members

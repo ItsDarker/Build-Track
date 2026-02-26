@@ -30,6 +30,7 @@ import {
   Truck,
   ClipboardCheck,
   Wrench,
+  ShieldCheck,
 } from "lucide-react";
 import { apiClient } from "@/lib/api/client";
 import { Logo } from "./Logo";
@@ -69,6 +70,8 @@ const sidebarIcons: Record<string, React.ReactNode> = {
   "My Projects": <FolderKanban className="w-5 h-5" />,
   "My Calendar": <CalendarDays className="w-5 h-5" />,
   "My Tasks": <ClipboardList className="w-5 h-5" />,
+  "Team Profile": <Users2 className="w-5 h-5" />,
+  "Customers": <ContactsOutlined style={{ fontSize: 18 }} />,
   Leads: <Megaphone className="w-4 h-4" />,
   "Design Requests": <Wrench className="w-4 h-4" />,
   "Work Orders": <ClipboardCheck className="w-4 h-4" />,
@@ -215,6 +218,19 @@ export function DashboardLayout({ user, children }: DashboardLayoutProps) {
             {!collapsed && <span>All Modules</span>}
           </Link>
         </div>
+
+        {/* Super Admin link — only for admin roles */}
+        {["SUPER_ADMIN", "ADMIN", "ORG_ADMIN"].includes(user?.role?.name ?? "") && (
+          <div className="px-2 mt-2 border-t border-slate-700 pt-3 pb-2">
+            <Link
+              href="/admin"
+              className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors text-purple-400 hover:text-purple-200 hover:bg-purple-900/30"
+            >
+              <ShieldCheck className="w-4 h-4 flex-shrink-0" />
+              {!collapsed && <span className="font-medium">Super Admin</span>}
+            </Link>
+          </div>
+        )}
       </Sider>
 
       {/* Main content area */}

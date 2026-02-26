@@ -160,6 +160,37 @@ router.post('/logout', async (req, res) => {
   }
 });
 
+// Update current user profile (protected route)
+router.put('/profile', authenticate, async (req: AuthRequest, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
+    const userId = (req as any).user?.userId ?? (req as any).user?.id;
+    const { firstName, lastName, displayName, avatarUrl, userType, userStatus, team, phone, company, jobTitle, bio } = req.body;
+    const updated = await authService.updateProfile(userId, { firstName, lastName, displayName, avatarUrl, userType, userStatus, team, phone, company, jobTitle, bio });
+    res.json({ user: updated });
+  } catch (error: any) {
+    console.error('Profile update error:', error);
+    res.status(500).json({ error: 'Failed to update profile' });
+  }
+});
+
+// Change password (protected route)
+router.post('/change-password', authenticate, async (req: AuthRequest, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
+    const userId = (req as any).user?.userId ?? (req as any).user?.id;
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) return res.status(400).json({ error: 'currentPassword and newPassword are required' });
+    if (newPassword.length < 10) return res.status(400).json({ error: 'New password must be at least 10 characters' });
+    await authService.changePassword(userId, currentPassword, newPassword);
+    res.json({ message: 'Password changed successfully' });
+  } catch (error: any) {
+    if (error.message === 'Current password is incorrect') return res.status(400).json({ error: error.message });
+    console.error('Change password error:', error);
+    res.status(500).json({ error: 'Failed to change password' });
+  }
+});
+
 // Get current user (protected route)
 router.get('/me', authenticate, async (req: AuthRequest, res) => {
   try {

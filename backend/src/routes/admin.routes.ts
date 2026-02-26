@@ -266,6 +266,20 @@ router.get('/notifications', async (req: Request, res: Response) => {
 });
 
 /**
+ * PUT /api/admin/notifications/read-all
+ * Mark all notifications as read (must be before /:id/read to avoid param clash)
+ */
+router.put('/notifications/read-all', async (req: Request, res: Response) => {
+  try {
+    await adminService.markAllNotificationsRead();
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error marking all notifications as read:', error);
+    res.status(500).json({ error: 'Failed to mark notifications as read' });
+  }
+});
+
+/**
  * PUT /api/admin/notifications/:id/read
  * Mark notification as read
  */
@@ -276,20 +290,6 @@ router.put('/notifications/:id/read', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error marking notification as read:', error);
     res.status(500).json({ error: 'Failed to mark notification as read' });
-  }
-});
-
-/**
- * PUT /api/admin/notifications/read-all
- * Mark all notifications as read
- */
-router.put('/notifications/read-all', async (req: Request, res: Response) => {
-  try {
-    await adminService.markAllNotificationsRead();
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Error marking all notifications as read:', error);
-    res.status(500).json({ error: 'Failed to mark notifications as read' });
   }
 });
 

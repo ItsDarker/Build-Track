@@ -236,12 +236,14 @@ export default function LoginPage() {
             </Button>
           </div>
 
+          {/* BT0001: Sign up disabled — account creation is done by Admins only
           <p className="text-center text-sm text-gray-600 mt-6">
             Don&apos;t have an account?{" "}
             <Link href="/signup" className="text-orange-600 hover:text-orange-700 font-medium hover:underline">
               Sign Up
             </Link>
           </p>
+          */}
 
           <p className="text-center text-xs text-gray-400 mt-4">
             Admin users will be redirected to the admin dashboard automatically.

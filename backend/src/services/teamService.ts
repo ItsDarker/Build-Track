@@ -43,6 +43,26 @@ export const teamService = {
         });
     },
 
+    // ── BT0006: Team entity CRUD ─────────────────────────────────────────────
+
+    async listTeams() {
+        return prisma.team.findMany({ orderBy: { name: 'asc' } });
+    },
+
+    async createTeam(data: { name: string; teamType?: string; status?: string }) {
+        return prisma.team.create({ data: { name: data.name, teamType: data.teamType, status: data.status ?? 'Active' } });
+    },
+
+    async updateTeam(teamId: string, data: { name?: string; teamType?: string; status?: string }) {
+        return prisma.team.update({ where: { id: teamId }, data });
+    },
+
+    async deleteTeam(teamId: string) {
+        return prisma.team.delete({ where: { id: teamId } });
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * Remove a member
      */

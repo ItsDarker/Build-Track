@@ -10,6 +10,7 @@ import {
   SettingOutlined,
   BellOutlined,
   LogoutOutlined,
+  ArrowLeftOutlined,
 } from "@ant-design/icons";
 import { apiClient } from "@/lib/api/client";
 import { Logo } from "@/components/ui-kit/Logo";
@@ -102,7 +103,7 @@ function AdminLayoutInner({ children }: { children: ReactNode }) {
 
       const user = (result.data as any).user;
       // Allow SUPER_ADMIN and ORG_ADMIN to access admin panel
-      const allowedRoles = ["SUPER_ADMIN", "ORG_ADMIN"];
+      const allowedRoles = ["SUPER_ADMIN", "ORG_ADMIN", "ADMIN"];
       if (!user.role?.name || !allowedRoles.includes(user.role.name)) {
         message.error("Access denied. Admin privileges required.");
         router.push("/app");
@@ -188,35 +189,62 @@ function AdminLayoutInner({ children }: { children: ReactNode }) {
     },
   ];
 
-  const notificationMenu = {
-    items: notifications.slice(0, 5).map((notif) => ({
-      key: notif.id,
-      label: (
-        <div
-          className={`py-2 ${!notif.read ? "font-semibold" : ""}`}
-          onClick={() => handleMarkNotificationRead(notif.id)}
-        >
-          <Text strong={!notif.read}>{notif.title}</Text>
-          <br />
-          <Text type="secondary" className="text-xs">
-            {notif.message.substring(0, 50)}...
-          </Text>
-        </div>
-      ),
-    })),
-    footer: (
-      <div className="p-2 border-t">
-        <Space>
-          <Button type="link" size="small" onClick={handleMarkAllRead}>
-            Mark all as read
-          </Button>
-          <Button type="link" size="small" danger onClick={handleClearAllNotifications}>
-            Clear All
-          </Button>
-        </Space>
+  const notificationDropdown = (
+    <div
+      style={{
+        background: "#fff",
+        borderRadius: 8,
+        boxShadow: "0 6px 16px rgba(0,0,0,0.12)",
+        minWidth: 320,
+        maxWidth: 380,
+      }}
+    >
+      <div style={{ padding: "12px 16px", borderBottom: "1px solid #f0f0f0", fontWeight: 600 }}>
+        Notifications {unreadCount > 0 && <span style={{ color: "#1677ff", fontSize: 12 }}>({unreadCount} unread)</span>}
       </div>
-    ),
-  };
+
+      {notifications.length === 0 ? (
+        <div style={{ padding: "32px 16px", textAlign: "center", color: "#999" }}>
+          <BellOutlined style={{ fontSize: 28, marginBottom: 8, display: "block" }} />
+          <span>No notifications</span>
+        </div>
+      ) : (
+        notifications.slice(0, 5).map((notif) => (
+          <div
+            key={notif.id}
+            onClick={() => !notif.read && handleMarkNotificationRead(notif.id)}
+            style={{
+              padding: "12px 16px",
+              borderBottom: "1px solid #f0f0f0",
+              cursor: notif.read ? "default" : "pointer",
+              background: notif.read ? "transparent" : "#f0f7ff",
+              transition: "background 0.2s",
+            }}
+          >
+            <Text strong={!notif.read} style={{ display: "block", marginBottom: 2 }}>
+              {notif.title}
+            </Text>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              {notif.message.length > 60 ? notif.message.substring(0, 60) + "…" : notif.message}
+            </Text>
+          </div>
+        ))
+      )}
+
+      {notifications.length > 0 && (
+        <div style={{ padding: "8px 16px", borderTop: "1px solid #f0f0f0" }}>
+          <Space>
+            <Button type="link" size="small" onClick={handleMarkAllRead}>
+              Mark all as read
+            </Button>
+            <Button type="link" size="small" danger onClick={handleClearAllNotifications}>
+              Clear All
+            </Button>
+          </Space>
+        </div>
+      )}
+    </div>
+  );
 
   const contextValue: AdminContextType = {
     currentUser,
@@ -265,6 +293,45 @@ function AdminLayoutInner({ children }: { children: ReactNode }) {
             mode="inline"
             items={menuItems}
           />
+
+          {/* Back to App link */}
+          <div
+            style={{
+              position: "absolute",
+              bottom: 48,
+              left: 0,
+              right: 0,
+              padding: "8px 12px",
+              borderTop: "1px solid rgba(255,255,255,0.1)",
+            }}
+          >
+            <Link
+              href="/app"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: "8px 12px",
+                borderRadius: 8,
+                color: "#94a3b8",
+                fontSize: 14,
+                transition: "all 0.2s",
+                textDecoration: "none",
+                justifyContent: collapsed ? "center" : "flex-start",
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLAnchorElement).style.color = "#fff";
+                (e.currentTarget as HTMLAnchorElement).style.background = "rgba(255,255,255,0.08)";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLAnchorElement).style.color = "#94a3b8";
+                (e.currentTarget as HTMLAnchorElement).style.background = "transparent";
+              }}
+            >
+              <ArrowLeftOutlined style={{ fontSize: 14, flexShrink: 0 }} />
+              {!collapsed && <span>Back to App</span>}
+            </Link>
+          </div>
         </Sider>
         <Layout style={{ marginLeft: collapsed ? 80 : 250, transition: "margin-left 0.2s" }}>
           <Header
@@ -283,7 +350,7 @@ function AdminLayoutInner({ children }: { children: ReactNode }) {
               <span className="text-lg font-semibold">BuildTrack Admin Panel</span>
             </div>
             <Space size="middle">
-              <Dropdown menu={notificationMenu} trigger={["click"]} placement="bottomRight">
+              <Dropdown dropdownRender={() => notificationDropdown} trigger={["click"]} placement="bottomRight">
                 <Badge count={unreadCount} size="small">
                   <Button type="text" icon={<BellOutlined />} />
                 </Badge>

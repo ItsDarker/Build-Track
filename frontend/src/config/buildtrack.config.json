@@ -21,6 +21,14 @@
         "path": "/app/calendar"
       },
       {
+        "label": "Team Profile",
+        "path": "/app/team"
+      },
+      {
+        "label": "Customers",
+        "path": "/app/clients"
+      },
+      {
         "label": "My Tasks",
         "path": "/app/tasks",
         "children": [

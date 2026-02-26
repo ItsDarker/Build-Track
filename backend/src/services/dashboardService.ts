@@ -52,10 +52,26 @@ export const dashboardService = {
             }
         });
 
+        // 4. Active Projects (not completed/cancelled)
+        const projectWhere: any = {
+            status: { notIn: ['COMPLETED', 'CANCELLED'] }
+        };
+        if (role === 'PM') {
+            projectWhere.managerId = userId;
+        }
+        const activeProjects = await prisma.project.count({ where: projectWhere });
+
+        // 5. Open Work Orders (ModuleRecord with slug 'work-orders')
+        const openWorkOrders = await prisma.moduleRecord.count({
+            where: { moduleSlug: 'work-orders' }
+        });
+
         return {
             activeTasks: taskCount,
             overdueIssues: overdueCount,
             teamMembers: teamCount,
+            activeProjects,
+            openWorkOrders,
         };
     }
 };

@@ -464,12 +464,71 @@ export class AuthService {
         id: true,
         email: true,
         name: true,
+        phone: true,
+        company: true,
+        jobTitle: true,
+        bio: true,
         emailVerified: true,
         role: { select: { name: true, displayName: true } },
         isBlocked: true,
         createdAt: true,
+        // BT0005: new fields (active after prisma db push)
+        firstName: true,
+        lastName: true,
+        displayName: true,
+        avatarUrl: true,
+        userType: true,
+        userStatus: true,
+        team: true,
       },
     });
+  }
+
+  async updateProfile(userId: string, data: {
+    firstName?: string;
+    lastName?: string;
+    displayName?: string;
+    avatarUrl?: string;
+    userType?: string;
+    userStatus?: string;
+    team?: string;
+    phone?: string;
+    company?: string;
+    jobTitle?: string;
+    bio?: string;
+  }) {
+    // Merge firstName + lastName into legacy `name` field
+    const name = [data.firstName, data.lastName].filter(Boolean).join(' ') || undefined;
+    return prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(name ? { name } : {}),
+        firstName: data.firstName,
+        lastName: data.lastName,
+        displayName: data.displayName,
+        avatarUrl: data.avatarUrl,
+        userType: data.userType,
+        userStatus: data.userStatus,
+        team: data.team,
+        phone: data.phone,
+        company: data.company,
+        jobTitle: data.jobTitle,
+        bio: data.bio,
+      },
+    });
+  }
+
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !user.passwordHash) {
+      throw new Error('User not found or uses OAuth login');
+    }
+    const isValid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!isValid) {
+      throw new Error('Current password is incorrect');
+    }
+    const newHash = await bcrypt.hash(newPassword, 12);
+    await prisma.user.update({ where: { id: userId }, data: { passwordHash: newHash } });
   }
 }
 

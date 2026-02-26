@@ -57,8 +57,9 @@ export const requirePermission = (action: string, resource: string) => {
                 return res.status(403).json({ error: 'User has no role assigned' });
             }
 
-            // Super Admin bypass
-            if (dbUser.role.name === 'SUPER_ADMIN') {
+            // Super Admin / legacy Admin bypass — full access
+            const ADMIN_ROLES = ['SUPER_ADMIN', 'ADMIN', 'ORG_ADMIN'];
+            if (ADMIN_ROLES.includes(dbUser.role.name)) {
                 req.user = {
                     userId: user.userId,
                     email: user.email,

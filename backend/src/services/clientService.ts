@@ -5,8 +5,13 @@ export const createClientSchema = z.object({
     name: z.string().min(1),
     email: z.string().email().optional().or(z.literal('')),
     phone: z.string().optional(),
+    altPhone: z.string().optional(),
     company: z.string().optional(),
+    role: z.enum(['Owner', 'Manager', 'Purchasing']).optional(),
+    projectAddress: z.string().optional(),
+    billingAddress: z.string().optional(),
     address: z.string().optional(),
+    preferredApprovalMethod: z.enum(['Online', 'Email', 'In-Person']).optional(),
     notes: z.string().optional(),
 });
 

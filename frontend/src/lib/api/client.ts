@@ -108,7 +108,19 @@ class ApiClient {
   }
 
   // Profile endpoints
-  async updateProfile(data: { name?: string; phone?: string; company?: string; jobTitle?: string; bio?: string }) {
+  async updateProfile(data: {
+    firstName?: string;
+    lastName?: string;
+    displayName?: string;
+    avatarUrl?: string;
+    userType?: string;
+    userStatus?: string;
+    team?: string;
+    phone?: string;
+    company?: string;
+    jobTitle?: string;
+    bio?: string;
+  }) {
     return this.request('/backend-api/auth/profile', {
       method: 'PUT',
       body: JSON.stringify(data),
@@ -122,7 +134,24 @@ class ApiClient {
     });
   }
 
-  // Team endpoints
+  // BT0006: Team entity CRUD
+  async getTeams() {
+    return this.request('/backend-api/teams', { method: 'GET' });
+  }
+
+  async createTeam(data: { name: string; teamType?: string; status?: string }) {
+    return this.request('/backend-api/teams', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async updateTeam(teamId: string, data: { name?: string; teamType?: string; status?: string }) {
+    return this.request(`/backend-api/teams/${teamId}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+
+  async deleteTeam(teamId: string) {
+    return this.request(`/backend-api/teams/${teamId}`, { method: 'DELETE' });
+  }
+
+  // Team member endpoints
   async getTeamMembers() {
     return this.request('/backend-api/teams/members', { method: 'GET' });
   }
@@ -150,18 +179,34 @@ class ApiClient {
     return this.request('/backend-api/clients', { method: 'GET' });
   }
 
-  async createClient(data: { name: string; email?: string; phone?: string; company?: string; address?: string; notes?: string }) {
-    return this.request('/backend-api/clients', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+  async createClient(data: {
+    name: string;
+    email?: string;
+    phone?: string;
+    altPhone?: string;
+    company?: string;
+    role?: string;
+    projectAddress?: string;
+    billingAddress?: string;
+    preferredApprovalMethod?: string;
+    notes?: string;
+  }) {
+    return this.request('/backend-api/clients', { method: 'POST', body: JSON.stringify(data) });
   }
 
-  async updateClient(clientId: string, data: { name?: string; email?: string; phone?: string; company?: string; address?: string; notes?: string }) {
-    return this.request(`/backend-api/clients/${clientId}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
+  async updateClient(clientId: string, data: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    altPhone?: string;
+    company?: string;
+    role?: string;
+    projectAddress?: string;
+    billingAddress?: string;
+    preferredApprovalMethod?: string;
+    notes?: string;
+  }) {
+    return this.request(`/backend-api/clients/${clientId}`, { method: 'PUT', body: JSON.stringify(data) });
   }
 
   async deleteClient(clientId: string) {
