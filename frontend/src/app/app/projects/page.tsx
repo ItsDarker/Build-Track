@@ -148,8 +148,8 @@ export default function ProjectsPage() {
             key: "dates",
             render: (_: any, record: any) => (
                 <div className="text-xs">
-                    <div>Start: {record.startDate ? new Date(record.startDate).toLocaleDateString() : "-"}</div>
-                    <div>End: {record.endDate ? new Date(record.endDate).toLocaleDateString() : "-"}</div>
+                    <div>Target Start: {record.startDate ? new Date(record.startDate).toLocaleDateString() : "-"}</div>
+                    <div>Target End: {record.endDate ? new Date(record.endDate).toLocaleDateString() : "-"}</div>
                 </div>
             )
         },
@@ -257,10 +257,10 @@ export default function ProjectsPage() {
                                 ]}
                             />
                         </Form.Item>
-                        <Form.Item name="startDate" label="Start Date">
+                        <Form.Item name="startDate" label="Target Start Date">
                             <DatePicker className="w-full" />
                         </Form.Item>
-                        <Form.Item name="endDate" label="End Date">
+                        <Form.Item name="endDate" label="Target End Date">
                             <DatePicker className="w-full" />
                         </Form.Item>
                     </div>
