@@ -42,7 +42,7 @@ import { cn } from "@/lib/utils";
 const SIDEBAR_PATH_TO_MODULE: Record<string, string> = {
   "/app/tasks/leads": "crm-leads",
   "/app/tasks/design-requests": "design-configurator",
-  "/app/tasks/work-orders": "work-orders",
+  "/app/tasks/work-orders": "support-warranty",
   "/app/tasks/inspections": "quality-control",
   "/app/tasks/deliveries": "delivery-installation",
 };

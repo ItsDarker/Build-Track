@@ -16,14 +16,21 @@ export const ROLE_MAP: Record<string, string> = {
   Admin: "SUPER_ADMIN",
   "Project Manager": "PROJECT_MANAGER",
   Sales: "SALES_MANAGER",
+  // Old aliases (backward-compat)
   Client: "CLIENT",
-  "Design Team": "PROJECT_COORDINATOR", // Coordinator handles design/requirements
+  "Design Team": "PROJECT_COORDINATOR",
   "Production Team": "PRODUCTION_MANAGER",
+  "Quality Control": "QC_MANAGER",
   Finance: "FINANCE_MANAGER",
   Procurement: "PROCUREMENT_MANAGER",
-  "Quality Control": "QC_MANAGER",
   Logistics: "LOGISTICS_MANAGER",
   Support: "VENDOR",
+  // New canonical display names (BT0008 spec) — override inversion
+  Customer: "CLIENT",
+  Designer: "PROJECT_COORDINATOR",
+  Planner: "PLANNER",
+  Mfg: "PRODUCTION_MANAGER",
+  QC: "QC_MANAGER",
 };
 
 /** DB system-name → config display-name */
@@ -53,6 +60,7 @@ export const MODULE_ACCESS: Record<string, Record<string, AccessLevel>> = {
     PROJECT_MANAGER: "R",
     SALES_MANAGER: "R/W",
     PROJECT_COORDINATOR: "R",
+    CLIENT: "R/W",
   },
   "project-requirements": {
     PROJECT_MANAGER: "R/W",
@@ -68,28 +76,33 @@ export const MODULE_ACCESS: Record<string, Record<string, AccessLevel>> = {
   "quoting-contracts": {
     PROJECT_MANAGER: "R",
     SALES_MANAGER: "R/W",
+    FINANCE_MANAGER: "R/W",
   },
   "approval-workflow": {
     PROJECT_MANAGER: "R/W",
     SALES_MANAGER: "R",
     PROJECT_COORDINATOR: "R/W",
+    CLIENT: "R/W",
   },
   "job-confirmation": {
     PROJECT_MANAGER: "R/W",
-    SALES_MANAGER: "R",
-    FINANCE_MANAGER: "R",
+    SALES_MANAGER: "R/W",
+    FINANCE_MANAGER: "R/W",
   },
-  "work-orders": {
+  "support-warranty": {
     PROJECT_MANAGER: "R/W",
     PROJECT_COORDINATOR: "R/W",
     PRODUCTION_MANAGER: "R/W",
+    PLANNER: "R/W",
     QC_MANAGER: "R",
     LOGISTICS_MANAGER: "R",
+    CLIENT: "R",
   },
   "bom-materials-planning": {
     PROJECT_MANAGER: "R",
-    PROCUREMENT_MANAGER: "R",
+    PROCUREMENT_MANAGER: "R/W",
     PRODUCTION_MANAGER: "R/W",
+    PLANNER: "R/W",
   },
   procurement: {
     PROJECT_MANAGER: "R",
@@ -101,19 +114,23 @@ export const MODULE_ACCESS: Record<string, Record<string, AccessLevel>> = {
     PROJECT_MANAGER: "R/W",
     PROJECT_COORDINATOR: "R",
     PRODUCTION_MANAGER: "R/W",
+    PLANNER: "R/W",
     LOGISTICS_MANAGER: "R",
   },
   manufacturing: {
     PROJECT_MANAGER: "R",
     PRODUCTION_MANAGER: "R/W",
+    QC_MANAGER: "R",
   },
   "quality-control": {
     PROJECT_MANAGER: "R",
     QC_MANAGER: "R/W",
+    PRODUCTION_MANAGER: "R",
   },
   packaging: {
     PROCUREMENT_MANAGER: "R",
     PRODUCTION_MANAGER: "R/W",
+    LOGISTICS_MANAGER: "R",
   },
   "delivery-installation": {
     PROJECT_MANAGER: "R",
@@ -122,10 +139,13 @@ export const MODULE_ACCESS: Record<string, Record<string, AccessLevel>> = {
   },
   "billing-invoicing": {
     FINANCE_MANAGER: "R/W",
-    CLIENT: "R",
+    SALES_MANAGER: "R",
+    CLIENT: "R/W",
   },
   closure: {
+    PROJECT_MANAGER: "R/W",
     FINANCE_MANAGER: "R/W",
+    LOGISTICS_MANAGER: "R/W",
     CLIENT: "R",
   },
 };

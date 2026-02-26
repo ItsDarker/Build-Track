@@ -70,15 +70,15 @@
       "description": "Manages leads, quotations, contracts and client relationships."
     },
     "Client": {
-      "label": "Client",
+      "label": "Customer",
       "description": "External customer. Submits inquiries, reviews designs, approves quotes."
     },
     "Design Team": {
-      "label": "Design Team",
+      "label": "Designer",
       "description": "Creates layouts, selects materials and prepares design packages."
     },
     "Production Team": {
-      "label": "Production Team",
+      "label": "Mfg",
       "description": "Handles manufacturing, assembly, quality control and packaging."
     },
     "Finance": {
@@ -90,7 +90,7 @@
       "description": "Handles material planning, purchase orders and supplier management."
     },
     "Quality Control": {
-      "label": "Quality Control",
+      "label": "QC",
       "description": "Performs inspections, manages QC checklists and defect reports."
     },
     "Logistics": {
@@ -100,6 +100,10 @@
     "Support": {
       "label": "Support",
       "description": "Handles warranty claims, service tickets and aftersales requests."
+    },
+    "Planner": {
+      "label": "Planner",
+      "description": "Plans BOM, production schedules and material requirements."
     }
   },
   "modules": {
@@ -312,18 +316,17 @@
         "Change order linkages"
       ]
     },
-    "work-orders": {
-      "name": "Work Orders",
-      "slug": "work-orders",
-      "description": "Convert approved quote into Sales Order\n Collect deposit/payment\n Issue Work Order",
-      "who": "Sales / Finance / Project Coordinator",
+    "support-warranty": {
+      "name": "Support / Warranty",
+      "slug": "support-warranty",
+      "description": "Handle post-delivery support requests\n Manage warranty claims\n Track service tickets",
+      "who": "Project Manager / Customer",
       "mvpUser": "Admin",
-      "process": "Order Confirmation and Work Authorization",
-      "screens": "Sales Order Detail\nWork Authorization Form",
+      "process": "Aftersales Support and Warranty Management",
+      "screens": "Support Tickets Dashboard\nWarranty Claim Form",
       "accessRoles": [
-        "Finance",
         "Project Manager",
-        "Sales"
+        "Customer"
       ],
       "fields": [
         "Created at",
@@ -331,18 +334,20 @@
         "Update at",
         "Updated by",
         "Task Status (New, In Progress, Completed)",
-        "Work Order ID",
+        "Support Ticket ID",
         "Linked Sales Order ID",
-        "Work Order Status (Created, Scheduled, In Progress, On Hold, Complete)",
-        "Priority",
-        "Due Date",
-        "Assigned Team (Production)",
-        "Assigned Lead/Operator",
-        "Instructions / Build Notes",
-        "Attachments (drawings/spec sheets)",
-        "Created By / Created Date",
-        "Optional",
-        "Operation routing (sequence of steps)"
+        "Ticket Type (Support Request, Warranty Claim, Service Issue)",
+        "Priority (Low, Medium, High, Critical)",
+        "Status (Open, In Progress, On Hold, Resolved, Closed)",
+        "Customer Name / Contact",
+        "Issue Description",
+        "Service Type (Repair, Replacement, Refund)",
+        "Expected Resolution Date",
+        "Assigned Technician",
+        "Notes / Resolution Details",
+        "Attachments (photos, documentation)",
+        "Closure Date",
+        "Customer Satisfaction Rating"
       ]
     },
     "bom-materials-planning": {
@@ -651,7 +656,7 @@
     "quoting-contracts",
     "approval-workflow",
     "job-confirmation",
-    "work-orders",
+    "support-warranty",
     "bom-materials-planning",
     "procurement",
     "production-scheduling",

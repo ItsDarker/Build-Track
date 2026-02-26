@@ -16,6 +16,11 @@ import { Upload, X } from "lucide-react";
 
 export type FormMode = "create" | "edit" | "view";
 
+interface FieldError {
+  field: string;
+  message: string;
+}
+
 interface DynamicFormRendererProps {
   fields: string[];
   values: Record<string, string>;
@@ -25,6 +30,10 @@ interface DynamicFormRendererProps {
   /** File attachments keyed by field label */
   files?: Record<string, File[]>;
   onFileChange?: (fieldLabel: string, files: File[]) => void;
+  /** Field-specific validation errors */
+  errors?: Record<string, string>;
+  /** Required field names */
+  requiredFields?: Set<string>;
 }
 
 const AUDIT_FIELDS = ["Created at", "Created by", "Update at", "Updated by"];
@@ -119,6 +128,8 @@ export function DynamicFormRenderer({
   mode = "create",
   files = {},
   onFileChange,
+  errors = {},
+  requiredFields = new Set(),
 }: DynamicFormRendererProps) {
   const isViewMode = mode === "view";
 
@@ -147,6 +158,8 @@ export function DynamicFormRenderer({
         const label = cleanLabel(field);
         const disabled = isViewMode || isAuditField(field);
         const fieldFiles = files[field] || [];
+        const fieldError = errors[field];
+        const isRequired = requiredFields.has(field);
 
         return (
           <div key={field} className="space-y-1.5">
@@ -155,6 +168,9 @@ export function DynamicFormRenderer({
               className={`text-sm font-medium ${disabled ? "text-gray-400" : ""}`}
             >
               {label}
+              {isRequired && !disabled && (
+                <span className="ml-1 text-red-500 font-bold">*</span>
+              )}
               {isAuditField(field) && (
                 <span className="ml-1.5 text-xs text-gray-400 font-normal">
                   (auto)
@@ -168,6 +184,7 @@ export function DynamicFormRenderer({
                 disabled={isViewMode}
                 onFilesChange={(f) => onFileChange?.(field, f)}
                 textValue={value}
+                error={fieldError}
               />
             ) : (
               renderField(
@@ -178,8 +195,12 @@ export function DynamicFormRenderer({
                 value,
                 idx,
                 onChange,
-                disabled
+                disabled,
+                fieldError
               )
+            )}
+            {fieldError && (
+              <p className="text-xs text-red-500 mt-1">{fieldError}</p>
             )}
           </div>
         );
@@ -194,12 +215,14 @@ function FileUploadField({
   disabled,
   onFilesChange,
   textValue,
+  error,
 }: {
   id: string;
   files: File[];
   disabled: boolean;
   onFilesChange?: (files: File[]) => void;
   textValue?: string;
+  error?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -238,7 +261,11 @@ function FileUploadField({
       <button
         type="button"
         onClick={() => inputRef.current?.click()}
-        className="flex items-center gap-2 w-full rounded-md border-2 border-dashed border-gray-300 px-4 py-3 text-sm text-gray-500 hover:border-orange-400 hover:text-orange-500 transition-colors"
+        className={`flex items-center gap-2 w-full rounded-md border-2 border-dashed px-4 py-3 text-sm transition-colors ${
+          error
+            ? "border-red-300 text-red-500 hover:border-red-400"
+            : "border-gray-300 text-gray-500 hover:border-orange-400 hover:text-orange-500"
+        }`}
       >
         <Upload className="w-4 h-4" />
         Click to upload files (any format)
@@ -279,7 +306,8 @@ function renderField(
   value: string,
   idx: number,
   onChange: (field: string, value: string) => void,
-  disabled: boolean
+  disabled: boolean,
+  error?: string
 ) {
   if (disabled && type !== "datetime") {
     // Read-only display for disabled non-datetime fields
@@ -293,6 +321,8 @@ function renderField(
     );
   }
 
+  const errorClass = error ? "border-red-500 focus:ring-red-500" : "";
+
   switch (type) {
     case "select":
     case "status": {
@@ -304,7 +334,7 @@ function renderField(
             onValueChange={(v: string) => onChange(field, v)}
             disabled={disabled}
           >
-            <SelectTrigger id={`field-${idx}`}>
+            <SelectTrigger id={`field-${idx}`} className={errorClass}>
               <SelectValue placeholder={`Select ${label}...`} />
             </SelectTrigger>
             <SelectContent>
@@ -349,7 +379,7 @@ function renderField(
           type="datetime-local"
           value={value}
           disabled={disabled}
-          className={disabled ? "bg-gray-50 text-gray-500" : ""}
+          className={`${disabled ? "bg-gray-50 text-gray-500" : ""} ${errorClass}`}
           onChange={(e) => onChange(field, e.target.value)}
         />
       );
@@ -361,6 +391,7 @@ function renderField(
           type="date"
           value={value}
           onChange={(e) => onChange(field, e.target.value)}
+          className={errorClass}
         />
       );
 
@@ -372,6 +403,7 @@ function renderField(
           value={value}
           onChange={(e) => onChange(field, e.target.value)}
           placeholder={`Enter ${label.toLowerCase()}...`}
+          className={errorClass}
         />
       );
 
@@ -382,6 +414,7 @@ function renderField(
           value={value}
           onChange={(e) => onChange(field, e.target.value)}
           placeholder={`Enter ${label.toLowerCase()}...`}
+          className={errorClass}
         />
       );
   }

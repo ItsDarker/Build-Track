@@ -44,7 +44,15 @@ router.post('/', requirePermission('create', 'project'), async (req, res) => {
         res.status(201).json({ project });
     } catch (error: any) {
         if (error instanceof z.ZodError) {
-            return res.status(400).json({ error: error.errors[0].message });
+            const fieldErrors = error.errors.map((err) => ({
+                field: err.path.join('.'),
+                message: err.message,
+                code: err.code,
+            }));
+            return res.status(400).json({
+                error: fieldErrors[0]?.message || 'Validation failed',
+                fieldErrors,
+            });
         }
         console.error('Error creating project:', error);
         res.status(500).json({ error: 'Failed to create project' });
@@ -52,14 +60,22 @@ router.post('/', requirePermission('create', 'project'), async (req, res) => {
 });
 
 // Update project
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireProjectAccess, async (req, res) => {
     try {
         const data = updateProjectSchema.parse(req.body);
         const project = await projectService.updateProject(req.params.id, data);
         res.json({ project });
     } catch (error: any) {
         if (error instanceof z.ZodError) {
-            return res.status(400).json({ error: error.errors[0].message });
+            const fieldErrors = error.errors.map((err) => ({
+                field: err.path.join('.'),
+                message: err.message,
+                code: err.code,
+            }));
+            return res.status(400).json({
+                error: fieldErrors[0]?.message || 'Validation failed',
+                fieldErrors,
+            });
         }
         console.error('Error updating project:', error);
         res.status(500).json({ error: 'Failed to update project' });

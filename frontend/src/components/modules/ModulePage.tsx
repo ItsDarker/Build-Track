@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
-import { Table, Drawer, Button as AntButton, Tag, Empty, Tooltip, App } from "antd";
+import { Table, Modal, Button as AntButton, Tag, Empty, Tooltip, App } from "antd";
 import {
   PlusOutlined,
   EyeOutlined,
@@ -48,6 +48,52 @@ const AUDIT_FIELDS = ["Created at", "Created by", "Update at", "Updated by"];
 
 function isAuditField(label: string): boolean {
   return AUDIT_FIELDS.includes(label);
+}
+
+/**
+ * Detects required fields based on naming patterns and section context.
+ * Fields before "Optional:" section and with certain keywords are marked required.
+ */
+function detectRequiredFields(fields: string[]): Set<string> {
+  const required = new Set<string>();
+  const lower = (s: string) => s.toLowerCase().trim();
+
+  let isInOptionalSection = false;
+
+  for (const field of fields) {
+    const fieldLower = lower(field);
+
+    // Track when we enter optional section
+    if (
+      fieldLower === "optional:" ||
+      fieldLower === "optional" ||
+      fieldLower.includes("(optional)")
+    ) {
+      isInOptionalSection = true;
+      continue;
+    }
+
+    // Skip section headers and audit fields
+    if (
+      fieldLower.endsWith("(table):") ||
+      fieldLower === "mvp fields" ||
+      fieldLower === "inventory (stock)" ||
+      fieldLower === "receiving" ||
+      AUDIT_FIELDS.includes(field)
+    ) {
+      continue;
+    }
+
+    // Fields before Optional section are generally required
+    if (!isInOptionalSection) {
+      // Skip obvious optional fields even if before Optional section
+      if (!fieldLower.includes("photo") && !fieldLower.includes("attachment")) {
+        required.add(field);
+      }
+    }
+  }
+
+  return required;
 }
 
 /** Generate mock records with a stable _id */
@@ -157,11 +203,13 @@ export function ModulePage({ module }: ModulePageProps) {
   const hasWriteAccess = canWriteModule(role.name, module.slug);
   const [records, setRecords] = useState<Record<string, any>[]>([]);
   const [loading, setLoading] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [drawerMode, setDrawerMode] = useState<FormMode>("create");
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<FormMode>("create");
   const [activeRecordId, setActiveRecordId] = useState<string | null>(null);
   const [formValues, setFormValues] = useState<Record<string, string>>({});
   const [formFiles, setFormFiles] = useState<Record<string, File[]>>({});
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [requiredFields, setRequiredFields] = useState<Set<string>>(new Set());
 
  useEffect(() => {
   let cancelled = false;
@@ -263,7 +311,7 @@ export function ModulePage({ module }: ModulePageProps) {
             <AntButton
               icon={<EyeOutlined />}
               size="small"
-              onClick={() => openDrawer("view", record)}
+              onClick={() => openModal("view", record)}
             />
           </Tooltip>
           {hasWriteAccess && (
@@ -271,7 +319,7 @@ export function ModulePage({ module }: ModulePageProps) {
               <AntButton
                 icon={<EditOutlined />}
                 size="small"
-                onClick={() => openDrawer("edit", record)}
+                onClick={() => openModal("edit", record)}
               />
             </Tooltip>
           )}
@@ -292,8 +340,8 @@ export function ModulePage({ module }: ModulePageProps) {
     return cols;
   }, [tableFields]);
 
-  const openDrawer = (mode: FormMode, record?: Record<string, string>) => {
-    setDrawerMode(mode);
+  const openModal = (mode: FormMode, record?: Record<string, string>) => {
+    setModalMode(mode);
     if (record) {
       setActiveRecordId(record._id);
       setFormValues({ ...record });
@@ -302,11 +350,85 @@ export function ModulePage({ module }: ModulePageProps) {
       setFormValues({});
     }
     setFormFiles({});
-    setDrawerOpen(true);
+    setFieldErrors({});
+    setRequiredFields(detectRequiredFields(module.fields));
+    setModalOpen(true);
   };
 
   const handleFormChange = (field: string, value: string) => {
     setFormValues((prev) => ({ ...prev, [field]: value }));
+    // Clear error for this field when user starts typing
+    if (fieldErrors[field]) {
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        delete next[field];
+        return next;
+      });
+    }
+  };
+
+  /**
+   * Handles validation errors from the backend.
+   * Parses field-specific errors and shows a detailed error message.
+   */
+  const handleValidationError = (errorData: any) => {
+    const fieldErrs: Record<string, string> = {};
+    let mainErrorMsg = errorData.error || "Validation failed";
+
+    // If backend returns field-specific errors, parse them
+    if (errorData.fieldErrors && Array.isArray(errorData.fieldErrors)) {
+      errorData.fieldErrors.forEach((err: any) => {
+        if (err.field && err.message) {
+          fieldErrs[err.field] = err.message;
+        }
+      });
+      setFieldErrors(fieldErrs);
+    }
+
+    // Build a detailed error message
+    const errorList = Object.entries(fieldErrs)
+      .map(([field, msg]) => {
+        const cleanedLabel = field
+          .replace(/\s*\([^)]*\)\s*/g, "")
+          .trim();
+        return `• ${cleanedLabel}: ${msg}`;
+      })
+      .join("\n");
+
+    const fullErrorMessage = errorList
+      ? `${mainErrorMsg}\n\n${errorList}`
+      : mainErrorMsg;
+
+    modal.error({
+      title: "Validation Error",
+      content: (
+        <div className="whitespace-pre-wrap text-sm">
+          {fullErrorMessage}
+        </div>
+      ),
+    });
+  };
+
+  /**
+   * Validates form before submission.
+   * Returns true if valid, false otherwise.
+   */
+  const validateForm = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    // Check required fields
+    for (const field of requiredFields) {
+      const value = formValues[field];
+      if (!value || value.trim() === "") {
+        const cleanedLabel = field
+          .replace(/\s*\([^)]*\)\s*/g, "")
+          .trim();
+        errors[field] = `${cleanedLabel} is required`;
+      }
+    }
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const handleFileChange = (field: string, files: File[]) => {
@@ -314,18 +436,32 @@ export function ModulePage({ module }: ModulePageProps) {
   };
 
   const handleCreate = async () => {
+    // Validate form before submission
+    if (!validateForm()) {
+      modal.error({
+        title: "Validation Error",
+        content: "Please fill in all required fields (marked with *).",
+      });
+      return;
+    }
+
     try {
       setLoading(true);
       const res = await fetch(`/backend-api/modules/${module.slug}/records`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify(formValues), // store only dynamic fields
-        });
-        
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        body: JSON.stringify(formValues),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        handleValidationError(errorData);
+        return;
+      }
+
       const { record } = await res.json();
-      
+
       const mapped: Record<string, any> = {
         _id: record.id,
         ...(record.data ?? {}),
@@ -334,57 +470,79 @@ export function ModulePage({ module }: ModulePageProps) {
         "Created by": record.createdById ?? "",
         "Updated by": record.updatedById ?? "",
       };
-      
+
       setRecords((prev) => [mapped, ...prev]);
       setFormValues({});
       setFormFiles({});
-      setDrawerOpen(false);
+      setModalOpen(false);
     } catch (e) {
       console.error("Create failed:", e);
-      modal.error({ title: "Create failed", content: String(e) });
-    }finally{
+      modal.error({
+        title: "Create Failed",
+        content: String(e),
+      });
+    } finally {
       setLoading(false);
     }
   };
 
   const handleEdit = async () => {
-  if (!activeRecordId) return;
+    if (!activeRecordId) return;
 
-  try {
-    setLoading(true);
-    const res = await fetch(
-      `/backend-api/modules/${module.slug}/records/${activeRecordId}`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(formValues),
+    // Validate form before submission
+    if (!validateForm()) {
+      modal.error({
+        title: "Validation Error",
+        content: "Please fill in all required fields (marked with *).",
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const res = await fetch(
+        `/backend-api/modules/${module.slug}/records/${activeRecordId}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(formValues),
+        }
+      );
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        handleValidationError(errorData);
+        return;
       }
-    );
 
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const { record } = await res.json();
+      const { record } = await res.json();
 
-    const mapped: Record<string, any> = {
-      _id: record.id,
-      ...(record.data ?? {}),
-      "Created at": String(record.createdAt).slice(0, 16),
-      "Update at": String(record.updatedAt).slice(0, 16),
-      "Created by": record.createdById ?? "",
-      "Updated by": record.updatedById ?? "",
-    };
+      const mapped: Record<string, any> = {
+        _id: record.id,
+        ...(record.data ?? {}),
+        "Created at": String(record.createdAt).slice(0, 16),
+        "Update at": String(record.updatedAt).slice(0, 16),
+        "Created by": record.createdById ?? "",
+        "Updated by": record.updatedById ?? "",
+      };
 
-    setRecords((prev) => prev.map((r) => (r._id === activeRecordId ? mapped : r)));
-    setFormValues({});
-    setFormFiles({});
-    setDrawerOpen(false);
-  } catch (e) {
-    console.error("Update failed:", e);
-    modal.error({ title: "Update failed", content: String(e) });
-  }finally {
-    setLoading(false);
-  }
-};
+      setRecords((prev) =>
+        prev.map((r) => (r._id === activeRecordId ? mapped : r))
+      );
+      setFormValues({});
+      setFormFiles({});
+      setModalOpen(false);
+    } catch (e) {
+      console.error("Update failed:", e);
+      modal.error({
+        title: "Update Failed",
+        content: String(e),
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   
 
@@ -434,10 +592,10 @@ export function ModulePage({ module }: ModulePageProps) {
     downloadExcel(records, columns, module.slug);
   };
 
-  const drawerTitle =
-    drawerMode === "create"
+  const modalTitle =
+    modalMode === "create"
       ? `Create New ${module.name}`
-      : drawerMode === "edit"
+      : modalMode === "edit"
         ? `Edit ${module.name}`
         : `${module.name} — Record Details`;
 
@@ -489,7 +647,7 @@ export function ModulePage({ module }: ModulePageProps) {
           {hasWriteAccess && (
             <Button
               className="bg-orange-500 hover:bg-orange-600 text-white gap-2"
-              onClick={() => openDrawer("create")}
+              onClick={() => openModal("create")}
             >
               <PlusOutlined />
               Create New
@@ -517,37 +675,45 @@ export function ModulePage({ module }: ModulePageProps) {
         )}
       </div>
 
-      {/* Create / Edit / View Drawer */}
-      <Drawer
-        title={drawerTitle}
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        width={520}
+      {/* Create / Edit / View Modal */}
+      <Modal
+        title={modalTitle}
+        open={modalOpen}
+        onCancel={() => setModalOpen(false)}
+        width={680}
+        centered
+        destroyOnHidden
         footer={
-          drawerMode !== "view" ? (
+          modalMode !== "view" ? (
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setDrawerOpen(false)}>
+              <AntButton onClick={() => setModalOpen(false)}>
                 Cancel
-              </Button>
-              <Button
-                className="bg-orange-500 hover:bg-orange-600 text-white"
-                onClick={drawerMode === "create" ? handleCreate : handleEdit}
+              </AntButton>
+              <AntButton
+                type="primary"
+                danger={false}
+                loading={loading}
+                onClick={modalMode === "create" ? handleCreate : handleEdit}
               >
-                {drawerMode === "create" ? "Create" : "Save Changes"}
-              </Button>
+                {modalMode === "create" ? "Create" : "Save Changes"}
+              </AntButton>
             </div>
           ) : null
         }
       >
-        <DynamicFormRenderer
-          fields={module.fields}
-          values={formValues}
-          onChange={handleFormChange}
-          mode={drawerMode}
-          files={formFiles}
-          onFileChange={handleFileChange}
-        />
-      </Drawer>
+        <div className="max-h-[60vh] overflow-y-auto pr-1">
+          <DynamicFormRenderer
+            fields={module.fields}
+            values={formValues}
+            onChange={handleFormChange}
+            mode={modalMode}
+            files={formFiles}
+            onFileChange={handleFileChange}
+            errors={fieldErrors}
+            requiredFields={requiredFields}
+          />
+        </div>
+      </Modal>
     </div>
   );
 }

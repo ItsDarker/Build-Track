@@ -11,6 +11,7 @@ const ROLES = [
   { name: 'PROJECT_COORDINATOR', displayName: 'Project Coordinator', isSystem: false },
   { name: 'PROCUREMENT_MANAGER', displayName: 'Procurement Manager', isSystem: false },
   { name: 'PRODUCTION_MANAGER', displayName: 'Production Manager', isSystem: false },
+  { name: 'PLANNER', displayName: 'Planner', isSystem: false },
   { name: 'QC_MANAGER', displayName: 'QC Manager', isSystem: false },
   { name: 'LOGISTICS_MANAGER', displayName: 'Logistics Manager', isSystem: false },
   { name: 'FINANCE_MANAGER', displayName: 'Finance Manager', isSystem: false },
@@ -103,6 +104,15 @@ const ROLE_PERMISSIONS: Record<string, { resource: string, action: string }[]> =
     ...p('production', ['read', 'create', 'update']),
     ...p('scheduling', ['read', 'create', 'update']),
     ...p('inventory', ['read']),         // BOM/procurement read
+  ],
+  PLANNER: [
+    ...p('crm', ['read']),
+    ...p('quoting', ['read']),
+    ...p('project', ['read']),
+    ...p('scheduling', ['read', 'create', 'update']),
+    ...p('production', ['read']),
+    ...p('inventory', ['read', 'create', 'update']),
+    ...p('work_orders', ['read']),
   ],
   QC_MANAGER: [
     ...p('work_orders', ['read']),
@@ -214,6 +224,7 @@ async function main() {
     { email: 'coordinator@buildtrack.com', name: 'Project Coordinator', role: 'PROJECT_COORDINATOR' },
     { email: 'procurement@buildtrack.com', name: 'Procurement User', role: 'PROCUREMENT_MANAGER' },
     { email: 'production@buildtrack.com', name: 'Production User', role: 'PRODUCTION_MANAGER' },
+    { email: 'planner@buildtrack.com', name: 'Planner User', role: 'PLANNER' },
     { email: 'logistics@buildtrack.com', name: 'Logistics User', role: 'LOGISTICS_MANAGER' },
     { email: 'vendor@buildtrack.com', name: 'Vendor User', role: 'VENDOR' },
   ];

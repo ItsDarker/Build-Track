@@ -17,16 +17,16 @@ const SLUG_TO_RESOURCE: Record<string, string> = {
   "design-configurator": "project",
   "approval-workflow": "project",
   "job-confirmation": "work_orders",
-  "work-orders": "work_orders",
+  "support-warranty": "work_orders",
   "bom-materials-planning": "inventory",
-  procurement: "inventory",
+  "procurement": "inventory",
   "production-scheduling": "scheduling",
-  manufacturing: "production",
+  "manufacturing": "production",
   "quality-control": "qc",
-  packaging: "production",
+  "packaging": "production",
   "delivery-installation": "delivery",
   "billing-invoicing": "finance",
-  closure: "finance",
+  "closure": "finance",
 };
 
 /**
@@ -38,7 +38,11 @@ function modulePermission(action: string) {
     const slug = req.params.slug;
     const resource = SLUG_TO_RESOURCE[slug];
     if (!resource) {
-      return res.status(404).json({ error: `Unknown module: ${slug}` });
+      console.warn(`Unknown module slug requested: ${slug}. Available slugs:`, Object.keys(SLUG_TO_RESOURCE));
+      return res.status(404).json({
+        error: `Unknown module: ${slug}`,
+        availableSlugs: Object.keys(SLUG_TO_RESOURCE)
+      });
     }
     return requirePermission(action, resource)(req, res, next);
   };
