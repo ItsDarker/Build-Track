@@ -438,25 +438,19 @@ export default function TeamPage() {
             label="Team Name"
             rules={[{ required: true, message: "Please select a team name" }]}
           >
-            <Select size="large" placeholder="Select team name">
-              {TEAM_NAME_OPTIONS.map((n) => (
-                <Select.Option key={n} value={n}>{n}</Select.Option>
-              ))}
-            </Select>
+            <Select size="large" placeholder="Select team name"
+              options={TEAM_NAME_OPTIONS.map((n) => ({ label: n, value: n }))}
+            />
           </Form.Item>
           <Form.Item name="teamType" label="Team Type">
-            <Select size="large" placeholder="Select team type" allowClear>
-              {TEAM_TYPE_OPTIONS.map((t) => (
-                <Select.Option key={t} value={t}>{t}</Select.Option>
-              ))}
-            </Select>
+            <Select size="large" placeholder="Select team type" allowClear
+              options={TEAM_TYPE_OPTIONS.map((t) => ({ label: t, value: t }))}
+            />
           </Form.Item>
           <Form.Item name="status" label="Status" initialValue="Active">
-            <Select size="large">
-              {TEAM_STATUS_OPTIONS.map((s) => (
-                <Select.Option key={s} value={s}>{s}</Select.Option>
-              ))}
-            </Select>
+            <Select size="large"
+              options={TEAM_STATUS_OPTIONS.map((s) => ({ label: s, value: s }))}
+            />
           </Form.Item>
           <div className="flex justify-end gap-2">
             <Button onClick={() => { setIsTeamModalOpen(false); teamForm.resetFields(); }}>Cancel</Button>

@@ -232,26 +232,20 @@ export default function ProfilePage() {
             </Form.Item>
 
             <Form.Item name="userType" label="User Type">
-              <Select size="large" placeholder="Select user type" allowClear>
-                {USER_TYPE_OPTIONS.map((t) => (
-                  <Select.Option key={t} value={t}>{t}</Select.Option>
-                ))}
-              </Select>
+              <Select size="large" placeholder="Select user type" allowClear
+                options={USER_TYPE_OPTIONS.map((t) => ({ label: t, value: t }))}
+              />
             </Form.Item>
             <Form.Item name="userStatus" label="Status">
-              <Select size="large" placeholder="Select status">
-                {USER_STATUS_OPTIONS.map((s) => (
-                  <Select.Option key={s} value={s}>{s}</Select.Option>
-                ))}
-              </Select>
+              <Select size="large" placeholder="Select status"
+                options={USER_STATUS_OPTIONS.map((s) => ({ label: s, value: s }))}
+              />
             </Form.Item>
 
             <Form.Item name="team" label="Team">
-              <Select size="large" placeholder="Select team" allowClear>
-                {TEAM_OPTIONS.map((t) => (
-                  <Select.Option key={t} value={t}>{t}</Select.Option>
-                ))}
-              </Select>
+              <Select size="large" placeholder="Select team" allowClear
+                options={TEAM_OPTIONS.map((t) => ({ label: t, value: t }))}
+              />
             </Form.Item>
             <Form.Item name="jobTitle" label="Job Title">
               <Input prefix={<IdcardOutlined />} placeholder="Project Manager" size="large" />

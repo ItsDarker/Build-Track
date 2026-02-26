@@ -369,18 +369,14 @@ export default function ClientsPage() {
 
             {/* Row 2: Role + Preferred Approval Method */}
             <Form.Item name="role" label="Role">
-              <Select size="large" placeholder="Select role" allowClear>
-                {ROLE_OPTIONS.map((r) => (
-                  <Select.Option key={r} value={r}>{r}</Select.Option>
-                ))}
-              </Select>
+              <Select size="large" placeholder="Select role" allowClear
+                options={ROLE_OPTIONS.map((r) => ({ label: r, value: r }))}
+              />
             </Form.Item>
             <Form.Item name="preferredApprovalMethod" label="Preferred Approval Method">
-              <Select size="large" placeholder="Select method" allowClear>
-                {APPROVAL_OPTIONS.map((a) => (
-                  <Select.Option key={a} value={a}>{a}</Select.Option>
-                ))}
-              </Select>
+              <Select size="large" placeholder="Select method" allowClear
+                options={APPROVAL_OPTIONS.map((a) => ({ label: a, value: a }))}
+              />
             </Form.Item>
 
             {/* Row 3: Phone + Alt Phone */}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, createContext, useContext, ReactNode } from "react";
+import React, { useEffect, useState, useCallback, createContext, useContext, ReactNode } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import {
@@ -319,13 +319,13 @@ function AdminLayoutInner({ children }: { children: ReactNode }) {
                 textDecoration: "none",
                 justifyContent: collapsed ? "center" : "flex-start",
               }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLAnchorElement).style.color = "#fff";
-                (e.currentTarget as HTMLAnchorElement).style.background = "rgba(255,255,255,0.08)";
+              onMouseEnter={(e: React.MouseEvent<HTMLAnchorElement>) => {
+                e.currentTarget.style.color = "#fff";
+                e.currentTarget.style.background = "rgba(255,255,255,0.08)";
               }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLAnchorElement).style.color = "#94a3b8";
-                (e.currentTarget as HTMLAnchorElement).style.background = "transparent";
+              onMouseLeave={(e: React.MouseEvent<HTMLAnchorElement>) => {
+                e.currentTarget.style.color = "#94a3b8";
+                e.currentTarget.style.background = "transparent";
               }}
             >
               <ArrowLeftOutlined style={{ fontSize: 14, flexShrink: 0 }} />
