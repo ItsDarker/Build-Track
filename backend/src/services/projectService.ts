@@ -6,10 +6,13 @@ export const createProjectSchema = z.object({
     code: z.string().optional(),
     description: z.string().optional(),
     status: z.enum(['PLANNING', 'IN_PROGRESS', 'ON_HOLD', 'COMPLETED', 'CANCELLED']).default('PLANNING'),
-    startDate: z.string().datetime().optional(), // Expecting ISO string
+    startDate: z.string().datetime().optional(),
     endDate: z.string().datetime().optional(),
     clientId: z.string().optional(),
     managerId: z.string().optional(),
+    assignedToId: z.string().optional(),
+    cancellationReason: z.string().optional(),
+    completionNote: z.string().optional(),
 });
 
 export const updateProjectSchema = createProjectSchema.partial();
@@ -80,6 +83,50 @@ export const projectService = {
     async deleteProject(id: string) {
         return prisma.project.delete({
             where: { id },
+        });
+    },
+
+    async assignProject(id: string, assignedToId: string) {
+        return prisma.project.update({
+            where: { id },
+            data: { assignedToId },
+        });
+    },
+
+    async startProject(id: string, taskTitle: string, assigneeId: string) {
+        await prisma.project.update({
+            where: { id },
+            data: { status: 'IN_PROGRESS' },
+        });
+        return prisma.task.create({
+            data: {
+                title: taskTitle,
+                status: 'TODO',
+                priority: 'MEDIUM',
+                projectId: id,
+                assigneeId: assigneeId,
+            },
+        });
+    },
+
+    async cancelProject(id: string, cancellationReason: string) {
+        return prisma.project.update({
+            where: { id },
+            data: { status: 'CANCELLED', cancellationReason },
+        });
+    },
+
+    async closeProject(id: string, completionNote?: string) {
+        return prisma.project.update({
+            where: { id },
+            data: { status: 'COMPLETED', completionNote },
+        });
+    },
+
+    async restoreProject(id: string) {
+        return prisma.project.update({
+            where: { id },
+            data: { status: 'PLANNING', cancellationReason: null },
         });
     },
 };

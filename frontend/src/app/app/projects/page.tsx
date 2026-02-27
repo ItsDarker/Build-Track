@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Table, Button, Card, Tag, Space, Modal, Form, Input, Select, DatePicker, App } from "antd";
-import { PlusOutlined, EditOutlined, DeleteOutlined, DownloadOutlined } from "@ant-design/icons";
+import { PlusOutlined, EditOutlined, DeleteOutlined, DownloadOutlined, UserAddOutlined, PlayCircleOutlined, CloseCircleOutlined, CheckCircleOutlined, UndoOutlined } from "@ant-design/icons";
 import { apiClient } from "@/lib/api/client";
 import { downloadExcel } from "@/lib/downloadExcel";
 import dayjs from "dayjs";
@@ -15,12 +15,27 @@ export default function ProjectsPage() {
     const [editingProject, setEditingProject] = useState<any>(null);
     const [clients, setClients] = useState<any[]>([]);
     const [managers, setManagers] = useState<any[]>([]);
+    const [assignableUsers, setAssignableUsers] = useState<any[]>([]);
+    const [currentUser, setCurrentUser] = useState<any>(null);
     const [form] = Form.useForm();
+
+    // Action modal states
+    const [assignModalOpen, setAssignModalOpen] = useState(false);
+    const [startModalOpen, setStartModalOpen] = useState(false);
+    const [cancelModalOpen, setCancelModalOpen] = useState(false);
+    const [closeModalOpen, setCloseModalOpen] = useState(false);
+    const [activeProject, setActiveProject] = useState<any>(null);
+    const [assignForm] = Form.useForm();
+    const [startForm] = Form.useForm();
+    const [cancelForm] = Form.useForm();
+    const [closeForm] = Form.useForm();
 
     useEffect(() => {
         fetchProjects();
         fetchClients();
         fetchManagers();
+        fetchAssignableUsers();
+        fetchCurrentUser();
     }, []);
 
     const fetchProjects = async () => {
@@ -43,6 +58,20 @@ export default function ProjectsPage() {
         const result = await apiClient.getAssignableUsers('PM,ADMIN');
         if (result.data) {
             setManagers((result.data as any).users);
+        }
+    };
+
+    const fetchAssignableUsers = async () => {
+        const result = await apiClient.getAssignableUsers('PM,ADMIN,SALES');
+        if (result.data) {
+            setAssignableUsers((result.data as any).users);
+        }
+    };
+
+    const fetchCurrentUser = async () => {
+        const result = await apiClient.getCurrentUser();
+        if (result.data) {
+            setCurrentUser((result.data as any).user);
         }
     };
 
@@ -84,6 +113,70 @@ export default function ProjectsPage() {
                     message.error(result.error);
                 } else {
                     message.success("Project deleted");
+                    fetchProjects();
+                }
+            }
+        });
+    };
+
+    const handleAssign = async (values: any) => {
+        const result = await apiClient.assignProject(activeProject.id, values.assignedToId);
+        if (result.error) {
+            message.error(result.error);
+        } else {
+            message.success("Project assigned");
+            fetchProjects();
+            setAssignModalOpen(false);
+            assignForm.resetFields();
+        }
+    };
+
+    const handleStart = async (values: any) => {
+        const result = await apiClient.startProject(activeProject.id, values.taskTitle, values.assigneeId);
+        if (result.error) {
+            message.error(result.error);
+        } else {
+            message.success("Project started and task created");
+            fetchProjects();
+            setStartModalOpen(false);
+            startForm.resetFields();
+        }
+    };
+
+    const handleCancel = async (values: any) => {
+        const result = await apiClient.cancelProject(activeProject.id, values.cancellationReason);
+        if (result.error) {
+            message.error(result.error);
+        } else {
+            message.success("Project cancelled");
+            fetchProjects();
+            setCancelModalOpen(false);
+            cancelForm.resetFields();
+        }
+    };
+
+    const handleClose = async (values: any) => {
+        const result = await apiClient.closeProject(activeProject.id, values.completionNote);
+        if (result.error) {
+            message.error(result.error);
+        } else {
+            message.success("Project closed");
+            fetchProjects();
+            setCloseModalOpen(false);
+            closeForm.resetFields();
+        }
+    };
+
+    const handleRestore = async (record: any) => {
+        modal.confirm({
+            title: "Restore Project",
+            content: `Are you sure you want to restore "${record.name}" back to Planning?`,
+            onOk: async () => {
+                const result = await apiClient.restoreProject(record.id);
+                if (result.error) {
+                    message.error(result.error);
+                } else {
+                    message.success("Project restored");
                     fetchProjects();
                 }
             }
@@ -157,9 +250,49 @@ export default function ProjectsPage() {
             title: "Actions",
             key: "actions",
             render: (_: any, record: any) => (
-                <Space>
+                <Space wrap>
                     <Button icon={<EditOutlined />} onClick={() => openModal(record)} />
                     <Button icon={<DeleteOutlined />} danger onClick={() => handleDelete(record.id)} />
+                    <Button
+                        icon={<UserAddOutlined />}
+                        title="Assign"
+                        onClick={() => { setActiveProject(record); assignForm.resetFields(); setAssignModalOpen(true); }}
+                    />
+                    {record.status !== 'CANCELLED' && record.status !== 'COMPLETED' && (
+                        <Button
+                            icon={<PlayCircleOutlined />}
+                            title="Start"
+                            style={{ color: '#52c41a', borderColor: '#52c41a' }}
+                            onClick={() => {
+                                setActiveProject(record);
+                                startForm.setFieldsValue({ taskTitle: 'CRM / Lead', assigneeId: currentUser?.id });
+                                setStartModalOpen(true);
+                            }}
+                        />
+                    )}
+                    {record.status !== 'CANCELLED' && record.status !== 'COMPLETED' && (
+                        <Button
+                            icon={<CloseCircleOutlined />}
+                            title="Cancel"
+                            style={{ color: '#ff4d4f', borderColor: '#ff4d4f' }}
+                            onClick={() => { setActiveProject(record); cancelForm.resetFields(); setCancelModalOpen(true); }}
+                        />
+                    )}
+                    {record.status !== 'CANCELLED' && record.status !== 'COMPLETED' && (
+                        <Button
+                            icon={<CheckCircleOutlined />}
+                            title="Close"
+                            style={{ color: '#1677ff', borderColor: '#1677ff' }}
+                            onClick={() => { setActiveProject(record); closeForm.resetFields(); setCloseModalOpen(true); }}
+                        />
+                    )}
+                    {record.status === 'CANCELLED' && (
+                        <Button
+                            icon={<UndoOutlined />}
+                            title="Restore"
+                            onClick={() => handleRestore(record)}
+                        />
+                    )}
                 </Space>
             ),
         },
@@ -180,8 +313,8 @@ export default function ProjectsPage() {
                                     Client: p.client?.name || "",
                                     Manager: p.manager?.name || "",
                                     Status: p.status?.replace("_", " ") || "",
-                                    "Start Date": p.startDate ? new Date(p.startDate).toLocaleDateString() : "",
-                                    "End Date": p.endDate ? new Date(p.endDate).toLocaleDateString() : "",
+                                    "Target Start Date": p.startDate ? new Date(p.startDate).toLocaleDateString() : "",
+                                    "Target End Date": p.endDate ? new Date(p.endDate).toLocaleDateString() : "",
                                     Description: p.description || "",
                                 })),
                                 undefined,
@@ -207,6 +340,7 @@ export default function ProjectsPage() {
                 />
             </Card>
 
+            {/* Edit / New Project Modal */}
             <Modal
                 title={editingProject ? "Edit Project" : "New Project"}
                 open={isModalOpen}
@@ -223,11 +357,9 @@ export default function ProjectsPage() {
                             <Input placeholder="e.g. PRJ-2024-01" />
                         </Form.Item>
                     </div>
-
                     <Form.Item name="description" label="Description">
                         <Input.TextArea rows={3} />
                     </Form.Item>
-
                     <div className="grid grid-cols-2 gap-4">
                         <Form.Item name="clientId" label="Client">
                             <Select
@@ -244,7 +376,6 @@ export default function ProjectsPage() {
                             />
                         </Form.Item>
                     </div>
-
                     <div className="grid grid-cols-3 gap-4">
                         <Form.Item name="status" label="Status" initialValue="PLANNING">
                             <Select
@@ -264,10 +395,93 @@ export default function ProjectsPage() {
                             <DatePicker className="w-full" />
                         </Form.Item>
                     </div>
-
                     <div className="flex justify-end gap-2 mt-4">
                         <Button onClick={() => setIsModalOpen(false)}>Cancel</Button>
                         <Button type="primary" htmlType="submit">Save</Button>
+                    </div>
+                </Form>
+            </Modal>
+
+            {/* Assign Modal */}
+            <Modal
+                title="Assign Project"
+                open={assignModalOpen}
+                onCancel={() => setAssignModalOpen(false)}
+                footer={null}
+            >
+                <Form form={assignForm} layout="vertical" onFinish={handleAssign}>
+                    <Form.Item name="assignedToId" label="Assign To" rules={[{ required: true, message: 'Please select a user' }]}>
+                        <Select
+                            showSearch
+                            optionFilterProp="label"
+                            options={assignableUsers.map(u => ({ value: u.id, label: u.name || u.email }))}
+                        />
+                    </Form.Item>
+                    <div className="flex justify-end gap-2 mt-4">
+                        <Button onClick={() => setAssignModalOpen(false)}>Cancel</Button>
+                        <Button type="primary" htmlType="submit">Assign</Button>
+                    </div>
+                </Form>
+            </Modal>
+
+            {/* Start Modal */}
+            <Modal
+                title="Start Project"
+                open={startModalOpen}
+                onCancel={() => setStartModalOpen(false)}
+                footer={null}
+            >
+                <Form form={startForm} layout="vertical" onFinish={handleStart}>
+                    <Form.Item name="taskTitle" label="First Task Title" rules={[{ required: true }]}>
+                        <Input />
+                    </Form.Item>
+                    <Form.Item name="assigneeId" label="Assign Task To" rules={[{ required: true, message: 'Please select an assignee' }]}>
+                        <Select
+                            showSearch
+                            optionFilterProp="label"
+                            options={assignableUsers.map(u => ({ value: u.id, label: u.name || u.email }))}
+                        />
+                    </Form.Item>
+                    <div className="flex justify-end gap-2 mt-4">
+                        <Button onClick={() => setStartModalOpen(false)}>Cancel</Button>
+                        <Button type="primary" htmlType="submit" style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}>Start Project</Button>
+                    </div>
+                </Form>
+            </Modal>
+
+            {/* Cancel Modal */}
+            <Modal
+                title="Cancel Project"
+                open={cancelModalOpen}
+                onCancel={() => setCancelModalOpen(false)}
+                footer={null}
+            >
+                <Form form={cancelForm} layout="vertical" onFinish={handleCancel}>
+                    <Form.Item name="cancellationReason" label="Reason for Cancellation" rules={[{ required: true, message: 'Please provide a reason' }]}>
+                        <Input.TextArea rows={3} />
+                    </Form.Item>
+                    <div className="flex justify-end gap-2 mt-4">
+                        <Button onClick={() => setCancelModalOpen(false)}>Back</Button>
+                        <Button danger htmlType="submit">Cancel Project</Button>
+                    </div>
+                </Form>
+            </Modal>
+
+            {/* Close Modal */}
+            <Modal
+                title="Close Project"
+                open={closeModalOpen}
+                onCancel={() => setCloseModalOpen(false)}
+                footer={null}
+            >
+                <Form form={closeForm} layout="vertical" onFinish={handleClose}>
+                    <p className="mb-4 text-gray-600">Are you sure you want to close this project?</p>
+                    <Form.Item name="completionNote" label="Completion Note (optional)">
+                        <Input.TextArea rows={3} />
+                    </Form.Item>
+                    <div className="flex justify-end gap-2 mt-4">
+                        <Button onClick={() => setCloseModalOpen(false)}>Back</Button>
+                        <Button type="primary" htmlType="submit">Close Project</Button>
                     </div>
                 </Form>
             </Modal>

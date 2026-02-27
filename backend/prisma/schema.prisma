@@ -34,6 +34,7 @@ model User {
   loginAttempts        LoginAttempt[]
   oauthAccounts        OAuthAccount[]
   managedProjects      Project[]           @relation("ProjectManager")
+  assignedProjects     Project[]           @relation("ProjectAssignee")
   refreshTokens        RefreshToken[]
   assignedTasks        Task[]              @relation("TaskAssignee")
   role                 Role?               @relation(fields: [roleId], references: [id])
@@ -208,20 +209,24 @@ model Client {
 }
 
 model Project {
-  id          String    @id @default(cuid())
-  name        String
-  code        String?
-  description String?
-  status      String    @default("PLANNING")
-  startDate   DateTime? @map("start_date")
-  endDate     DateTime? @map("end_date")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-  clientId    String?   @map("client_id")
-  managerId   String?   @map("manager_id")
-  client      Client?   @relation(fields: [clientId], references: [id])
-  manager     User?     @relation("ProjectManager", fields: [managerId], references: [id])
-  tasks       Task[]
+  id                 String    @id @default(cuid())
+  name               String
+  code               String?
+  description        String?
+  status             String    @default("PLANNING")
+  startDate          DateTime? @map("start_date")
+  endDate            DateTime? @map("end_date")
+  cancellationReason String?   @map("cancellation_reason")
+  completionNote     String?   @map("completion_note")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  clientId           String?   @map("client_id")
+  managerId          String?   @map("manager_id")
+  assignedToId       String?   @map("assigned_to_id")
+  client             Client?   @relation(fields: [clientId], references: [id])
+  manager            User?     @relation("ProjectManager", fields: [managerId], references: [id])
+  assignedTo         User?     @relation("ProjectAssignee", fields: [assignedToId], references: [id])
+  tasks              Task[]
 
   @@map("projects")
 }

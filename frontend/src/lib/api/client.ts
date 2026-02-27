@@ -461,6 +461,40 @@ class ApiClient {
     return this.request(`/backend-api/projects/${projectId}`, { method: 'DELETE' });
   }
 
+  async assignProject(projectId: string, assignedToId: string) {
+    return this.request(`/backend-api/projects/${projectId}/assign`, {
+      method: 'POST',
+      body: JSON.stringify({ assignedToId }),
+    });
+  }
+
+  async startProject(projectId: string, taskTitle: string, assigneeId: string) {
+    return this.request(`/backend-api/projects/${projectId}/start`, {
+      method: 'POST',
+      body: JSON.stringify({ taskTitle, assigneeId }),
+    });
+  }
+
+  async cancelProject(projectId: string, cancellationReason: string) {
+    return this.request(`/backend-api/projects/${projectId}/cancel`, {
+      method: 'POST',
+      body: JSON.stringify({ cancellationReason }),
+    });
+  }
+
+  async closeProject(projectId: string, completionNote?: string) {
+    return this.request(`/backend-api/projects/${projectId}/close`, {
+      method: 'POST',
+      body: JSON.stringify({ completionNote }),
+    });
+  }
+
+  async restoreProject(projectId: string) {
+    return this.request(`/backend-api/projects/${projectId}/restore`, {
+      method: 'POST',
+    });
+  }
+
   // Task endpoints
   async getTasks(params: { projectId: string }) {
     const searchParams = new URLSearchParams();

@@ -93,4 +93,76 @@ router.delete('/:id', async (req, res) => {
     }
 });
 
+// Assign project to a user
+router.post('/:id/assign', requireProjectAccess, async (req, res) => {
+    try {
+        const { assignedToId } = req.body;
+        if (!assignedToId) {
+            return res.status(400).json({ error: 'assignedToId is required' });
+        }
+        const project = await projectService.assignProject(req.params.id, assignedToId);
+        res.json({ project });
+    } catch (error) {
+        console.error('Error assigning project:', error);
+        res.status(500).json({ error: 'Failed to assign project' });
+    }
+});
+
+// Start project - sets status to IN_PROGRESS and creates first task
+router.post('/:id/start', requireProjectAccess, async (req, res) => {
+    try {
+        const { taskTitle, assigneeId } = req.body;
+        if (!assigneeId) {
+            return res.status(400).json({ error: 'assigneeId is required' });
+        }
+        const task = await projectService.startProject(
+            req.params.id,
+            taskTitle || 'CRM / Lead',
+            assigneeId
+        );
+        res.json({ task });
+    } catch (error) {
+        console.error('Error starting project:', error);
+        res.status(500).json({ error: 'Failed to start project' });
+    }
+});
+
+// Cancel project - requires a reason
+router.post('/:id/cancel', requireProjectAccess, async (req, res) => {
+    try {
+        const { cancellationReason } = req.body;
+        if (!cancellationReason) {
+            return res.status(400).json({ error: 'cancellationReason is required' });
+        }
+        const project = await projectService.cancelProject(req.params.id, cancellationReason);
+        res.json({ project });
+    } catch (error) {
+        console.error('Error cancelling project:', error);
+        res.status(500).json({ error: 'Failed to cancel project' });
+    }
+});
+
+// Close project - optional completion note
+router.post('/:id/close', requireProjectAccess, async (req, res) => {
+    try {
+        const { completionNote } = req.body;
+        const project = await projectService.closeProject(req.params.id, completionNote);
+        res.json({ project });
+    } catch (error) {
+        console.error('Error closing project:', error);
+        res.status(500).json({ error: 'Failed to close project' });
+    }
+});
+
+// Restore a cancelled project back to PLANNING
+router.post('/:id/restore', requireProjectAccess, async (req, res) => {
+    try {
+        const project = await projectService.restoreProject(req.params.id);
+        res.json({ project });
+    } catch (error) {
+        console.error('Error restoring project:', error);
+        res.status(500).json({ error: 'Failed to restore project' });
+    }
+});
+
 export default router;
