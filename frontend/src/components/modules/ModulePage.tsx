@@ -1,19 +1,23 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
-import { Table, Modal, Button as AntButton, Tag, Empty, Tooltip, App } from "antd";
+import { useRouter } from "next/navigation";
+import { Table, Modal, Button as AntButton, Tag, Empty, Tooltip, App, Select as AntSelect } from "antd";
 import {
   PlusOutlined,
   EyeOutlined,
   EditOutlined,
   DeleteOutlined,
   DownloadOutlined,
+  UserSwitchOutlined,
+  CheckCircleOutlined,
 } from "@ant-design/icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DynamicFormRenderer } from "./DynamicFormRenderer";
 import type { FormMode } from "./DynamicFormRenderer";
 import type { ModuleConfig } from "@/config/buildtrack.config";
+import { getAllModules } from "@/config/buildtrack.config";
 import { ShieldCheck } from "lucide-react";
 import { downloadExcel } from "@/lib/downloadExcel";
 import { useUser } from "@/lib/context/UserContext";
@@ -42,6 +46,71 @@ function isSectionLabel(label: string): boolean {
     lower === "receiving" ||
     label.endsWith("(table):")
   );
+}
+
+/** Detects assignee-type fields based on naming patterns */
+function findAssigneeFields(fields: string[]): string[] {
+  const assigneeKeywords = [
+    "assigned to",
+    "assignee",
+    "inspector",
+    "operator",
+    "technician",
+    "driver",
+    "installer",
+    "crew",
+    "approver",
+    "planner",
+    "packed by",
+    "closed by",
+    "prepared by",
+    "owner",
+    "assigned crew",
+  ];
+
+  return fields.filter((field) => {
+    const lower = field.toLowerCase();
+    return assigneeKeywords.some((kw) => lower.includes(kw));
+  });
+}
+
+/** Detects ID fields (auto-populated, read-only) */
+function findIdFields(fields: string[]): string[] {
+  return fields.filter((field) => {
+    const lower = field.toLowerCase();
+    return lower.includes("id") && !lower.includes("video");
+  });
+}
+
+/** Generates an ID value based on module name and a timestamp */
+function generateId(moduleName: string): string {
+  const prefix = moduleName
+    .split(/[\s\/]+/)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 3);
+
+  // Use timestamp-based suffix for uniqueness
+  const timestamp = Date.now().toString().slice(-6);
+  return `${prefix}-${timestamp}`;
+}
+
+/** Detects Status fields */
+function findStatusFields(fields: string[]): string[] {
+  return fields.filter((field) => {
+    const lower = field.toLowerCase();
+    return lower.includes("status");
+  });
+}
+
+/** Extracts the default (first) status option from a status field label */
+function getDefaultStatus(fieldLabel: string): string | null {
+  const match = fieldLabel.match(/\(([^)]+)\)/);
+  if (!match) return null;
+  const inner = match[1];
+  const parts = inner.split(",").map((s) => s.trim());
+  return parts.length > 0 ? parts[0] : null;
 }
 
 const AUDIT_FIELDS = ["Created at", "Created by", "Update at", "Updated by"];
@@ -198,6 +267,7 @@ function getMockValue(field: string, index: number, mod: ModuleConfig): string {
 }
 
 export function ModulePage({ module }: ModulePageProps) {
+  const router = useRouter();
   const { modal } = App.useApp();
   const { role } = useUser();
   const hasWriteAccess = canWriteModule(role.name, module.slug);
@@ -210,6 +280,8 @@ export function ModulePage({ module }: ModulePageProps) {
   const [formFiles, setFormFiles] = useState<Record<string, File[]>>({});
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [requiredFields, setRequiredFields] = useState<Set<string>>(new Set());
+  const [assignableUsers, setAssignableUsers] = useState<{ id: string; name?: string; email: string }[]>([]);
+  const [assignPickerOpen, setAssignPickerOpen] = useState(false);
 
  useEffect(() => {
   let cancelled = false;
@@ -246,7 +318,28 @@ export function ModulePage({ module }: ModulePageProps) {
     cancelled = true;
   };
 }, [module.slug]);
- 
+
+  // Fetch assignable users for the Assign action (optional feature)
+  useEffect(() => {
+    // Use timeout to avoid blocking page load if endpoint is slow/unavailable
+    const timeoutId = setTimeout(() => {
+      fetch('/backend-api/teams/assignable', { credentials: 'include' })
+        .then((r) => {
+          if (!r.ok) {
+            // Silently fail - Assign button will just be unavailable
+            return { users: [] };
+          }
+          return r.json();
+        })
+        .then((d) => setAssignableUsers(d.users ?? []))
+        .catch(() => {
+          // Silently fail - this is an optional feature
+          setAssignableUsers([]);
+        });
+    }, 100);
+
+    return () => clearTimeout(timeoutId);
+  }, []);
 
   // Key fields for table columns (first 5 non-section, non-audit fields)
   const tableFields = useMemo(() => {
@@ -347,7 +440,25 @@ export function ModulePage({ module }: ModulePageProps) {
       setFormValues({ ...record });
     } else {
       setActiveRecordId(null);
-      setFormValues({});
+      const initialValues: Record<string, string> = {};
+      // Auto-populate in create mode
+      if (mode === "create") {
+        // Auto-populate ID fields
+        const idFields = findIdFields(module.fields);
+        idFields.forEach((field) => {
+          initialValues[field] = generateId(module.name);
+        });
+
+        // Auto-populate Status fields with their default value
+        const statusFields = findStatusFields(module.fields);
+        statusFields.forEach((field) => {
+          const defaultStatus = getDefaultStatus(field);
+          if (defaultStatus) {
+            initialValues[field] = defaultStatus;
+          }
+        });
+      }
+      setFormValues(initialValues);
     }
     setFormFiles({});
     setFieldErrors({});
@@ -435,116 +546,169 @@ export function ModulePage({ module }: ModulePageProps) {
     setFormFiles((prev) => ({ ...prev, [field]: files }));
   };
 
-  const handleCreate = async () => {
+  /**
+   * Shared save logic for both create and edit operations.
+   * Returns true on success, false on failure.
+   */
+  const saveRecord = async (values?: Record<string, string>): Promise<boolean> => {
+    const valuesToSave = values || formValues;
+
     // Validate form before submission
     if (!validateForm()) {
       modal.error({
         title: "Validation Error",
         content: "Please fill in all required fields (marked with *).",
       });
-      return;
+      return false;
     }
 
     try {
       setLoading(true);
-      const res = await fetch(`/backend-api/modules/${module.slug}/records`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(formValues),
-      });
 
-      if (!res.ok) {
-        const errorData = await res.json();
-        handleValidationError(errorData);
-        return;
+      if (modalMode === "create") {
+        const res = await fetch(`/backend-api/modules/${module.slug}/records`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(valuesToSave),
+        });
+
+        if (!res.ok) {
+          const errorData = await res.json();
+          handleValidationError(errorData);
+          return false;
+        }
+
+        const { record } = await res.json();
+
+        const mapped: Record<string, any> = {
+          _id: record.id,
+          ...(record.data ?? {}),
+          "Created at": String(record.createdAt).slice(0, 16),
+          "Update at": String(record.updatedAt).slice(0, 16),
+          "Created by": record.createdById ?? "",
+          "Updated by": record.updatedById ?? "",
+        };
+
+        setRecords((prev) => [mapped, ...prev]);
+      } else if (modalMode === "edit" && activeRecordId) {
+        const res = await fetch(
+          `/backend-api/modules/${module.slug}/records/${activeRecordId}`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify(valuesToSave),
+          }
+        );
+
+        if (!res.ok) {
+          const errorData = await res.json();
+          handleValidationError(errorData);
+          return false;
+        }
+
+        const { record } = await res.json();
+
+        const mapped: Record<string, any> = {
+          _id: record.id,
+          ...(record.data ?? {}),
+          "Created at": String(record.createdAt).slice(0, 16),
+          "Update at": String(record.updatedAt).slice(0, 16),
+          "Created by": record.createdById ?? "",
+          "Updated by": record.updatedById ?? "",
+        };
+
+        setRecords((prev) =>
+          prev.map((r) => (r._id === activeRecordId ? mapped : r))
+        );
       }
 
-      const { record } = await res.json();
+      return true;
+    } catch (e) {
+      console.error("Save failed:", e);
+      modal.error({
+        title: "Save Failed",
+        content: String(e),
+      });
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      const mapped: Record<string, any> = {
-        _id: record.id,
-        ...(record.data ?? {}),
-        "Created at": String(record.createdAt).slice(0, 16),
-        "Update at": String(record.updatedAt).slice(0, 16),
-        "Created by": record.createdById ?? "",
-        "Updated by": record.updatedById ?? "",
-      };
-
-      setRecords((prev) => [mapped, ...prev]);
+  const handleCreate = async () => {
+    const success = await saveRecord();
+    if (success) {
       setFormValues({});
       setFormFiles({});
       setModalOpen(false);
-    } catch (e) {
-      console.error("Create failed:", e);
-      modal.error({
-        title: "Create Failed",
-        content: String(e),
-      });
-    } finally {
-      setLoading(false);
     }
   };
 
   const handleEdit = async () => {
     if (!activeRecordId) return;
 
-    // Validate form before submission
-    if (!validateForm()) {
-      modal.error({
-        title: "Validation Error",
-        content: "Please fill in all required fields (marked with *).",
-      });
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const res = await fetch(
-        `/backend-api/modules/${module.slug}/records/${activeRecordId}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify(formValues),
-        }
-      );
-
-      if (!res.ok) {
-        const errorData = await res.json();
-        handleValidationError(errorData);
-        return;
-      }
-
-      const { record } = await res.json();
-
-      const mapped: Record<string, any> = {
-        _id: record.id,
-        ...(record.data ?? {}),
-        "Created at": String(record.createdAt).slice(0, 16),
-        "Update at": String(record.updatedAt).slice(0, 16),
-        "Created by": record.createdById ?? "",
-        "Updated by": record.updatedById ?? "",
-      };
-
-      setRecords((prev) =>
-        prev.map((r) => (r._id === activeRecordId ? mapped : r))
-      );
+    const success = await saveRecord();
+    if (success) {
       setFormValues({});
       setFormFiles({});
       setModalOpen(false);
-    } catch (e) {
-      console.error("Update failed:", e);
-      modal.error({
-        title: "Update Failed",
-        content: String(e),
-      });
-    } finally {
-      setLoading(false);
     }
   };
 
-  
+  const handleAssignUser = (userId: string) => {
+    const user = assignableUsers.find((u) => u.id === userId);
+    if (!user) return;
+    const displayName = user.name || user.email;
+    const assigneeFields = findAssigneeFields(module.fields);
+
+    // Populate all matching fields with the selected user's display name
+    assigneeFields.forEach((f) => {
+      setFormValues((prev) => ({ ...prev, [f]: displayName }));
+    });
+    setAssignPickerOpen(false);
+  };
+
+  const handleComplete = async () => {
+    // 1. Set Task Status field to "Completed"
+    const statusField = module.fields.find((f) =>
+      f.toLowerCase().includes("task status")
+    );
+
+    const updatedValues = { ...formValues };
+    if (statusField) {
+      updatedValues[statusField] = "Completed";
+      setFormValues(updatedValues);
+    }
+
+    // 2. Save the record
+    const savedOk = await saveRecord(updatedValues);
+    if (!savedOk) return;
+
+    // 3. Close modal
+    setModalOpen(false);
+
+    // 4. Find next module in workflow
+    const allMods = getAllModules();
+    const currentIndex = allMods.findIndex((m) => m.slug === module.slug);
+    const nextModule = allMods[currentIndex + 1];
+
+    // 5. Navigate to next module or show done message
+    if (nextModule) {
+      modal.success({
+        title: "Task Completed",
+        content: `Moving to next step: ${nextModule.name}`,
+        onOk: () => router.push(`/app/modules/${nextModule.slug}`),
+        okText: "Go to next step",
+      });
+    } else {
+      modal.success({
+        title: "Workflow Complete",
+        content: "All workflow steps are done.",
+      });
+    }
+  };
 
   const handleDelete = (id: string) => {
     modal.confirm({
@@ -685,18 +849,38 @@ export function ModulePage({ module }: ModulePageProps) {
         destroyOnHidden
         footer={
           modalMode !== "view" ? (
-            <div className="flex justify-end gap-2">
-              <AntButton onClick={() => setModalOpen(false)}>
-                Cancel
-              </AntButton>
-              <AntButton
-                type="primary"
-                danger={false}
-                loading={loading}
-                onClick={modalMode === "create" ? handleCreate : handleEdit}
-              >
-                {modalMode === "create" ? "Create" : "Save Changes"}
-              </AntButton>
+            <div className="flex justify-between gap-2">
+              {modalMode === "edit" && assignableUsers.length > 0 && (
+                <AntButton
+                  icon={<UserSwitchOutlined />}
+                  onClick={() => setAssignPickerOpen(true)}
+                >
+                  Assign
+                </AntButton>
+              )}
+              <div className="flex gap-2">
+                <AntButton onClick={() => setModalOpen(false)}>
+                  Cancel
+                </AntButton>
+                <AntButton
+                  type="primary"
+                  danger={false}
+                  loading={loading}
+                  onClick={modalMode === "create" ? handleCreate : handleEdit}
+                >
+                  {modalMode === "create" ? "Create" : "Save"}
+                </AntButton>
+                {modalMode === "edit" && (
+                  <AntButton
+                    type="primary"
+                    icon={<CheckCircleOutlined />}
+                    loading={loading}
+                    onClick={handleComplete}
+                  >
+                    Complete
+                  </AntButton>
+                )}
+              </div>
             </div>
           ) : null
         }
@@ -713,6 +897,27 @@ export function ModulePage({ module }: ModulePageProps) {
             requiredFields={requiredFields}
           />
         </div>
+      </Modal>
+
+      {/* Assign User Picker Modal */}
+      <Modal
+        title="Assign To"
+        open={assignPickerOpen}
+        footer={null}
+        onCancel={() => setAssignPickerOpen(false)}
+        width={380}
+      >
+        <AntSelect
+          showSearch
+          style={{ width: "100%" }}
+          placeholder="Select a team member..."
+          optionFilterProp="label"
+          options={assignableUsers.map((u) => ({
+            value: u.id,
+            label: u.name || u.email,
+          }))}
+          onChange={handleAssignUser}
+        />
       </Modal>
     </div>
   );

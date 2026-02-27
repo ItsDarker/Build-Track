@@ -45,6 +45,10 @@
             "path": "/app/tasks/work-orders"
           },
           {
+            "label": "Support & Warranty",
+            "path": "/app/tasks/support-warranty"
+          },
+          {
             "label": "Inspections",
             "path": "/app/tasks/inspections"
           },
@@ -314,6 +318,47 @@
         "Internal Owner (Project Coordinator)",
         "Optional",
         "Change order linkages"
+      ]
+    },
+    "work-orders": {
+      "name": "Work Orders",
+      "slug": "work-orders",
+      "description": "Current work assigned to team members\n Track job progress and execution\n Manage work order status",
+      "who": "Project Coordinator / Manufacturing Team",
+      "mvpUser": "Admin",
+      "process": "Work Order Execution and Tracking",
+      "screens": "Work Order Dashboard\nWork Order Detail\nExecution Checklist",
+      "accessRoles": [
+        "Project Manager",
+        "Production Team",
+        "Design Team",
+        "Quality Control"
+      ],
+      "fields": [
+        "Created at",
+        "Created by",
+        "Update at",
+        "Updated by",
+        "Task Status (New, In Progress, Completed)",
+        "Work Order ID",
+        "Linked Sales Order ID",
+        "Linked Project ID",
+        "Work Type (Design, Fabrication, Assembly, Installation, Other)",
+        "Status (Assigned, In Progress, On Hold, Ready for QC, Completed)",
+        "Assigned To (Team/Person)",
+        "Assigned Date",
+        "Scheduled Start Date",
+        "Scheduled End Date",
+        "Actual Start Date",
+        "Actual End Date",
+        "Priority (Low, Medium, High, Critical)",
+        "Description / Scope",
+        "Special Instructions",
+        "Attachments (drawings, specifications)",
+        "Notes / Progress Updates",
+        "Optional",
+        "Approval signature/sign-off",
+        "Resource allocation (tools, materials)"
       ]
     },
     "support-warranty": {
@@ -656,6 +701,7 @@
     "quoting-contracts",
     "approval-workflow",
     "job-confirmation",
+    "work-orders",
     "support-warranty",
     "bom-materials-planning",
     "procurement",

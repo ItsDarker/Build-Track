@@ -83,6 +83,7 @@ export default function ClientsPage() {
   const [saving, setSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [form] = Form.useForm();
+  const [selectedCustomer, setSelectedCustomer] = useState<Client | null>(null);
 
   useEffect(() => {
     const init = async () => {
@@ -152,7 +153,21 @@ export default function ClientsPage() {
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingClient(null);
+    setSelectedCustomer(null);
     form.resetFields();
+  };
+
+  const handleCustomerSelect = (customerId: string) => {
+    const customer = clients.find(c => c.id === customerId);
+    if (customer) {
+      setSelectedCustomer(customer);
+      // Auto-populate locked fields from customer profile
+      form.setFieldsValue({
+        name: customer.name,
+        company: customer.company || '',
+        role: customer.role || undefined,
+      });
+    }
   };
 
   if (loading || !user) {
@@ -343,33 +358,95 @@ export default function ClientsPage() {
         onCancel={closeModal}
         footer={null}
         width={680}
-        destroyOnHidden
       >
         {/* Read-only Customer ID when editing */}
         {editingClient && (
-          <div className="mb-4 px-3 py-2 bg-gray-50 rounded-lg">
-            <Text type="secondary" className="text-xs block">Customer ID</Text>
-            <Text code className="text-xs">{editingClient.id}</Text>
+          <>
+            <div className="mb-4 px-3 py-2 bg-gray-50 rounded-lg">
+              <Text type="secondary" className="text-xs block">Customer ID</Text>
+              <Text code className="text-xs">{editingClient.id}</Text>
+            </div>
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <Text type="secondary" className="text-xs block mb-1"><strong>Customer Profile (Read-Only):</strong></Text>
+              <Text type="secondary" className="text-xs block">
+                • <strong>Contact Name, Company, Role</strong> are from Customer Profile table (cannot be changed)
+              </Text>
+              <Text type="secondary" className="text-xs block">
+                • You can edit addresses, phone, and preferences
+              </Text>
+            </div>
+          </>
+        )}
+
+        {!editingClient && (
+          <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+            <Text type="secondary" className="text-xs block"><strong>Workflow:</strong> Select a Customer from the dropdown to auto-populate their profile information</Text>
           </div>
         )}
 
         <Form form={form} layout="vertical" onFinish={handleSave}>
+          {/* Customer Lookup (Create Mode Only) */}
+          {!editingClient && (
+            <Form.Item label="Select Customer from Profile">
+              <Select
+                size="large"
+                placeholder="Search and select customer..."
+                allowClear
+                showSearch
+                filterOption={(input: string, option: any) =>
+                  (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                }
+                options={clients.map((c) => ({
+                  value: c.id,
+                  label: `${c.name}${c.company ? ` (${c.company})` : ''}`,
+                }))}
+                onChange={handleCustomerSelect}
+              />
+            </Form.Item>
+          )}
+
           {/* Row 1: Contact Name + Company */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4">
             <Form.Item
               name="name"
-              label="Contact Name"
-              rules={[{ required: true, message: "Contact name is required" }]}
+              label={<span>Contact Name <span className="text-red-500">*</span></span>}
+              rules={[
+                { required: true, message: "Contact name is required" },
+                { pattern: /^[a-zA-Z\s\-']+$/, message: "Contact name must contain only letters, spaces, hyphens, or apostrophes" }
+              ]}
+              tooltip={editingClient ? "From Customer Profile (cannot edit)" : selectedCustomer ? "From Customer Profile (cannot edit)" : undefined}
             >
-              <Input prefix={<UserOutlined />} placeholder="Jane Smith" size="large" />
+              <Input
+                prefix={<UserOutlined />}
+                placeholder="Jane Smith"
+                size="large"
+                disabled={!!editingClient || !!selectedCustomer}
+              />
             </Form.Item>
-            <Form.Item name="company" label="Company Name">
-              <Input prefix={<BankOutlined />} placeholder="Smith Construction" size="large" />
+            <Form.Item
+              name="company"
+              label="Company Name"
+              tooltip={selectedCustomer ? "From Customer Profile (cannot edit)" : undefined}
+            >
+              <Input
+                prefix={<BankOutlined />}
+                placeholder="Smith Construction"
+                size="large"
+                disabled={!!selectedCustomer}
+              />
             </Form.Item>
 
             {/* Row 2: Role + Preferred Approval Method */}
-            <Form.Item name="role" label="Role">
-              <Select size="large" placeholder="Select role" allowClear
+            <Form.Item
+              name="role"
+              label="Role"
+              tooltip={selectedCustomer || editingClient ? "From Customer Profile (cannot edit)" : undefined}
+            >
+              <Select
+                size="large"
+                placeholder="Select role"
+                allowClear
+                disabled={!!selectedCustomer || !!editingClient}
                 options={ROLE_OPTIONS.map((r) => ({ label: r, value: r }))}
               />
             </Form.Item>
@@ -380,7 +457,13 @@ export default function ClientsPage() {
             </Form.Item>
 
             {/* Row 3: Phone + Alt Phone */}
-            <Form.Item name="phone" label="Phone Number">
+            <Form.Item
+              name="phone"
+              label="Phone Number"
+              rules={[
+                { pattern: /^[\d\s\-\+\(\)]*$/, message: "Phone must contain only numbers, spaces, hyphens, parentheses, or plus sign (e.g., +1 312 285 6334)" }
+              ]}
+            >
               <Input
                 prefix={<PhoneOutlined />}
                 placeholder="+1 312 285 6334"
@@ -391,7 +474,13 @@ export default function ClientsPage() {
                 }}
               />
             </Form.Item>
-            <Form.Item name="altPhone" label="Alt Phone Number">
+            <Form.Item
+              name="altPhone"
+              label="Alt Phone Number"
+              rules={[
+                { pattern: /^[\d\s\-\+\(\)]*$/, message: "Phone must contain only numbers, spaces, hyphens, parentheses, or plus sign (e.g., +1 312 285 6334)" }
+              ]}
+            >
               <Input
                 prefix={<PhoneOutlined />}
                 placeholder="+1 312 285 6335"
@@ -408,7 +497,10 @@ export default function ClientsPage() {
               name="email"
               label="Email"
               className="md:col-span-2"
-              rules={[{ type: "email", message: "Enter a valid email" }]}
+              rules={[
+                { type: "email", message: "Email must be valid (format: user@example.com)" },
+                { pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: "Email must contain @ and domain name (e.g., user@company.com)" }
+              ]}
             >
               <Input prefix={<MailOutlined />} placeholder="jane@company.com" size="large" />
             </Form.Item>

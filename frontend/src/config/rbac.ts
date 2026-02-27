@@ -57,7 +57,7 @@ export const ADMIN_ROLES = ["SUPER_ADMIN", "ORG_ADMIN"] as const;
 
 export const MODULE_ACCESS: Record<string, Record<string, AccessLevel>> = {
   "crm-leads": {
-    PROJECT_MANAGER: "R",
+    PROJECT_MANAGER: "R/W",
     SALES_MANAGER: "R/W",
     PROJECT_COORDINATOR: "R",
     CLIENT: "R/W",
@@ -74,7 +74,7 @@ export const MODULE_ACCESS: Record<string, Record<string, AccessLevel>> = {
     CLIENT: "R",
   },
   "quoting-contracts": {
-    PROJECT_MANAGER: "R",
+    PROJECT_MANAGER: "R/W",
     SALES_MANAGER: "R/W",
     FINANCE_MANAGER: "R/W",
   },
@@ -89,6 +89,13 @@ export const MODULE_ACCESS: Record<string, Record<string, AccessLevel>> = {
     SALES_MANAGER: "R/W",
     FINANCE_MANAGER: "R/W",
   },
+  "work-orders": {
+    PROJECT_MANAGER: "R/W",
+    PROJECT_COORDINATOR: "R/W",
+    PRODUCTION_MANAGER: "R/W",
+    QC_MANAGER: "R/W",
+    PLANNER: "R",
+  },
   "support-warranty": {
     PROJECT_MANAGER: "R/W",
     PROJECT_COORDINATOR: "R/W",
@@ -99,13 +106,13 @@ export const MODULE_ACCESS: Record<string, Record<string, AccessLevel>> = {
     CLIENT: "R",
   },
   "bom-materials-planning": {
-    PROJECT_MANAGER: "R",
+    PROJECT_MANAGER: "R/W",
     PROCUREMENT_MANAGER: "R/W",
     PRODUCTION_MANAGER: "R/W",
     PLANNER: "R/W",
   },
   procurement: {
-    PROJECT_MANAGER: "R",
+    PROJECT_MANAGER: "R/W",
     PROJECT_COORDINATOR: "R",
     PROCUREMENT_MANAGER: "R/W",
     PRODUCTION_MANAGER: "R",
@@ -118,26 +125,28 @@ export const MODULE_ACCESS: Record<string, Record<string, AccessLevel>> = {
     LOGISTICS_MANAGER: "R",
   },
   manufacturing: {
-    PROJECT_MANAGER: "R",
+    PROJECT_MANAGER: "R/W",
     PRODUCTION_MANAGER: "R/W",
     QC_MANAGER: "R",
   },
   "quality-control": {
-    PROJECT_MANAGER: "R",
+    PROJECT_MANAGER: "R/W",
     QC_MANAGER: "R/W",
     PRODUCTION_MANAGER: "R",
   },
   packaging: {
+    PROJECT_MANAGER: "R/W",
     PROCUREMENT_MANAGER: "R",
     PRODUCTION_MANAGER: "R/W",
     LOGISTICS_MANAGER: "R",
   },
   "delivery-installation": {
-    PROJECT_MANAGER: "R",
+    PROJECT_MANAGER: "R/W",
     LOGISTICS_MANAGER: "R/W",
     CLIENT: "R",
   },
   "billing-invoicing": {
+    PROJECT_MANAGER: "R/W",
     FINANCE_MANAGER: "R/W",
     SALES_MANAGER: "R",
     CLIENT: "R/W",

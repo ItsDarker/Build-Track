@@ -7,6 +7,19 @@ import { apiClient } from "@/lib/api/client";
 import { downloadExcel } from "@/lib/downloadExcel";
 import dayjs from "dayjs";
 
+/** Generate a Project ID based on project name and timestamp */
+function generateProjectId(projectName: string): string {
+  const prefix = projectName
+    .split(/[\s\/]+/)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 3);
+
+  const timestamp = Date.now().toString().slice(-6);
+  return `${prefix}-${timestamp}`;
+}
+
 export default function ProjectsPage() {
     const { message, modal } = App.useApp();
     const [projects, setProjects] = useState<any[]>([]);
@@ -24,6 +37,7 @@ export default function ProjectsPage() {
     const [startModalOpen, setStartModalOpen] = useState(false);
     const [cancelModalOpen, setCancelModalOpen] = useState(false);
     const [closeModalOpen, setCloseModalOpen] = useState(false);
+    const [detailsModalOpen, setDetailsModalOpen] = useState(false);
     const [activeProject, setActiveProject] = useState<any>(null);
     const [assignForm] = Form.useForm();
     const [startForm] = Form.useForm();
@@ -193,8 +207,22 @@ export default function ProjectsPage() {
             });
         } else {
             form.resetFields();
+            // Auto-populate Project ID in create mode with a placeholder
+            form.setFieldsValue({
+                code: generateProjectId("PRJ"),
+            });
         }
         setIsModalOpen(true);
+    };
+
+    const handleProjectNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const projectName = e.target.value;
+        if (projectName && !editingProject) {
+            // Auto-update Project ID based on project name in create mode
+            form.setFieldsValue({
+                code: generateProjectId(projectName),
+            });
+        }
     };
 
     const columns = [
@@ -252,6 +280,14 @@ export default function ProjectsPage() {
             render: (_: any, record: any) => (
                 <Space wrap>
                     <Button icon={<EditOutlined />} onClick={() => openModal(record)} />
+                    {record.cancellationReason && (
+                        <Button
+                            title="View Cancellation Reason"
+                            onClick={() => { setActiveProject(record); setDetailsModalOpen(true); }}
+                        >
+                            Details
+                        </Button>
+                    )}
                     <Button icon={<DeleteOutlined />} danger onClick={() => handleDelete(record.id)} />
                     <Button
                         icon={<UserAddOutlined />}
@@ -309,7 +345,7 @@ export default function ProjectsPage() {
                             downloadExcel(
                                 projects.map((p: any) => ({
                                     Name: p.name,
-                                    Code: p.code || "",
+                                    "Project ID": p.code || "",
                                     Client: p.client?.name || "",
                                     Manager: p.manager?.name || "",
                                     Status: p.status?.replace("_", " ") || "",
@@ -351,10 +387,18 @@ export default function ProjectsPage() {
                 <Form form={form} layout="vertical" onFinish={handleSave}>
                     <div className="grid grid-cols-2 gap-4">
                         <Form.Item name="name" label="Project Name" rules={[{ required: true }]}>
-                            <Input />
+                            <Input onChange={handleProjectNameChange} />
                         </Form.Item>
-                        <Form.Item name="code" label="Project Code">
-                            <Input placeholder="e.g. PRJ-2024-01" />
+                        <Form.Item
+                          name="code"
+                          label="Project ID"
+                          tooltip={editingProject ? "Project ID cannot be changed after creation" : "Auto-generated based on project name"}
+                        >
+                            <Input
+                              placeholder="Auto-generated"
+                              disabled={!!editingProject}
+                              className={editingProject ? "bg-gray-50" : ""}
+                            />
                         </Form.Item>
                     </div>
                     <Form.Item name="description" label="Description">
@@ -484,6 +528,47 @@ export default function ProjectsPage() {
                         <Button type="primary" htmlType="submit">Close Project</Button>
                     </div>
                 </Form>
+            </Modal>
+
+            {/* Project Details Modal */}
+            <Modal
+                title="Project Details"
+                open={detailsModalOpen}
+                onCancel={() => setDetailsModalOpen(false)}
+                footer={null}
+                width={600}
+            >
+                {activeProject && (
+                    <div className="space-y-4">
+                        <div>
+                            <label className="font-semibold text-gray-700">Project Name</label>
+                            <p className="text-gray-600">{activeProject.name}</p>
+                        </div>
+                        <div>
+                            <label className="font-semibold text-gray-700">Status</label>
+                            <p className="mt-1">
+                                <Tag color={activeProject.status === 'CANCELLED' ? 'red' : activeProject.status === 'COMPLETED' ? 'green' : 'orange'}>
+                                    {activeProject.status.replace(/_/g, ' ')}
+                                </Tag>
+                            </p>
+                        </div>
+                        {activeProject.cancellationReason && (
+                            <div>
+                                <label className="font-semibold text-gray-700">Reason for Cancellation</label>
+                                <p className="text-gray-600 whitespace-pre-wrap">{activeProject.cancellationReason}</p>
+                            </div>
+                        )}
+                        {activeProject.completionNote && (
+                            <div>
+                                <label className="font-semibold text-gray-700">Completion Note</label>
+                                <p className="text-gray-600 whitespace-pre-wrap">{activeProject.completionNote}</p>
+                            </div>
+                        )}
+                        <div className="flex justify-end gap-2 mt-6">
+                            <Button onClick={() => setDetailsModalOpen(false)}>Close</Button>
+                        </div>
+                    </div>
+                )}
             </Modal>
         </div>
     );

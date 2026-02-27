@@ -80,6 +80,11 @@ function isAuthorField(label: string): boolean {
   return label === "Created by" || label === "Updated by";
 }
 
+function isIdField(label: string): boolean {
+  const lower = label.toLowerCase();
+  return lower.includes("id") && !lower.includes("video");
+}
+
 function extractOptions(label: string): string[] | null {
   const match = label.match(/\(([^)]+)\)/);
   if (!match) return null;
@@ -156,7 +161,7 @@ export function DynamicFormRenderer({
         const options = extractOptions(field);
         const value = values[field] || "";
         const label = cleanLabel(field);
-        const disabled = isViewMode || isAuditField(field);
+        const disabled = isViewMode || isAuditField(field) || isIdField(field);
         const fieldFiles = files[field] || [];
         const fieldError = errors[field];
         const isRequired = requiredFields.has(field);
@@ -174,6 +179,11 @@ export function DynamicFormRenderer({
               {isAuditField(field) && (
                 <span className="ml-1.5 text-xs text-gray-400 font-normal">
                   (auto)
+                </span>
+              )}
+              {isIdField(field) && (
+                <span className="ml-1.5 text-xs text-gray-400 font-normal">
+                  (auto-generated)
                 </span>
               )}
             </Label>
