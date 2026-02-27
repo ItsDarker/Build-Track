@@ -43,9 +43,6 @@ export default function ProjectsPage() {
     const [startForm] = Form.useForm();
     const [cancelForm] = Form.useForm();
     const [closeForm] = Form.useForm();
-
-    // Project Details modal states
-    const [detailsModalOpen, setDetailsModalOpen] = useState(false);
     const [detailsProject, setDetailsProject] = useState<any>(null);
     const [detailsLoading, setDetailsLoading] = useState(false);
 
