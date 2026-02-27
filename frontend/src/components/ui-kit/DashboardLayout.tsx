@@ -277,7 +277,7 @@ export function DashboardLayout({ user, children }: DashboardLayoutProps) {
                           {displayName}
                         </p>
                         <p className="text-gray-400 text-xs leading-tight">
-                          {user.role.displayName}
+                          {user.role?.displayName || 'No Role'}
                         </p>
                       </div>
                       <div className="w-9 h-9 bg-orange-500 rounded-full flex items-center justify-center text-white font-semibold text-sm">

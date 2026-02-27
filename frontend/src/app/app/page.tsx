@@ -19,7 +19,7 @@ import { apiClient } from "@/lib/api/client";
 export default function DashboardPage() {
   const { role } = useUser();
   const modules = getAllModules().filter((mod) =>
-    canAccessModule(role.name, mod.slug)
+    canAccessModule(role?.name, mod.slug)
   );
 
   const [statsData, setStatsData] = useState({
