@@ -281,46 +281,50 @@ export function ModulePage({ module }: ModulePageProps) {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [requiredFields, setRequiredFields] = useState<Set<string>>(new Set());
   const [assignableUsers, setAssignableUsers] = useState<{ id: string; name?: string; email: string }[]>([]);
+  const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
+  const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
   const [assignPickerOpen, setAssignPickerOpen] = useState(false);
 
- useEffect(() => {
-  let cancelled = false;
+  useEffect(() => {
+    let cancelled = false;
 
-  (async () => {
-    try {
-      setLoading(true);
-      const res = await fetch(`/backend-api/modules/${module.slug}/records`, {
-        credentials: "include"
-      });
+    (async () => {
+      try {
+        setLoading(true);
+        const res = await fetch(`/backend-api/modules/${module.slug}/records`, {
+          credentials: "include"
+        });
 
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
 
-      const mapped = (data.records ?? []).map((r: any) => ({
-        _id: r.id,
-        ...(r.data ?? {}),
-        "Created at": r.createdAt ? String(r.createdAt).slice(0, 16) : "",
-        "Update at": r.updatedAt ? String(r.updatedAt).slice(0, 16) : "",
-        "Created by": r.createdById ?? "",
-        "Updated by": r.updatedById ?? "",
-      }));
+        const mapped = (data.records ?? []).map((r: any) => ({
+          _id: r.id,
+          ...(r.data ?? {}),
+          "Created at": r.createdAt ? String(r.createdAt).slice(0, 16) : "",
+          "Update at": r.updatedAt ? String(r.updatedAt).slice(0, 16) : "",
+          "Created by": r.createdById ?? "",
+          "Updated by": r.updatedById ?? "",
+        }));
 
-      if (!cancelled) setRecords(mapped);
-    } catch (e) {
-      console.error("Failed to load module records:", e);
-      if (!cancelled) setRecords([]);
-    } finally {
-      if (!cancelled) setLoading(false);
-    }
-  })();
+        if (!cancelled) setRecords(mapped);
+      } catch (e) {
+        console.error("Failed to load module records:", e);
+        if (!cancelled) setRecords([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
 
-  return () => {
-    cancelled = true;
-  };
-}, [module.slug]);
+    return () => {
+      cancelled = true;
+    };
+  }, [module.slug]);
 
   // Fetch assignable users for the Assign action (optional feature)
   useEffect(() => {
+    let cancelled = false;
+
     // Use timeout to avoid blocking page load if endpoint is slow/unavailable
     const timeoutId = setTimeout(() => {
       fetch('/backend-api/teams/assignable', { credentials: 'include' })
@@ -331,15 +335,61 @@ export function ModulePage({ module }: ModulePageProps) {
           }
           return r.json();
         })
-        .then((d) => setAssignableUsers(d.users ?? []))
+        .then((d) => {
+          if (!cancelled) setAssignableUsers(d.users ?? []);
+        })
         .catch(() => {
           // Silently fail - this is an optional feature
-          setAssignableUsers([]);
+          if (!cancelled) setAssignableUsers([]);
+        });
+
+      fetch('/backend-api/projects', { credentials: 'include' })
+        .then((r) => (r.ok ? r.json() : { projects: [] }))
+        .then((d) => {
+          if (!cancelled) setProjects(d.projects ?? []);
+        })
+        .catch(() => {
+          if (!cancelled) setProjects([]);
+        });
+
+      fetch('/backend-api/clients', { credentials: 'include' })
+        .then((r) => (r.ok ? r.json() : { clients: [] }))
+        .then((d) => {
+          if (!cancelled) setClients(d.clients ?? []);
+        })
+        .catch(() => {
+          if (!cancelled) setClients([]);
         });
     }, 100);
 
-    return () => clearTimeout(timeoutId);
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
   }, []);
+
+  const dynamicOptions = useMemo(() => {
+    const opts: Record<string, { label: string; value: string }[]> = {};
+
+    module.fields.forEach((field) => {
+      const label = cleanLabel(field);
+      const lower = label.toLowerCase();
+
+      if (lower.includes("project id") || lower.includes("project reference") || lower.includes("linked project")) {
+        opts[label] = projects.map((p) => ({ value: p.id, label: p.name }));
+      } else if (lower.includes("project name")) {
+        opts[label] = projects.map((p) => ({ value: p.name, label: p.name }));
+      } else if (lower.includes("customer name") || lower.includes("client name")) {
+        opts[label] = clients.map((c) => ({ value: c.name, label: c.name }));
+      } else if (lower.includes("customer") || lower.includes("client")) {
+        opts[label] = clients.map((c) => ({ value: c.id, label: c.name }));
+      } else if (findAssigneeFields([label]).length > 0) {
+        opts[label] = assignableUsers.map((u) => ({ value: String(u.name || u.email), label: String(u.name || u.email) }));
+      }
+    });
+
+    return opts;
+  }, [module.fields, projects, clients, assignableUsers]);
 
   // Key fields for table columns (first 5 non-section, non-audit fields)
   const tableFields = useMemo(() => {
@@ -717,28 +767,28 @@ export function ModulePage({ module }: ModulePageProps) {
       okText: "Delete",
       okButtonProps: { danger: true, loading },
       onOk: async () => {
-  try {
-    setLoading(true);
+        try {
+          setLoading(true);
 
-    const res = await fetch(
-      `/backend-api/modules/${module.slug}/records/${id}`,
-      {
-        method: "DELETE",
-        credentials: "include",
-      }
-    );
+          const res = await fetch(
+            `/backend-api/modules/${module.slug}/records/${id}`,
+            {
+              method: "DELETE",
+              credentials: "include",
+            }
+          );
 
-    if (!res.ok && res.status !== 204) throw new Error(`HTTP ${res.status}`);
+          if (!res.ok && res.status !== 204) throw new Error(`HTTP ${res.status}`);
 
-    setRecords((prev) => prev.filter((r) => r._id !== id));
-  } catch (e) {
-    console.error("Delete failed:", e);
-    modal.error({ title: "Delete failed", content: String(e) });
-    throw e; // optional but recommended (keeps confirm open on failure)
-  } finally {
-    setLoading(false);
-  }
-},
+          setRecords((prev) => prev.filter((r) => r._id !== id));
+        } catch (e) {
+          console.error("Delete failed:", e);
+          modal.error({ title: "Delete failed", content: String(e) });
+          throw e; // optional but recommended (keeps confirm open on failure)
+        } finally {
+          setLoading(false);
+        }
+      },
 
     });
   };
@@ -895,6 +945,7 @@ export function ModulePage({ module }: ModulePageProps) {
             onFileChange={handleFileChange}
             errors={fieldErrors}
             requiredFields={requiredFields}
+            dynamicOptions={dynamicOptions}
           />
         </div>
       </Modal>
