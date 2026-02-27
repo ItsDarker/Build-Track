@@ -25,14 +25,15 @@ const createUserSchema = z.object({
 
 const updateUserSchema = z.object({
   email: z.string().email().optional(),
-  name: z.string().optional(),
-  role: z.string().optional(), // Role name will be validated against database
-  phone: z.string().optional(),
-  company: z.string().optional(),
-  jobTitle: z.string().optional(),
-  bio: z.string().optional(),
+  name: z.string().nullable().optional(),
+  role: z.string().optional(),
+  phone: z.string().nullable().optional(),
+  company: z.string().nullable().optional(),
+  jobTitle: z.string().nullable().optional(),
+  bio: z.string().nullable().optional(),
   emailVerified: z.boolean().optional(),
 });
+
 
 const resetPasswordSchema = z.object({
   password: z.string().min(10),
