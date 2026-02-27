@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Table, Button, Card, Tag, Space, Modal, Form, Input, Select, DatePicker, App } from "antd";
-import { PlusOutlined, EditOutlined, DeleteOutlined, DownloadOutlined, UserAddOutlined, PlayCircleOutlined, CloseCircleOutlined, CheckCircleOutlined, UndoOutlined } from "@ant-design/icons";
+import { Table, Button, Card, Tag, Space, Modal, Form, Input, Select, DatePicker, App, Upload, List } from "antd";
+import { PlusOutlined, EditOutlined, DeleteOutlined, DownloadOutlined, UserAddOutlined, PlayCircleOutlined, CloseCircleOutlined, CheckCircleOutlined, UndoOutlined, FolderOpenOutlined, InboxOutlined } from "@ant-design/icons";
 import { apiClient } from "@/lib/api/client";
 import { downloadExcel } from "@/lib/downloadExcel";
 import dayjs from "dayjs";
@@ -43,6 +43,15 @@ export default function ProjectsPage() {
     const [startForm] = Form.useForm();
     const [cancelForm] = Form.useForm();
     const [closeForm] = Form.useForm();
+
+    // Project Details modal states
+    const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+    const [detailsProject, setDetailsProject] = useState<any>(null);
+    const [detailsLoading, setDetailsLoading] = useState(false);
+
+    // Project Files modal states
+    const [filesModalOpen, setFilesModalOpen] = useState(false);
+    const [filesProject, setFilesProject] = useState<any>(null);
 
     useEffect(() => {
         fetchProjects();
@@ -87,6 +96,16 @@ export default function ProjectsPage() {
         if (result.data) {
             setCurrentUser((result.data as any).user);
         }
+    };
+
+    const openDetailsModal = async (record: any) => {
+        setDetailsModalOpen(true);
+        setDetailsLoading(true);
+        const result = await apiClient.getProject(record.id);
+        if (result.data) {
+            setDetailsProject((result.data as any).project);
+        }
+        setDetailsLoading(false);
     };
 
     const handleSave = async (values: any) => {
@@ -225,14 +244,25 @@ export default function ProjectsPage() {
         }
     };
 
+    const taskStatusColors: Record<string, string> = {
+        TODO: "default",
+        IN_PROGRESS: "orange",
+        DONE: "green",
+        COMPLETED: "green",
+        BLOCKED: "red",
+    };
+
     const columns = [
         {
             title: "Name",
             dataIndex: "name",
             key: "name",
             render: (text: string, record: any) => (
-                <div>
-                    <div className="font-medium">{text}</div>
+                <div
+                    className="cursor-pointer hover:text-blue-600"
+                    onClick={() => openDetailsModal(record)}
+                >
+                    <div className="font-medium text-blue-500 underline">{text}</div>
                     <div className="text-xs text-gray-500">{record.code}</div>
                 </div>
             )
@@ -289,6 +319,11 @@ export default function ProjectsPage() {
                         </Button>
                     )}
                     <Button icon={<DeleteOutlined />} danger onClick={() => handleDelete(record.id)} />
+                    <Button
+                        icon={<FolderOpenOutlined />}
+                        title="Project Files"
+                        onClick={() => { setFilesProject(record); setFilesModalOpen(true); }}
+                    />
                     <Button
                         icon={<UserAddOutlined />}
                         title="Assign"
@@ -375,6 +410,104 @@ export default function ProjectsPage() {
                     pagination={{ pageSize: 10 }}
                 />
             </Card>
+
+            {/* Project Details Modal */}
+            <Modal
+                title="Project Details"
+                open={detailsModalOpen}
+                onCancel={() => { setDetailsModalOpen(false); setDetailsProject(null); }}
+                footer={null}
+                width={700}
+            >
+                {detailsLoading ? (
+                    <div className="text-center py-8 text-gray-400">Loading...</div>
+                ) : detailsProject ? (
+                    <div className="space-y-6">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <div className="text-xs text-gray-500 mb-1">Project Name</div>
+                                <div className="font-medium">{detailsProject.name}</div>
+                            </div>
+                            <div>
+                                <div className="text-xs text-gray-500 mb-1">Project Code</div>
+                                <div className="font-medium">{detailsProject.code || "-"}</div>
+                            </div>
+                            <div>
+                                <div className="text-xs text-gray-500 mb-1">Client</div>
+                                <div className="font-medium">{detailsProject.client?.name || "-"}</div>
+                            </div>
+                            <div>
+                                <div className="text-xs text-gray-500 mb-1">Project Manager</div>
+                                <div className="font-medium">{detailsProject.manager?.name || "-"}</div>
+                            </div>
+                            <div>
+                                <div className="text-xs text-gray-500 mb-1">Status</div>
+                                <Tag color={{
+                                    PLANNING: "blue",
+                                    IN_PROGRESS: "orange",
+                                    COMPLETED: "green",
+                                    ON_HOLD: "default",
+                                    CANCELLED: "red",
+                                }[detailsProject.status as string]}>
+                                    {detailsProject.status?.replace("_", " ")}
+                                </Tag>
+                            </div>
+                            <div>
+                                <div className="text-xs text-gray-500 mb-1">Description</div>
+                                <div className="font-medium">{detailsProject.description || "-"}</div>
+                            </div>
+                            <div>
+                                <div className="text-xs text-gray-500 mb-1">Target Start Date</div>
+                                <div className="font-medium">{detailsProject.startDate ? new Date(detailsProject.startDate).toLocaleDateString() : "-"}</div>
+                            </div>
+                            <div>
+                                <div className="text-xs text-gray-500 mb-1">Target End Date</div>
+                                <div className="font-medium">{detailsProject.endDate ? new Date(detailsProject.endDate).toLocaleDateString() : "-"}</div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div className="font-semibold mb-2">Tasks</div>
+                            {detailsProject.tasks && detailsProject.tasks.length > 0 ? (
+                                <List
+                                    bordered
+                                    dataSource={detailsProject.tasks}
+                                    renderItem={(task: any) => (
+                                        <List.Item>
+                                            <div className="flex justify-between w-full items-center">
+                                                <span>{task.title}</span>
+                                                <Tag color={taskStatusColors[task.status] || "default"}>
+                                                    {task.status?.replace("_", " ")}
+                                                </Tag>
+                                            </div>
+                                        </List.Item>
+                                    )}
+                                />
+                            ) : (
+                                <div className="text-gray-400 text-sm">No tasks yet.</div>
+                            )}
+                        </div>
+                    </div>
+                ) : null}
+            </Modal>
+
+            {/* Project Files Modal */}
+            <Modal
+                title={`Project Files — ${filesProject?.name || ""}`}
+                open={filesModalOpen}
+                onCancel={() => { setFilesModalOpen(false); setFilesProject(null); }}
+                footer={null}
+                width={600}
+            >
+                <div className="space-y-4">
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center text-gray-400">
+                        <InboxOutlined style={{ fontSize: 40, marginBottom: 8 }} />
+                        <div className="text-base font-medium">File uploads coming soon</div>
+                        <div className="text-sm mt-1">This area will allow you to upload and manage files for this project.</div>
+                    </div>
+                    <div className="text-gray-400 text-sm text-center">No files uploaded yet.</div>
+                </div>
+            </Modal>
 
             {/* Edit / New Project Modal */}
             <Modal
