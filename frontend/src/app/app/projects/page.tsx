@@ -75,14 +75,14 @@ export default function ProjectsPage() {
     };
 
     const fetchManagers = async () => {
-        const result = await apiClient.getAssignableUsers('PM,ADMIN');
+        const result = await apiClient.getAssignableUsers('PROJECT_MANAGER,SUPER_ADMIN,ORG_ADMIN');
         if (result.data) {
             setManagers((result.data as any).users);
         }
     };
 
     const fetchAssignableUsers = async () => {
-        const result = await apiClient.getAssignableUsers('PM,ADMIN,SALES');
+        const result = await apiClient.getAssignableUsers('PROJECT_MANAGER,SUPER_ADMIN,ORG_ADMIN,SALES_MANAGER,PROJECT_COORDINATOR');
         if (result.data) {
             setAssignableUsers((result.data as any).users);
         }

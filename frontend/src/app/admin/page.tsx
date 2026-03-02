@@ -25,6 +25,8 @@ import {
 } from "@ant-design/icons";
 import { apiClient } from "@/lib/api/client";
 import { useAdminContext } from "./layout";
+import { getAllModules } from "@/config/buildtrack.config";
+import { SettingOutlined } from "@ant-design/icons";
 
 const { Text } = Typography;
 
@@ -173,6 +175,49 @@ export default function AdminDashboardPage() {
     },
   ];
 
+  const moduleColumns = [
+    {
+      title: "Module Name",
+      dataIndex: "name",
+      key: "name",
+      render: (text: string) => <span className="font-medium">{text}</span>,
+    },
+    {
+      title: "Slug",
+      dataIndex: "slug",
+      key: "slug",
+      render: (text: string) => <code className="text-xs bg-gray-50 px-2 py-1 rounded">{text}</code>,
+    },
+    {
+      title: "Fields",
+      key: "fields",
+      render: (_: any, record: any) => record.fields?.length || 0,
+    },
+    {
+      title: "Access",
+      dataIndex: "accessRoles",
+      key: "access",
+      render: (roles: string[]) => (
+        <Space size={[0, 4]} wrap>
+          {roles.map(role => (
+            <Tag key={role} className="text-[10px] uppercase">{role}</Tag>
+          ))}
+        </Space>
+      ),
+    },
+    {
+      title: "Actions",
+      key: "actions",
+      render: (_: any, record: any) => (
+        <Link href={`/admin/modules/${record.slug}/fields`}>
+          <Button size="small" icon={<SettingOutlined />} type="primary" ghost>
+            Update Options
+          </Button>
+        </Link>
+      ),
+    },
+  ];
+
   return (
     <>
       <div className="flex justify-between items-center mb-6">
@@ -307,6 +352,7 @@ export default function AdminDashboardPage() {
       {/* Recent Users Table */}
       <Card
         title="Recent Users"
+        className="mb-6"
         extra={
           <Link href="/admin/users">
             <Button type="primary">View All Users</Button>
@@ -319,6 +365,29 @@ export default function AdminDashboardPage() {
           rowKey="id"
           pagination={false}
           loading={loading}
+        />
+      </Card>
+
+      {/* Module Management */}
+      <Card
+        title={
+          <Space>
+            <SettingOutlined className="text-blue-500" />
+            <span>Module Management</span>
+          </Space>
+        }
+        extra={
+          <Link href="/admin/modules">
+            <Button type="link">View All Modules</Button>
+          </Link>
+        }
+      >
+        <Table
+          dataSource={getAllModules()}
+          columns={moduleColumns}
+          rowKey="slug"
+          pagination={false}
+          size="small"
         />
       </Card>
     </>

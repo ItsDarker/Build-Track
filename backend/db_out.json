@@ -1,0 +1,116 @@
+{
+  "users": [
+    {
+      "email": "timt@gmail.com",
+      "name": "Tim Tyson",
+      "role": "VENDOR"
+    },
+    {
+      "email": "admin@buildtrack.com",
+      "name": "Admin",
+      "role": "SUPER_ADMIN"
+    },
+    {
+      "email": "pm@buildtrack.com",
+      "name": "Project Manager",
+      "role": "PROJECT_MANAGER"
+    },
+    {
+      "email": "finofranklin@gmail.com",
+      "name": "Fino ",
+      "role": "PROJECT_MANAGER"
+    },
+    {
+      "email": "qc@buildtrack.com",
+      "name": "QC User",
+      "role": "QC_MANAGER"
+    },
+    {
+      "email": "finance@buildtrack.com",
+      "name": "Finance User",
+      "role": "FINANCE_MANAGER"
+    },
+    {
+      "email": "client@buildtrack.com",
+      "name": "Client User",
+      "role": "CLIENT"
+    },
+    {
+      "email": "sales@buildtrack.com",
+      "name": "Sales User",
+      "role": "SALES_MANAGER"
+    },
+    {
+      "email": "orgadmin@buildtrack.com",
+      "name": "Org Admin",
+      "role": "ORG_ADMIN"
+    },
+    {
+      "email": "brennan@geodigitalpartners.com",
+      "name": "Maxwell Brennan",
+      "role": "VENDOR"
+    },
+    {
+      "email": "coordinator@buildtrack.com",
+      "name": "Project Coordinator",
+      "role": "PROJECT_COORDINATOR"
+    },
+    {
+      "email": "jason@geodigitalpartners.com",
+      "name": "Jason Bryan",
+      "role": "ORG_ADMIN"
+    },
+    {
+      "email": "brennan3d@gmail.com",
+      "name": "Mike Jackson"
+    },
+    {
+      "email": "kataichi47@gmail.com",
+      "name": "Mike Jackson"
+    },
+    {
+      "email": "frankr@gmail.com",
+      "name": "Frank Ross ",
+      "role": "VENDOR"
+    },
+    {
+      "email": "tomt@gmail.com",
+      "name": "Tom Taylor"
+    },
+    {
+      "email": "procurement@buildtrack.com",
+      "name": "Procurement User",
+      "role": "PROCUREMENT_MANAGER"
+    },
+    {
+      "email": "tomj@gmail.com",
+      "name": "Tom Jones",
+      "role": "VENDOR"
+    },
+    {
+      "email": "production@buildtrack.com",
+      "name": "Production User",
+      "role": "PRODUCTION_MANAGER"
+    },
+    {
+      "email": "planner@buildtrack.com",
+      "name": "Planner User",
+      "role": "PLANNER"
+    },
+    {
+      "email": "logistics@buildtrack.com",
+      "name": "Logistics User",
+      "role": "LOGISTICS_MANAGER"
+    },
+    {
+      "email": "vendor@buildtrack.com",
+      "name": "Vendor User",
+      "role": "VENDOR"
+    },
+    {
+      "email": "courtenaymaxwell@gmail.com",
+      "name": "Mike Jackson"
+    }
+  ],
+  "clients": 1
+}

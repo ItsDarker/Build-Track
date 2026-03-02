@@ -11,10 +11,12 @@ import {
   DownloadOutlined,
   UserSwitchOutlined,
   CheckCircleOutlined,
+  SettingOutlined,
 } from "@ant-design/icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { DynamicFormRenderer } from "./DynamicFormRenderer";
+import { DynamicFormRenderer, isFileField } from "./DynamicFormRenderer";
+
 import type { FormMode } from "./DynamicFormRenderer";
 import type { ModuleConfig } from "@/config/buildtrack.config";
 import { getAllModules } from "@/config/buildtrack.config";
@@ -66,6 +68,9 @@ function findAssigneeFields(fields: string[]): string[] {
     "prepared by",
     "owner",
     "assigned crew",
+    "rework assigned to",
+    "manager",
+    "coordinator",
   ];
 
   return fields.filter((field) => {
@@ -111,6 +116,18 @@ function getDefaultStatus(fieldLabel: string): string | null {
   const inner = match[1];
   const parts = inner.split(",").map((s) => s.trim());
   return parts.length > 0 ? parts[0] : null;
+}
+
+/** Extracts all options from a field label (e.g. "Status (A, B, C)") */
+function extractOptions(label: string): string[] | null {
+  const match = label.match(/\(([^)]+)\)/);
+  if (!match) return null;
+  let inner = match[1];
+  inner = inner.replace(/^dropdown:\s*/i, "");
+  inner = inner.replace(/^multi-select:\s*/i, "");
+  const parts = inner.split(",").map((s) => s.trim());
+  if (parts.length >= 2) return parts;
+  return null;
 }
 
 const AUDIT_FIELDS = ["Created at", "Created by", "Update at", "Updated by"];
@@ -283,7 +300,10 @@ export function ModulePage({ module }: ModulePageProps) {
   const [assignableUsers, setAssignableUsers] = useState<{ id: string; name?: string; email: string }[]>([]);
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
+  const [lookups, setLookups] = useState<Record<string, { id: string; value: string; label: string; order: number }[]>>({});
+  const [recordAttachments, setRecordAttachments] = useState<Record<string, { id: string; filename: string; path: string; mimeType: string }[]>>({});
   const [assignPickerOpen, setAssignPickerOpen] = useState(false);
+
 
   useEffect(() => {
     let cancelled = false;
@@ -338,8 +358,7 @@ export function ModulePage({ module }: ModulePageProps) {
         .then((d) => {
           if (!cancelled) setAssignableUsers(d.users ?? []);
         })
-        .catch(() => {
-          // Silently fail - this is an optional feature
+        .catch((err) => {
           if (!cancelled) setAssignableUsers([]);
         });
 
@@ -348,7 +367,7 @@ export function ModulePage({ module }: ModulePageProps) {
         .then((d) => {
           if (!cancelled) setProjects(d.projects ?? []);
         })
-        .catch(() => {
+        .catch((err) => {
           if (!cancelled) setProjects([]);
         });
 
@@ -357,7 +376,7 @@ export function ModulePage({ module }: ModulePageProps) {
         .then((d) => {
           if (!cancelled) setClients(d.clients ?? []);
         })
-        .catch(() => {
+        .catch((err) => {
           if (!cancelled) setClients([]);
         });
     }, 100);
@@ -368,13 +387,36 @@ export function ModulePage({ module }: ModulePageProps) {
     };
   }, []);
 
+  // Fetch module-specific lookup options (scoped per module slug)
+  useEffect(() => {
+    let cancelled = false;
+    if (!module.slug) return;
+
+    fetch(`/backend-api/lookups?moduleSlug=${module.slug}`, { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : { lookups: {} }))
+      .then((d) => {
+        if (!cancelled) setLookups(d.lookups ?? {});
+      })
+      .catch((err) => {
+        if (!cancelled) setLookups({});
+      });
+    return () => { cancelled = true; };
+  }, [module.slug]);
+
   const dynamicOptions = useMemo(() => {
     const opts: Record<string, { label: string; value: string }[]> = {};
 
     module.fields.forEach((field) => {
       const label = cleanLabel(field);
       const lower = label.toLowerCase();
+      const options = extractOptions(field);
 
+      // Start with hardcoded/config options if they exist
+      if (options && options.length > 0) {
+        opts[label] = options.map(o => ({ value: o, label: o }));
+      }
+
+      // Relational data (Projects, Clients, Users)
       if (lower.includes("project id") || lower.includes("project reference") || lower.includes("linked project")) {
         opts[label] = projects.map((p) => ({ value: p.id, label: p.name }));
       } else if (lower.includes("project name")) {
@@ -388,8 +430,15 @@ export function ModulePage({ module }: ModulePageProps) {
       }
     });
 
+    // Merge/Overwrite with backend lookups (Admin-configured)
+    Object.keys(lookups).forEach((category) => {
+      if (lookups[category] && lookups[category].length > 0) {
+        opts[category] = lookups[category].map((l) => ({ value: l.value, label: l.label }));
+      }
+    });
+
     return opts;
-  }, [module.fields, projects, clients, assignableUsers]);
+  }, [module.fields, projects, clients, assignableUsers, lookups]);
 
   // Key fields for table columns (first 5 non-section, non-audit fields)
   const tableFields = useMemo(() => {
@@ -481,13 +530,94 @@ export function ModulePage({ module }: ModulePageProps) {
     });
 
     return cols;
-  }, [tableFields]);
+  }, [tableFields, hasWriteAccess]);
 
-  const openModal = (mode: FormMode, record?: Record<string, string>) => {
+  const fetchAttachments = async (recordId: string) => {
+    try {
+      const res = await fetch(`/backend-api/attachments/record/${recordId}`, {
+        credentials: "include"
+      });
+      if (res.ok) {
+        const data = await res.json();
+        // Group attachments by field
+        // Since backend only links by recordId, we'll show all attachments in the first file field
+        const fileFields = module.fields.filter(f => isFileField(f));
+        const grouped: Record<string, any[]> = {};
+        if (fileFields.length > 0 && data.attachments) {
+          // Map attachments to include all metadata
+          grouped[cleanLabel(fileFields[0])] = data.attachments.map((a: any) => ({
+            id: a.id,
+            filename: a.filename,
+            path: a.path,
+            mimeType: a.mimeType,
+            size: a.size,
+            createdAt: a.createdAt,
+            uploadedBy: a.uploadedBy
+          }));
+        }
+        setRecordAttachments(grouped);
+      }
+    } catch (e) {
+      console.error("Failed to fetch attachments:", e);
+    }
+  };
+
+  const uploadFiles = async (recordId: string) => {
+    const fieldsWithFiles = Object.keys(formFiles).filter(k => formFiles[k].length > 0);
+    if (fieldsWithFiles.length === 0) return;
+
+    for (const field of fieldsWithFiles) {
+      const formData = new FormData();
+      formFiles[field].forEach(file => {
+        formData.append("files", file);
+      });
+      formData.append("moduleRecordId", recordId);
+
+      try {
+        const res = await fetch("/backend-api/attachments/upload", {
+          method: "POST",
+          body: formData,
+          credentials: "include"
+        });
+
+        if (!res.ok) {
+          const errorData = await res.json();
+          console.error(`Failed to upload files for field ${field}:`, errorData);
+          throw new Error(errorData.error || `HTTP ${res.status}`);
+        }
+
+        // Upload successful
+        const data = await res.json();
+        console.log(`Successfully uploaded ${data.attachments.length} file(s) for field ${field}`);
+      } catch (e) {
+        console.error(`Failed to upload files for field ${field}:`, e);
+        // Don't throw - allow save to complete even if attachment upload fails
+      }
+    }
+  };
+
+  const deleteAttachment = async (id: string) => {
+    try {
+      const res = await fetch(`/backend-api/attachments/${id}`, {
+        method: "DELETE",
+        credentials: "include"
+      });
+      if (res.ok) {
+        // Refresh attachments
+        if (activeRecordId) fetchAttachments(activeRecordId);
+      }
+    } catch (e) {
+      console.error("Failed to delete attachment:", e);
+    }
+  };
+
+  const openModal = async (mode: FormMode, record?: Record<string, string>) => {
     setModalMode(mode);
+    setRecordAttachments({});
     if (record) {
       setActiveRecordId(record._id);
       setFormValues({ ...record });
+      await fetchAttachments(record._id);
     } else {
       setActiveRecordId(null);
       const initialValues: Record<string, string> = {};
@@ -614,74 +744,69 @@ export function ModulePage({ module }: ModulePageProps) {
 
     try {
       setLoading(true);
+      const isEdit = modalMode === "edit";
+      const url = isEdit
+        ? `/backend-api/modules/${module.slug}/records/${activeRecordId}`
+        : `/backend-api/modules/${module.slug}/records`;
 
-      if (modalMode === "create") {
-        const res = await fetch(`/backend-api/modules/${module.slug}/records`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify(valuesToSave),
-        });
+      const res = await fetch(url, {
+        method: isEdit ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ data: valuesToSave }),
+      });
 
-        if (!res.ok) {
-          const errorData = await res.json();
-          handleValidationError(errorData);
-          return false;
-        }
-
-        const { record } = await res.json();
-
-        const mapped: Record<string, any> = {
-          _id: record.id,
-          ...(record.data ?? {}),
-          "Created at": String(record.createdAt).slice(0, 16),
-          "Update at": String(record.updatedAt).slice(0, 16),
-          "Created by": record.createdById ?? "",
-          "Updated by": record.updatedById ?? "",
-        };
-
-        setRecords((prev) => [mapped, ...prev]);
-      } else if (modalMode === "edit" && activeRecordId) {
-        const res = await fetch(
-          `/backend-api/modules/${module.slug}/records/${activeRecordId}`,
-          {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify(valuesToSave),
-          }
-        );
-
-        if (!res.ok) {
-          const errorData = await res.json();
-          handleValidationError(errorData);
-          return false;
-        }
-
-        const { record } = await res.json();
-
-        const mapped: Record<string, any> = {
-          _id: record.id,
-          ...(record.data ?? {}),
-          "Created at": String(record.createdAt).slice(0, 16),
-          "Update at": String(record.updatedAt).slice(0, 16),
-          "Created by": record.createdById ?? "",
-          "Updated by": record.updatedById ?? "",
-        };
-
-        setRecords((prev) =>
-          prev.map((r) => (r._id === activeRecordId ? mapped : r))
-        );
+      if (!res.ok) {
+        const errorData = await res.json();
+        handleValidationError(errorData);
+        throw new Error(errorData.error || `HTTP ${res.status}`);
       }
 
-      return true;
-    } catch (e) {
-      console.error("Save failed:", e);
-      modal.error({
-        title: "Save Failed",
-        content: String(e),
+      const savedData = await res.json();
+      const savedRecordId = savedData.record?.id || activeRecordId;
+
+      // Handle file uploads separately
+      if (savedRecordId) {
+        await uploadFiles(savedRecordId);
+        // Refetch attachments after upload so they display properly
+        await fetchAttachments(savedRecordId);
+      }
+
+      modal.success({
+        title: isEdit ? "Record Updated" : "Record Created",
+        content: `Successfully ${isEdit ? "updated" : "created"} record.`,
       });
-      return false;
+
+      // Close modal
+      setModalOpen(false);
+      setFormFiles({}); // Clear pending files from state
+
+      // Refresh records list without page reload
+      try {
+        const listRes = await fetch(`/backend-api/modules/${module.slug}/records`, {
+          credentials: "include"
+        });
+        if (listRes.ok) {
+          const data = await listRes.json();
+          const mapped = (data.records ?? []).map((r: any) => ({
+            _id: r.id,
+            ...(r.data ?? {}),
+            "Created at": r.createdAt ? String(r.createdAt).slice(0, 16) : "",
+            "Update at": r.updatedAt ? String(r.updatedAt).slice(0, 16) : "",
+            "Created by": r.createdById ?? "",
+            "Updated by": r.updatedById ?? "",
+          }));
+          setRecords(mapped);
+        }
+      } catch (e) {
+        console.error("Failed to refresh records list:", e);
+      }
+
+      return true; // Indicate success
+    } catch (e: any) {
+      console.error("Save error:", e);
+      modal.error({ title: "Save Failed", content: e.message });
+      return false; // Indicate failure
     } finally {
       setLoading(false);
     }
@@ -691,8 +816,7 @@ export function ModulePage({ module }: ModulePageProps) {
     const success = await saveRecord();
     if (success) {
       setFormValues({});
-      setFormFiles({});
-      setModalOpen(false);
+      // setFormFiles is cleared in saveRecord
     }
   };
 
@@ -702,8 +826,7 @@ export function ModulePage({ module }: ModulePageProps) {
     const success = await saveRecord();
     if (success) {
       setFormValues({});
-      setFormFiles({});
-      setModalOpen(false);
+      // setFormFiles is cleared in saveRecord
     }
   };
 
@@ -867,6 +990,17 @@ export function ModulePage({ module }: ModulePageProps) {
               Create New
             </Button>
           )}
+          {/* Configure Fields button visible to Admins only */}
+          {(role.name === 'SUPER_ADMIN' || role.name === 'ORG_ADMIN' || role.name === 'ADMIN') && (
+            <Button
+              variant="outline"
+              className="gap-2 border-blue-300 text-blue-600 hover:bg-blue-50"
+              onClick={() => router.push(`/admin/modules/${module.slug}/fields`)}
+            >
+              <SettingOutlined />
+              Configure Fields
+            </Button>
+          )}
         </div>
       </div>
 
@@ -935,19 +1069,27 @@ export function ModulePage({ module }: ModulePageProps) {
           ) : null
         }
       >
-        <div className="max-h-[60vh] overflow-y-auto pr-1">
-          <DynamicFormRenderer
-            fields={module.fields}
-            values={formValues}
-            onChange={handleFormChange}
-            mode={modalMode}
-            files={formFiles}
-            onFileChange={handleFileChange}
-            errors={fieldErrors}
-            requiredFields={requiredFields}
-            dynamicOptions={dynamicOptions}
-          />
-        </div>
+        {module.fields.length > 0 ? (
+          <div className="max-h-[60vh] overflow-y-auto pr-1">
+            <DynamicFormRenderer
+              fields={module.fields}
+              values={formValues}
+              onChange={handleFormChange}
+              mode={modalMode}
+              files={formFiles}
+              onFileChange={handleFileChange}
+              errors={fieldErrors}
+              requiredFields={requiredFields}
+              dynamicOptions={dynamicOptions}
+              existingAttachments={recordAttachments}
+              onDeleteAttachment={deleteAttachment}
+            />
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+            <Empty description="No fields defined for this module" />
+          </div>
+        )}
       </Modal>
 
       {/* Assign User Picker Modal */}

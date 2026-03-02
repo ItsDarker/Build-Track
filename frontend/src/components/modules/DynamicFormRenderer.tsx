@@ -1,18 +1,35 @@
 "use client";
 
-import React, { useRef } from "react";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
+import React, { useState } from "react";
 import {
+  Input,
   Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Upload, X } from "lucide-react";
+  DatePicker,
+  Upload,
+  Button,
+  Badge,
+  Space,
+  Typography,
+  Form,
+  ConfigProvider,
+  UploadFile,
+  Divider as AntDivider
+} from "antd";
+import type { UploadChangeParam } from "antd/es/upload";
+import {
+  UploadOutlined,
+  InboxOutlined,
+  DeleteOutlined,
+  EyeOutlined,
+  FileTextOutlined,
+  FileImageOutlined,
+  FilePdfOutlined
+} from "@ant-design/icons";
+import dayjs from "dayjs";
+import { AttachmentViewer } from "./AttachmentViewer";
+
+const { TextArea } = Input;
+const { Text } = Typography;
 
 export type FormMode = "create" | "edit" | "view";
 
@@ -34,6 +51,11 @@ interface DynamicFormRendererProps {
   errors?: Record<string, string>;
   /** Required field names */
   requiredFields?: Set<string>;
+  /** Dynamic Options for relational fields */
+  dynamicOptions?: Record<string, { label: string; value: string }[]>;
+  /** Existing attachments for view/edit mode */
+  existingAttachments?: Record<string, { id: string; filename: string; path: string; mimeType: string }[]>;
+  onDeleteAttachment?: (id: string) => void;
 }
 
 const AUDIT_FIELDS = ["Created at", "Created by", "Update at", "Updated by"];
@@ -54,7 +76,8 @@ function isAuditField(label: string): boolean {
   return AUDIT_FIELDS.includes(label);
 }
 
-function isFileField(label: string): boolean {
+export function isFileField(label: string): boolean {
+
   const lower = label.toLowerCase();
   return (
     lower.includes("attachment") ||
@@ -88,7 +111,9 @@ function isIdField(label: string): boolean {
 function extractOptions(label: string): string[] | null {
   const match = label.match(/\(([^)]+)\)/);
   if (!match) return null;
-  const inner = match[1];
+  let inner = match[1];
+  inner = inner.replace(/^dropdown:\s*/i, "");
+  inner = inner.replace(/^multi-select:\s*/i, "");
   const parts = inner.split(",").map((s) => s.trim());
   if (parts.length >= 2) return parts;
   return null;
@@ -99,6 +124,10 @@ function getFieldType(
 ): "select" | "date" | "status" | "textarea" | "file" | "datetime" | "input" {
   if (isFileField(label)) return "file";
   if (isTimestampField(label)) return "datetime";
+
+  const extracted = extractOptions(label);
+  if (extracted && extracted.length > 0) return "select";
+
   const lower = label.toLowerCase();
   if (lower.includes("dropdown") || lower.includes("multi-select")) return "select";
   if (lower.includes("status")) return "status";
@@ -135,297 +164,375 @@ export function DynamicFormRenderer({
   onFileChange,
   errors = {},
   requiredFields = new Set(),
+  dynamicOptions = {},
+  existingAttachments = {},
+  onDeleteAttachment,
 }: DynamicFormRendererProps) {
   const isViewMode = mode === "view";
 
   return (
-    <div className="space-y-4">
-      {fields.map((field, idx) => {
-        if (isSectionHeader(field)) {
-          return (
-            <div
-              key={`section-${idx}`}
-              className="pt-4 pb-1 border-t border-gray-200 mt-2"
-            >
-              <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
-                {field.replace(/:$/, "")}
-              </h4>
-            </div>
-          );
-        }
+    <div className="space-y-6">
+      <ConfigProvider
+        theme={{
+          token: {
+            colorPrimary: "#1677ff",
+            borderRadius: 6,
+          },
+        }}
+      >
+        <Form layout="vertical">
+          {fields.map((field, idx) => {
+            if (isSectionHeader(field)) {
+              return (
+                <div key={`section-${idx}`} className="pt-6 pb-2">
+                  <Typography.Title level={5} className="text-gray-400 uppercase tracking-widest text-[10px] m-0">
+                    {field.replace(/:$/, "")}
+                  </Typography.Title>
+                  <Divider className="my-2" />
+                </div>
+              );
+            }
 
-        // In create mode, skip audit fields entirely
-        if (mode === "create" && isAuditField(field)) return null;
+            if (mode === "create" && isAuditField(field)) return null;
 
-        const fieldType = getFieldType(field);
-        const options = extractOptions(field);
-        const value = values[field] || "";
-        const label = cleanLabel(field);
-        const disabled = isViewMode || isAuditField(field) || isIdField(field);
-        const fieldFiles = files[field] || [];
-        const fieldError = errors[field];
-        const isRequired = requiredFields.has(field);
+            let fieldType = getFieldType(field);
+            const options = extractOptions(field);
+            const value = values[field] || "";
+            const label = cleanLabel(field);
+            const disabled = isViewMode || isAuditField(field) || isIdField(field);
+            const fieldError = errors[field];
+            const isRequired = requiredFields.has(field);
 
-        return (
-          <div key={field} className="space-y-1.5">
-            <Label
-              htmlFor={`field-${idx}`}
-              className={`text-sm font-medium ${disabled ? "text-gray-400" : ""}`}
-            >
-              {label}
-              {isRequired && !disabled && (
-                <span className="ml-1 text-red-500 font-bold">*</span>
-              )}
-              {isAuditField(field) && (
-                <span className="ml-1.5 text-xs text-gray-400 font-normal">
-                  (auto)
-                </span>
-              )}
-              {isIdField(field) && (
-                <span className="ml-1.5 text-xs text-gray-400 font-normal">
-                  (auto-generated)
-                </span>
-              )}
-            </Label>
-            {fieldType === "file" ? (
-              <FileUploadField
-                id={`field-${idx}`}
-                files={fieldFiles}
-                disabled={isViewMode}
-                onFilesChange={(f) => onFileChange?.(field, f)}
-                textValue={value}
-                error={fieldError}
-              />
-            ) : (
-              renderField(
-                field,
-                label,
-                fieldType,
-                options,
-                value,
-                idx,
-                onChange,
-                disabled,
-                fieldError
-              )
-            )}
-            {fieldError && (
-              <p className="text-xs text-red-500 mt-1">{fieldError}</p>
-            )}
-          </div>
-        );
-      })}
+            let finalOptions = options ? options.map(o => ({ value: o, label: o })) : [];
+
+            // Dynamic options (fetched from DB) take precedence over hardcoded/static options
+            const hasDynamic = dynamicOptions && dynamicOptions[label];
+            if (hasDynamic && hasDynamic.length > 0) {
+              fieldType = "select";
+              finalOptions = dynamicOptions[label];
+            }
+
+            return (
+              <Form.Item
+                key={field}
+                label={
+                  <span className={`text-sm font-semibold ${disabled ? "text-gray-400" : "text-gray-700"}`}>
+                    {label}
+                    {isAuditField(field) && <span className="ml-1 text-[10px] text-gray-300 font-normal">(auto)</span>}
+                    {isIdField(field) && <span className="ml-1 text-[10px] text-gray-300 font-normal">(auto-gen)</span>}
+                  </span>
+                }
+                required={isRequired && !disabled}
+                help={fieldError}
+                validateStatus={fieldError ? "error" : ""}
+                className="mb-4"
+              >
+                {fieldType === "file" ? (
+                  <UploadField
+                    id={`field-${idx}`}
+                    files={files[field] || []}
+                    existing={existingAttachments[field] || []}
+                    onFilesChange={(f) => onFileChange?.(field, f)}
+                    onDeleteExisting={onDeleteAttachment}
+                    disabled={isViewMode}
+                  />
+                ) : (
+                  renderAntField(
+                    field,
+                    label,
+                    fieldType,
+                    finalOptions,
+                    value,
+                    onChange,
+                    disabled
+                  )
+                )}
+              </Form.Item>
+            );
+          })}
+        </Form>
+      </ConfigProvider>
     </div>
   );
 }
 
-function FileUploadField({
+const Divider = ({ className }: { className?: string }) => <div className={`h-[1px] bg-gray-100 ${className}`} />;
+
+function getFileIcon(mimeType: string) {
+  const mime = mimeType.toLowerCase();
+  if (mime.startsWith("image/")) {
+    return <FileImageOutlined className="text-blue-500" />;
+  }
+  if (mime === "application/pdf") {
+    return <FilePdfOutlined className="text-red-500" />;
+  }
+  if (mime.startsWith("text/")) {
+    return <FileTextOutlined className="text-gray-600" />;
+  }
+  return <FileTextOutlined className="text-gray-400" />;
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes === 0) return "0 Bytes";
+  const k = 1024;
+  const sizes = ["Bytes", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
+}
+
+function UploadField({
   id,
   files,
-  disabled,
+  existing = [],
   onFilesChange,
-  textValue,
-  error,
+  onDeleteExisting,
+  disabled
 }: {
   id: string;
   files: File[];
-  disabled: boolean;
-  onFilesChange?: (files: File[]) => void;
-  textValue?: string;
-  error?: string;
+  existing?: { id: string; filename: string; path: string; mimeType: string; size?: number }[];
+  onFilesChange?: (f: File[]) => void;
+  onDeleteExisting?: (id: string) => void;
+  disabled?: boolean
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [viewerVisible, setViewerVisible] = useState(false);
+  const [selectedAttachment, setSelectedAttachment] = useState<any>(null);
 
-  if (disabled) {
-    return (
-      <div className="text-sm text-gray-500 py-2">
-        {files.length > 0
-          ? files.map((f) => f.name).join(", ")
-          : textValue || "No files attached"}
-      </div>
-    );
-  }
-
-  const handleAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files) return;
-    const newFiles = [...files, ...Array.from(e.target.files)];
-    onFilesChange?.(newFiles);
-    // Reset so the same file can be re-selected
-    e.target.value = "";
-  };
-
-  const handleRemove = (index: number) => {
-    onFilesChange?.(files.filter((_, i) => i !== index));
+  const handleViewAttachment = (file: any) => {
+    setSelectedAttachment(file);
+    setViewerVisible(true);
   };
 
   return (
-    <div className="space-y-2">
-      <input
-        ref={inputRef}
-        id={id}
-        type="file"
-        multiple
-        className="hidden"
-        onChange={handleAdd}
-      />
-      <button
-        type="button"
-        onClick={() => inputRef.current?.click()}
-        className={`flex items-center gap-2 w-full rounded-md border-2 border-dashed px-4 py-3 text-sm transition-colors ${
-          error
-            ? "border-red-300 text-red-500 hover:border-red-400"
-            : "border-gray-300 text-gray-500 hover:border-orange-400 hover:text-orange-500"
-        }`}
-      >
-        <Upload className="w-4 h-4" />
-        Click to upload files (any format)
-      </button>
-      {files.length > 0 && (
-        <ul className="space-y-1">
-          {files.map((f, i) => (
-            <li
-              key={`${f.name}-${i}`}
-              className="flex items-center justify-between rounded bg-gray-50 px-3 py-1.5 text-sm"
-            >
-              <span className="truncate mr-2">
-                {f.name}{" "}
-                <span className="text-xs text-gray-400">
-                  ({(f.size / 1024).toFixed(0)} KB)
-                </span>
-              </span>
-              <button
-                type="button"
-                onClick={() => handleRemove(i)}
-                className="text-gray-400 hover:text-red-500"
+    <div className="space-y-4">
+      {/* Existing Files */}
+      {existing.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <Text className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Attached Files ({existing.length})</Text>
+          </div>
+          <div className="grid grid-cols-1 gap-2">
+            {existing.map((file) => (
+              <div
+                key={file.id}
+                className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-lg hover:border-blue-300 hover:shadow-sm transition-all group"
               >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </li>
-          ))}
-        </ul>
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="text-lg flex-shrink-0">
+                    {getFileIcon(file.mimeType)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p
+                      className="text-sm text-blue-900 truncate font-medium"
+                      title={file.filename}
+                    >
+                      {file.filename}
+                    </p>
+                    {file.size && (
+                      <p className="text-xs text-blue-600">
+                        {formatFileSize(file.size)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <Space size="small" className="flex-shrink-0">
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<EyeOutlined />}
+                    className="text-blue-600 hover:text-blue-700 hover:bg-blue-100 transition-colors"
+                    onClick={() => handleViewAttachment(file)}
+                    title="View file"
+                  />
+                  {!disabled && (
+                    <Button
+                      type="text"
+                      size="small"
+                      danger
+                      icon={<DeleteOutlined />}
+                      className="hover:bg-red-50 transition-colors"
+                      onClick={() => onDeleteExisting?.(file.id)}
+                      title="Delete file"
+                    />
+                  )}
+                </Space>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
+
+      {/* New Files Upload */}
+      {!disabled && (
+        <>
+          {existing.length > 0 && <AntDivider className="my-3" />}
+          <div>
+            <Upload
+              id={id}
+              multiple
+              beforeUpload={() => false}
+              onChange={(info: UploadChangeParam<UploadFile>) => {
+                const fileList = info.fileList.map(f => f.originFileObj as File).filter(Boolean);
+                onFilesChange?.(fileList);
+              }}
+              fileList={files.map((f, i) => ({
+                uid: String(i),
+                name: f.name,
+                status: 'done',
+                originFileObj: f
+              }))}
+            >
+              <div className="border-2 border-dashed border-blue-300 rounded-lg p-6 hover:border-blue-500 hover:bg-blue-50/30 transition-all cursor-pointer bg-blue-50/10">
+                <div className="flex flex-col items-center justify-center gap-2">
+                  <UploadOutlined className="text-2xl text-blue-500" />
+                  <span className="text-sm font-semibold text-gray-700">
+                    Click to select files
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    or drag and drop (Images, PDFs, Documents, etc.)
+                  </span>
+                </div>
+              </div>
+            </Upload>
+
+            {/* Pending Uploads */}
+            {files.length > 0 && (
+              <div className="mt-3">
+                <Text className="text-xs font-semibold text-amber-600">
+                  ⚠️ {files.length} file(s) pending upload - will upload on save
+                </Text>
+                <div className="mt-2 space-y-1">
+                  {files.map((file, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between p-2 bg-amber-50 border border-amber-100 rounded text-sm"
+                    >
+                      <span className="text-amber-900 truncate">{file.name}</span>
+                      <span className="text-xs text-amber-700 ml-2 flex-shrink-0">
+                        {formatFileSize(file.size)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* No Files Message */}
+      {disabled && existing.length === 0 && (
+        <div className="flex items-center justify-center p-4 bg-gray-50 border border-gray-100 rounded-lg">
+          <Text type="secondary" className="text-sm">
+            📎 No files attached
+          </Text>
+        </div>
+      )}
+
+      {/* Attachment Viewer Modal */}
+      <AttachmentViewer
+        visible={viewerVisible}
+        attachment={selectedAttachment}
+        onClose={() => {
+          setViewerVisible(false);
+          setSelectedAttachment(null);
+        }}
+        onDelete={onDeleteExisting}
+        canDelete={!disabled}
+      />
     </div>
   );
 }
 
-function renderField(
+function renderAntField(
   field: string,
   label: string,
   type: string,
-  options: string[] | null,
+  options: { label: string; value: string }[],
   value: string,
-  idx: number,
   onChange: (field: string, value: string) => void,
-  disabled: boolean,
-  error?: string
+  disabled: boolean
 ) {
-  if (disabled && type !== "datetime") {
-    // Read-only display for disabled non-datetime fields
-    return (
-      <Input
-        id={`field-${idx}`}
-        value={value}
-        disabled
-        className="bg-gray-50 text-gray-500"
-      />
-    );
+  if (disabled && type !== "status") {
+    return <Input value={value} disabled className="bg-gray-50" />;
   }
-
-  const errorClass = error ? "border-red-500 focus:ring-red-500" : "";
 
   switch (type) {
     case "select":
-    case "status": {
-      const opts = options || ["Option 1", "Option 2", "Option 3"];
+    case "status":
       return (
-        <div className="space-y-1">
+        <div className="space-y-2">
           <Select
-            value={value}
-            onValueChange={(v: string) => onChange(field, v)}
-            disabled={disabled}
-          >
-            <SelectTrigger id={`field-${idx}`} className={errorClass}>
-              <SelectValue placeholder={`Select ${label}...`} />
-            </SelectTrigger>
-            <SelectContent>
-              {opts.map((opt) => (
-                <SelectItem key={opt} value={opt}>
-                  {opt}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            showSearch
+            className="w-full"
+            placeholder={`Select ${label}`}
+            value={value || undefined}
+            onChange={(v: string) => onChange(field, v)}
+            disabled={disabled && type === "select"}
+            options={options}
+            optionFilterProp="label"
+          />
           {type === "status" && value && (
-            <Badge
-              variant={
-                value.toLowerCase().includes("complete") ||
-                value.toLowerCase().includes("approved") ||
-                value.toLowerCase().includes("pass") ||
-                value.toLowerCase().includes("paid")
-                  ? "success"
-                  : value.toLowerCase().includes("reject") ||
-                    value.toLowerCase().includes("fail") ||
-                    value.toLowerCase().includes("overdue") ||
-                    value.toLowerCase().includes("cancel")
-                  ? "destructive"
-                  : value.toLowerCase().includes("progress") ||
-                    value.toLowerCase().includes("sent") ||
-                    value.toLowerCase().includes("scheduled")
-                  ? "info"
-                  : "warning"
-              }
-            >
-              {value}
-            </Badge>
+            <div className="mt-1">
+              <StatusBadge status={value} />
+            </div>
           )}
         </div>
       );
-    }
 
     case "datetime":
       return (
-        <Input
-          id={`field-${idx}`}
-          type="datetime-local"
-          value={value}
+        <DatePicker
+          showTime
+          className="w-full"
+          value={value ? dayjs(value) : null}
+          onChange={(date) => onChange(field, date ? date.toISOString() : "")}
           disabled={disabled}
-          className={`${disabled ? "bg-gray-50 text-gray-500" : ""} ${errorClass}`}
-          onChange={(e) => onChange(field, e.target.value)}
         />
       );
 
     case "date":
       return (
-        <Input
-          id={`field-${idx}`}
-          type="date"
-          value={value}
-          onChange={(e) => onChange(field, e.target.value)}
-          className={errorClass}
+        <DatePicker
+          className="w-full"
+          value={value ? dayjs(value) : null}
+          onChange={(date) => onChange(field, date ? date.format("YYYY-MM-DD") : "")}
+          disabled={disabled}
         />
       );
 
     case "textarea":
       return (
-        <Textarea
-          id={`field-${idx}`}
+        <TextArea
           rows={3}
           value={value}
-          onChange={(e) => onChange(field, e.target.value)}
-          placeholder={`Enter ${label.toLowerCase()}...`}
-          className={errorClass}
+          onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => onChange(field, e.target.value)}
+          placeholder={`Enter ${label}...`}
+          disabled={disabled}
         />
       );
 
     default:
       return (
         <Input
-          id={`field-${idx}`}
           value={value}
-          onChange={(e) => onChange(field, e.target.value)}
-          placeholder={`Enter ${label.toLowerCase()}...`}
-          className={errorClass}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => onChange(field, e.target.value)}
+          placeholder={disabled ? "" : `Enter ${label}...`}
+          disabled={disabled}
         />
       );
   }
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const lower = status.toLowerCase();
+  let color = "default";
+
+  if (lower.includes("new") || lower.includes("open") || lower.includes("draft")) color = "blue";
+  else if (lower.includes("progress") || lower.includes("contacted") || lower.includes("scheduled")) color = "orange";
+  else if (lower.includes("complete") || lower.includes("pass") || lower.includes("approved") || lower.includes("qualified") || lower.includes("success")) color = "green";
+  else if (lower.includes("fail") || lower.includes("reject") || lower.includes("cancel") || lower.includes("closed") || lower.includes("error")) color = "red";
+  else if (lower.includes("hold") || lower.includes("pending")) color = "warning";
+
+  return <Badge status={color as any} text={status} className="font-medium text-xs uppercase" />;
 }

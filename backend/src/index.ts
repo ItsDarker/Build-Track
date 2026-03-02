@@ -13,11 +13,12 @@ import teamRoutes from './routes/team.routes';
 import dashboardRoutes from './routes/dashboard.routes';
 import { prisma } from "./config/prisma";
 import moduleRecordsRoutes from './routes/moduleRecords.routes';
-
-
+import lookupRoutes from './routes/lookup.routes';
+import attachmentRoutes from './routes/attachment.routes';
 
 
 const app = express();
+
 
 // Middleware
 app.use(cors({
@@ -34,7 +35,7 @@ app.use(cookieParser());
 
 
 // Serve static uploads
-app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // Health check
 app.get('/health', (req, res) => {
@@ -65,6 +66,9 @@ app.use('/api/tasks', taskRoutes);
 app.use('/api/teams', teamRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/modules', moduleRecordsRoutes);
+app.use('/api/lookups', lookupRoutes);
+app.use('/api/attachments', attachmentRoutes);
+
 
 // Error handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

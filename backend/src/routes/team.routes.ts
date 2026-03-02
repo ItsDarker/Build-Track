@@ -115,12 +115,12 @@ router.post('/invite', requirePermission('create', 'users'), async (req, res) =>
 
 /**
  * GET /api/teams/assignable
- * Get users that can be assigned to projects or tasks (ADMIN and PM only)
+ * Get users that can be assigned to projects or tasks
  */
-router.get('/assignable', requirePermission('read', 'users'), async (req, res) => {
+router.get('/assignable', async (req, res) => {
     try {
         const role = req.query.role as string;
-        const roles = role ? role.split(',') : ['ADMIN', 'PM', 'SUBCONTRACTOR'];
+        const roles = role ? role.split(',') : ['SUPER_ADMIN', 'ORG_ADMIN', 'PROJECT_MANAGER', 'PROJECT_COORDINATOR'];
 
         const users = await prisma.user.findMany({
             where: {

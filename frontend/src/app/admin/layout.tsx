@@ -14,6 +14,7 @@ import {
 } from "@ant-design/icons";
 import { apiClient } from "@/lib/api/client";
 import { Logo } from "@/components/ui-kit/Logo";
+import { getAllModules } from "@/config/buildtrack.config";
 import {
   App,
   Layout,
@@ -160,6 +161,7 @@ function AdminLayoutInner({ children }: { children: ReactNode }) {
     if (pathname === "/admin") return "dashboard";
     if (pathname?.startsWith("/admin/users")) return "users";
     if (pathname?.startsWith("/admin/pages")) return "pages";
+    if (pathname?.startsWith("/admin/modules")) return "modules";
     return "dashboard";
   };
 
@@ -183,9 +185,18 @@ function AdminLayoutInner({ children }: { children: ReactNode }) {
       onClick: () => router.push("/admin/pages"),
     },
     {
-      key: "settings",
+      key: "modules",
       icon: <SettingOutlined />,
-      label: "Settings",
+      label: "Module Fields",
+      onClick: (e: any) => {
+        // Only navigate to overview if we clicked the label, not the expand arrow
+        if (e.key === "modules") router.push("/admin/modules");
+      },
+      children: getAllModules().map((m) => ({
+        key: `module-${m.slug}`,
+        label: m.name,
+        onClick: () => router.push(`/admin/modules/${m.slug}/fields`),
+      })),
     },
   ];
 
@@ -350,7 +361,7 @@ function AdminLayoutInner({ children }: { children: ReactNode }) {
               <span className="text-lg font-semibold">BuildTrack Admin Panel</span>
             </div>
             <Space size="middle">
-              <Dropdown dropdownRender={() => notificationDropdown} trigger={["click"]} placement="bottomRight">
+              <Dropdown popupRender={() => notificationDropdown} trigger={["click"]} placement="bottomRight">
                 <Badge count={unreadCount} size="small">
                   <Button type="text" icon={<BellOutlined />} />
                 </Badge>
