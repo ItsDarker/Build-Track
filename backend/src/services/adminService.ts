@@ -209,7 +209,7 @@ class AdminService {
    * Create a new user
    */
   async createUser(data: CreateUserData) {
-    const { email, name, password, role = 'USER', emailVerified = false, phone, company, jobTitle, bio } = data;
+    const { email, name, password, role = 'USER', emailVerified = true, phone, company, jobTitle, bio } = data;
 
     // Check if email already exists
     const existing = await prisma.user.findUnique({ where: { email } });
@@ -273,17 +273,23 @@ class AdminService {
       }
     }
 
-    const updateData: any = { ...data };
-    if (data.emailVerified !== undefined) {
-      updateData.emailVerified = data.emailVerified ? new Date() : null;
-    }
+    const updateData: any = {};
+      if (data.email !== undefined) updateData.email = data.email;
+      if (data.name !== undefined) updateData.name = data.name || null;
+      if (data.phone !== undefined) updateData.phone = data.phone || null;
+      if (data.company !== undefined) updateData.company = data.company || null;
+      if (data.jobTitle !== undefined) updateData.jobTitle = data.jobTitle || null;
+      if (data.bio !== undefined) updateData.bio = data.bio || null;
+      if (data.emailVerified !== undefined) {
+        updateData.emailVerified = data.emailVerified ? new Date() : null;
+      }
 
-    // Handle role update
-    if (data.role) {
-      const roleRecord = await prisma.role.findUnique({ where: { name: data.role } });
-      if (roleRecord) {
-        updateData.role = undefined;
-        updateData.roleId = roleRecord.id;
+      // Handle role update
+      if (data.role) {
+        const roleRecord = await prisma.role.findUnique({ where: { name: data.role } });
+        if (roleRecord) {
+          updateData.role = undefined;
+          updateData.roleId = roleRecord.id;
       }
     }
 

@@ -239,13 +239,13 @@ export default function UsersPage() {
 
       if (editingUser) {
         const result = await apiClient.updateAdminUser(editingUser.id, {
-          email: saveData.email,
-          name: saveData.name,
+          email: editingUser.email,
+          name: saveData.name || null,
           role: saveData.role,
-          phone: saveData.phone,
-          company: saveData.company,
-          jobTitle: saveData.jobTitle,
-          bio: saveData.bio,
+          phone: saveData.phone || null,
+          company: saveData.company || null,
+          jobTitle: saveData.jobTitle || null,
+          bio: saveData.bio || null,
           emailVerified: saveData.emailVerified,
         });
         if (result.error) {
