@@ -262,12 +262,11 @@ router.get("/oauth/google/callback", async (req, res) => {
     // 1) Issue tokens using your existing auth service (handles find-or-create)
     const result = await authService.loginWithOAuth(email, name);
 
-    // 2) Set cookies
-    setAuthCookies(res, result.accessToken, result.refreshToken);
-
-    // 3) Redirect to app (or admin)
-    const dest = result.user?.role?.name === "ADMIN" ? "/admin" : "/app";
-    return res.redirect(`${config.frontendUrl}${dest}`);
+    // 2) Redirect with tokens for cross-domain handling
+    const dest = ["SUPER_ADMIN", "ADMIN", "ORG_ADMIN"].includes(result.user?.role?.name) ? "/admin" : "/app";
+    return res.redirect(
+      `${config.frontendUrl}/auth/callback?accessToken=${result.accessToken}&refreshToken=${result.refreshToken}&dest=${encodeURIComponent(dest)}`
+    );
   } catch (error: any) {
     console.error("Google OAuth error:", error);
     return res.status(500).json({ error: error.message || "Google OAuth failed" });
