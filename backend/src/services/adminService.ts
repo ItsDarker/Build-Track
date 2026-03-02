@@ -31,13 +31,13 @@ export interface CreateUserData {
 }
 
 export interface UpdateUserData {
-  name?: string;
+  name?: string | null;
   email?: string;
   role?: string;
-  phone?: string;
-  company?: string;
-  jobTitle?: string;
-  bio?: string;
+  phone?: string | null;
+  company?: string | null;
+  jobTitle?: string | null;
+  bio?: string | null;
   emailVerified?: boolean;
 }
 
