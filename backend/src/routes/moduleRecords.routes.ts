@@ -127,7 +127,55 @@ router.put(
         },
       });
 
+      // Auto-chain: when a module record is marked complete, create next task
+      const CHAIN: Record<string, { nextTitle: string; nextSlug: string }> = {
+        'crm-leads': { nextTitle: 'Project Requirements', nextSlug: 'project-requirements' },
+        'project-requirements': { nextTitle: 'Design Configuration', nextSlug: 'design-configurator' },
+        'design-configurator': { nextTitle: 'Quoting & Contracts', nextSlug: 'quoting-contracts' },
+      };
+
+      const leadStatus = (data as any)?.['Lead Status (New, Contacted, Qualified, Closed)'];
+      const taskStatus = (data as any)?.['Task Status (New, In Progress, Completed)'];
+      const isCompleted = leadStatus === 'Closed' || taskStatus === 'Completed';
+      const chain = CHAIN[slug];
+
+      if (isCompleted && chain) {
+        const recordData = data as any;
+        const projectId = recordData._projectId;
+        const assigneeId = (req as any).user?.userId ?? (req as any).user?.id ?? null;
+
+        if (projectId) {
+          // Create next task
+          const nextTask = await prisma.task.create({
+            data: {
+              title: chain.nextTitle,
+              status: 'TODO',
+              priority: 'MEDIUM',
+              projectId,
+              assigneeId,
+            },
+          });
+
+          // Create next module record
+          await prisma.moduleRecord.create({
+            data: {
+              moduleSlug: chain.nextSlug,
+              data: {
+                _projectId: projectId,
+                _projectCode: recordData._projectCode || '',
+                _projectName: recordData._projectName || '',
+                _taskId: nextTask.id,
+                'Task Status (New, In Progress, Completed)': 'New',
+              },
+              createdById: assigneeId,
+              updatedById: assigneeId,
+            },
+          });
+        }
+      }
+
       res.json({ record });
+      
     } catch (err) {
       console.error("Update module record error:", err);
       res.status(500).json({ error: "Failed to update record" });
