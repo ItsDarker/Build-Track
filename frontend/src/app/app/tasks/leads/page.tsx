@@ -141,7 +141,7 @@ export default function LeadsPage() {
             value={status}
             size="small"
             style={{ width: 130 }}
-            onChange={(val) => handleStatusChange(record, "Lead Status (New, Contacted, Qualified, Closed)", val)}
+            onChange={(val: string) => handleStatusChange(record, "Lead Status (New, Contacted, Qualified, Closed)", val)}
             options={LEAD_STATUSES.map((s) => ({ value: s, label: s }))}
           />
         );
@@ -224,7 +224,7 @@ export default function LeadsPage() {
                     <List.Item>
                       <div className="flex justify-between w-full items-center">
                         <span>{task.title}</span>
-                        <Tag color={{ TODO: "default", IN_PROGRESS: "orange", DONE: "green", COMPLETED: "green", BLOCKED: "red" }[task.status] || "default"}>
+                        <Tag color={({ TODO: "default", IN_PROGRESS: "orange", DONE: "green", COMPLETED: "green", BLOCKED: "red" } as Record<string, string>)[task.status] || "default"}>
                           {task.status?.replace("_", " ")}
                         </Tag>
                       </div>
