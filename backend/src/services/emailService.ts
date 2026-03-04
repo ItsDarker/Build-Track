@@ -195,3 +195,90 @@ ${message}
     throw new Error('Failed to send contact email');
   }
 }
+export interface PasswordResetEmailData {
+  to: string;
+  name?: string;
+  resetUrl: string;
+}
+
+export async function sendPasswordResetEmail(data: PasswordResetEmailData): Promise<void> {
+  const { to, name, resetUrl } = data;
+
+  const mailOptions = {
+    from: config.mail.from,
+    to,
+    subject: 'Reset your BuildTrack password',
+    text: `
+Hello${name ? ` ${name}` : ''},
+
+We received a request to reset your BuildTrack password.
+
+Click the link below to reset your password:
+
+${resetUrl}
+
+This link will expire in 60 minutes.
+
+If you did not request a password reset, please ignore this email.
+
+---
+BuildTrack - Clarity and accountability for construction workflows
+    `.trim(),
+    html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reset your password</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px;">
+    <h1 style="color: #f97316; margin-top: 0;">BuildTrack</h1>
+    <h2 style="color: #1e293b;">Reset your password</h2>
+    <p>Hello${name ? ` ${name}` : ''},</p>
+    <p>We received a request to reset your BuildTrack password.</p>
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="${resetUrl}" style="background-color: #f97316; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">
+        Reset Password
+      </a>
+    </div>
+    <p style="color: #64748b; font-size: 14px;">
+      Or copy and paste this link into your browser:<br>
+      <a href="${resetUrl}" style="color: #f97316; word-break: break-all;">${resetUrl}</a>
+    </p>
+    <p style="color: #64748b; font-size: 14px;">This link will expire in 60 minutes.</p>
+    <p style="color: #64748b; font-size: 14px;">If you did not request a password reset, please ignore this email.</p>
+    <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;">
+    <p style="color: #94a3b8; font-size: 12px; text-align: center;">
+      BuildTrack - Clarity and accountability for construction workflows
+    </p>
+  </div>
+</body>
+</html>
+    `.trim(),
+  };
+
+  try {
+    const transport = getTransporter();
+    await transport.sendMail(mailOptions);
+
+    if (config.mail.mode === 'console') {
+      console.log('\n' + '='.repeat(80));
+      console.log('📧 PASSWORD RESET EMAIL (Console Mode)');
+      console.log('='.repeat(80));
+      console.log(`To: ${to}`);
+      console.log(`Subject: ${mailOptions.subject}`);
+      console.log('-'.repeat(80));
+      console.log(mailOptions.text);
+      console.log('='.repeat(80));
+      console.log(`🔗 Reset URL: ${resetUrl}`);
+      console.log('='.repeat(80) + '\n');
+    } else {
+      console.log(`Password reset email sent to ${to}`);
+    }
+  } catch (error) {
+    console.error('Failed to send password reset email:', error);
+    throw new Error('Failed to send password reset email');
+  }
+}

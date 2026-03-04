@@ -4,7 +4,7 @@ import { prisma } from '../lib/prisma';
 import { config } from '../config/env';
 import { generateAccessToken, generateRefreshToken } from '../utils/jwt';
 import { isDisposableEmail, isLikelySpamDomain } from '../utils/emailValidation';
-import { sendVerificationEmail } from './emailService';
+import { sendVerificationEmail, sendPasswordResetEmail } from './emailService';
 
 const EMAIL_VERIFICATION_DISABLED =
   (process.env.DISABLE_EMAIL_VERIFICATION ?? "false") === "true";
@@ -530,6 +530,75 @@ export class AuthService {
     const newHash = await bcrypt.hash(newPassword, 12);
     await prisma.user.update({ where: { id: userId }, data: { passwordHash: newHash } });
   }
+
+  async requestPasswordReset(email: string): Promise<{ message: string }> {
+    const user = await prisma.user.findUnique({ where: { email } });
+
+    // Don't reveal if user exists
+    if (!user) {
+      return { message: 'If an account exists with this email, a password reset link has been sent.' };
+    }
+
+    // Delete any existing reset tokens for this user
+    await prisma.verificationToken.deleteMany({ where: { userId: user.id } });
+
+    const token = randomBytes(32).toString('hex');
+    const tokenHash = createHash('sha256').update(token).digest('hex');
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + 60);
+
+    await prisma.verificationToken.create({
+      data: {
+        userId: user.id,
+        email: user.email,
+        tokenHash,
+        expiresAt,
+      },
+    });
+
+    const resetUrl = `${config.frontendUrl}/reset-password?token=${token}`;
+
+    await sendPasswordResetEmail({
+      to: user.email,
+      name: user.name || undefined,
+      resetUrl,
+    });
+
+    return { message: 'If an account exists with this email, a password reset link has been sent.' };
+  }
+
+  async confirmPasswordReset(token: string, newPassword: string): Promise<{ message: string }> {
+    const tokenHash = createHash('sha256').update(token).digest('hex');
+
+    const resetToken = await prisma.verificationToken.findUnique({
+      where: { tokenHash },
+      include: { user: true },
+    });
+
+    if (!resetToken) {
+      throw new Error('Invalid or expired reset link');
+    }
+
+    if (resetToken.expiresAt < new Date()) {
+      await prisma.verificationToken.delete({ where: { id: resetToken.id } });
+      throw new Error('Reset link has expired');
+    }
+
+    if (newPassword.length < 10) {
+      throw new Error('Password must be at least 10 characters');
+    }
+
+    const newHash = await bcrypt.hash(newPassword, 12);
+
+    await prisma.user.update({
+      where: { id: resetToken.userId },
+      data: { passwordHash: newHash },
+    });
+
+    await prisma.verificationToken.delete({ where: { id: resetToken.id } });
+
+    return { message: 'Password reset successfully. You can now log in.' };
+  } 
 }
 
 export const authService = new AuthService();
