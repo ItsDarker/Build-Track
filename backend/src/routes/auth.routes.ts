@@ -282,7 +282,7 @@ router.post('/reset-password', async (req, res) => {
     res.json(result);
   } catch (error: any) {
     console.error('Password reset request error:', error);
-    res.status(500).json({ error: 'Failed to process password reset request' });
+    res.status(500).json({ error: error.message || 'Failed to process password reset request' });
   }
 });
 
