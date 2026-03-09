@@ -98,7 +98,13 @@ export const projectService = {
             where: { id },
             data: { status: 'IN_PROGRESS' },
         });
-        return prisma.task.create({
+
+        const project = await prisma.project.findUnique({
+            where: { id },
+            select: { id: true, name: true, code: true, client: { select: { name: true } } },
+        });
+
+        const task = await prisma.task.create({
             data: {
                 title: taskTitle,
                 status: 'TODO',
@@ -107,7 +113,28 @@ export const projectService = {
                 assigneeId: assigneeId,
             },
         });
+
+        // Auto-create CRM/Lead module record linked to this project and task
+        await prisma.moduleRecord.create({
+            data: {
+                moduleSlug: 'crm-leads',
+                data: {
+                    _projectId: id,
+                    _projectCode: project?.code || '',
+                    _projectName: project?.name || '',
+                    _taskId: task.id,
+                    'Task Status (New, In Progress, Completed)': 'New',
+                    'Lead ID': `CL-${task.id.slice(-6).toUpperCase()}`,
+                    'Lead Status (New, Contacted, Qualified, Closed)': 'New',
+                    'Customer Name (text)': project?.client?.name || '',
+                    'Project Name / Reference': project?.name || '',
+                },
+            },
+        });
+
+        return task;
     },
+    
 
     async cancelProject(id: string, cancellationReason: string) {
         return prisma.project.update({

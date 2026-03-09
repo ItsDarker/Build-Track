@@ -273,6 +273,30 @@ router.get("/oauth/google/callback", async (req, res) => {
   }
 });
 
+// Request password reset
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email is required' });
+    const result = await authService.requestPasswordReset(email);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Password reset request error:', error);
+    res.status(500).json({ error: error.message || 'Failed to process password reset request' });
+  }
+});
 
+// Confirm password reset
+router.post('/reset-password/confirm', async (req, res) => {
+  try {
+    const { token, password } = req.body;
+    if (!token || !password) return res.status(400).json({ error: 'Token and password are required' });
+    const result = await authService.confirmPasswordReset(token, password);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Password reset confirm error:', error);
+    res.status(400).json({ error: error.message || 'Failed to reset password' });
+  }
+});
 
 export default router;
