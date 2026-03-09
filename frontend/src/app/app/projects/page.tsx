@@ -496,282 +496,295 @@ export default function ProjectsPage() {
                     </Form>
                 ) : (
                     // Edit mode - show tabs
-                    <Tabs activeKey={editModalTab} onChange={setEditModalTab}>
-                        {/* Details Tab */}
-                        <Tabs.TabPane tab="Details" key="details">
-                            <Form form={form} layout="vertical" onFinish={handleSave} className="mt-4">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <Form.Item name="name" label="Project Name" rules={[{ required: true }]}>
-                                        <Input onChange={handleProjectNameChange} />
-                                    </Form.Item>
-                                    <Form.Item
-                                      name="code"
-                                      label="Project ID"
-                                      tooltip="Project ID cannot be changed after creation"
-                                    >
-                                        <Input
-                                          placeholder="Auto-generated"
-                                          disabled={true}
-                                          className="bg-gray-50"
-                                        />
-                                    </Form.Item>
-                                </div>
-                                <Form.Item name="description" label="Description">
-                                    <Input.TextArea rows={3} />
-                                </Form.Item>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <Form.Item name="clientId" label="Client">
-                                        <Select
-                                            showSearch
-                                            optionFilterProp="label"
-                                            options={clients.map(c => ({ value: c.id, label: c.name }))}
-                                        />
-                                    </Form.Item>
-                                    <Form.Item name="managerId" label="Project Manager">
-                                        <Select
-                                            showSearch
-                                            optionFilterProp="label"
-                                            options={managers.map(u => ({ value: u.id, label: u.name || u.email }))}
-                                        />
-                                    </Form.Item>
-                                </div>
-                                <div className="grid grid-cols-3 gap-4">
-                                    <Form.Item name="status" label="Status">
-                                        <Select
-                                            options={[
-                                                { value: "PLANNING", label: "Planning" },
-                                                { value: "IN_PROGRESS", label: "In Progress" },
-                                                { value: "ON_HOLD", label: "On Hold" },
-                                                { value: "COMPLETED", label: "Completed" },
-                                                { value: "CANCELLED", label: "Cancelled" },
-                                            ]}
-                                        />
-                                    </Form.Item>
-                                    <Form.Item name="startDate" label="Target Start Date">
-                                        <DatePicker className="w-full" />
-                                    </Form.Item>
-                                    <Form.Item name="endDate" label="Target End Date">
-                                        <DatePicker className="w-full" />
-                                    </Form.Item>
-                                </div>
-                                <div className="flex justify-end gap-2 mt-4">
-                                    <Button onClick={() => setIsModalOpen(false)}>Cancel</Button>
-                                    <Button type="primary" htmlType="submit">Save</Button>
-                                </div>
-                            </Form>
-                        </Tabs.TabPane>
-
-                        {/* Project Files Tab */}
-                        <Tabs.TabPane tab="Files" key="files">
-                            <div className="space-y-4 mt-4">
-                                <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center text-gray-400">
-                                    <InboxOutlined style={{ fontSize: 40, marginBottom: 8 }} />
-                                    <div className="text-base font-medium">File uploads coming soon</div>
-                                    <div className="text-sm mt-1">This area will allow you to upload and manage files for this project.</div>
-                                </div>
-                                <div className="text-gray-400 text-sm text-center">No files uploaded yet.</div>
-                            </div>
-                        </Tabs.TabPane>
-
-                        {/* Team Invitations Tab */}
-                        {['PROJECT_MANAGER', 'SUPER_ADMIN', 'ORG_ADMIN'].includes(currentUser?.role?.name) && (
-                            <Tabs.TabPane tab="Team" key="invitations">
-                                <div className="space-y-6 mt-4">
-                                    {/* Send New Invitation Section */}
-                                    <div className="border rounded-lg p-4 bg-gray-50">
-                                        <h3 className="font-semibold text-gray-900 mb-3">Send New Invitation</h3>
-                                        <div className="space-y-3">
-                                            <Form layout="vertical">
-                                                <Form.Item label="Search Users" className="mb-2">
-                                                    <AutoComplete
-                                                        value={emailSearch}
-                                                        options={userSuggestions}
-                                                        onSearch={handleEmailSearch}
-                                                        onChange={(value: string) => {
-                                                            setEmailSearch(value);
-                                                            const selected = userSuggestions.find(s => s.value === value);
-                                                            setSelectedInviteeId(selected ? value : null);
-                                                        }}
-                                                        placeholder="Start typing email or name..."
-                                                        notFoundContent={emailSearch.length < 2 ? "Type at least 2 characters" : "No users found"}
-                                                    />
-                                                </Form.Item>
-                                                <Form.Item label="Optional Message" className="mb-0">
-                                                    <Input.TextArea
-                                                        rows={2}
-                                                        placeholder="Add a personal message..."
-                                                        value={inviteMessage}
-                                                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setInviteMessage(e.target.value)}
-                                                    />
-                                                </Form.Item>
-                                            </Form>
-                                            <Button
-                                                type="primary"
-                                                loading={inviteLoading}
-                                                disabled={!selectedInviteeId}
-                                                onClick={handleSendInvite}
-                                                block
+                    <Tabs
+                        activeKey={editModalTab}
+                        onChange={setEditModalTab}
+                        items={[
+                            {
+                                key: "details",
+                                label: "Details",
+                                children: (
+                                    <Form form={form} layout="vertical" onFinish={handleSave} className="mt-4">
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <Form.Item name="name" label="Project Name" rules={[{ required: true }]}>
+                                                <Input onChange={handleProjectNameChange} />
+                                            </Form.Item>
+                                            <Form.Item
+                                              name="code"
+                                              label="Project ID"
+                                              tooltip="Project ID cannot be changed after creation"
                                             >
-                                                Send Invitation
-                                            </Button>
+                                                <Input
+                                                  placeholder="Auto-generated"
+                                                  disabled={true}
+                                                  className="bg-gray-50"
+                                                />
+                                            </Form.Item>
                                         </div>
+                                        <Form.Item name="description" label="Description">
+                                            <Input.TextArea rows={3} />
+                                        </Form.Item>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <Form.Item name="clientId" label="Client">
+                                                <Select
+                                                    showSearch
+                                                    optionFilterProp="label"
+                                                    options={clients.map(c => ({ value: c.id, label: c.name }))}
+                                                />
+                                            </Form.Item>
+                                            <Form.Item name="managerId" label="Project Manager">
+                                                <Select
+                                                    showSearch
+                                                    optionFilterProp="label"
+                                                    options={managers.map(u => ({ value: u.id, label: u.name || u.email }))}
+                                                />
+                                            </Form.Item>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-4">
+                                            <Form.Item name="status" label="Status">
+                                                <Select
+                                                    options={[
+                                                        { value: "PLANNING", label: "Planning" },
+                                                        { value: "IN_PROGRESS", label: "In Progress" },
+                                                        { value: "ON_HOLD", label: "On Hold" },
+                                                        { value: "COMPLETED", label: "Completed" },
+                                                        { value: "CANCELLED", label: "Cancelled" },
+                                                    ]}
+                                                />
+                                            </Form.Item>
+                                            <Form.Item name="startDate" label="Target Start Date">
+                                                <DatePicker className="w-full" />
+                                            </Form.Item>
+                                            <Form.Item name="endDate" label="Target End Date">
+                                                <DatePicker className="w-full" />
+                                            </Form.Item>
+                                        </div>
+                                        <div className="flex justify-end gap-2 mt-4">
+                                            <Button onClick={() => setIsModalOpen(false)}>Cancel</Button>
+                                            <Button type="primary" htmlType="submit">Save</Button>
+                                        </div>
+                                    </Form>
+                                )
+                            },
+                            {
+                                key: "files",
+                                label: "Files",
+                                children: (
+                                    <div className="space-y-4 mt-4">
+                                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center text-gray-400">
+                                            <InboxOutlined style={{ fontSize: 40, marginBottom: 8 }} />
+                                            <div className="text-base font-medium">File uploads coming soon</div>
+                                            <div className="text-sm mt-1">This area will allow you to upload and manage files for this project.</div>
+                                        </div>
+                                        <div className="text-gray-400 text-sm text-center">No files uploaded yet.</div>
                                     </div>
-
-                                    {/* Sent Invitations Section */}
-                                    <div>
-                                        <h3 className="font-semibold text-gray-900 mb-3">Sent Invitations</h3>
-                                        {projectInvitations.length === 0 ? (
-                                            <div className="text-center text-gray-500 py-6">
-                                                No invitations sent yet
+                                )
+                            },
+                            ...((['PROJECT_MANAGER', 'SUPER_ADMIN', 'ORG_ADMIN'].includes(currentUser?.role?.name)) ? [{
+                                key: "invitations",
+                                label: "Team",
+                                children: (
+                                    <div className="space-y-6 mt-4">
+                                        {/* Send New Invitation Section */}
+                                        <div className="border rounded-lg p-4 bg-gray-50">
+                                            <h3 className="font-semibold text-gray-900 mb-3">Send New Invitation</h3>
+                                            <div className="space-y-3">
+                                                <div className="space-y-3">
+                                                    <div>
+                                                        <label className="block text-sm font-medium mb-2">Search Users</label>
+                                                        <AutoComplete
+                                                            value={emailSearch}
+                                                            options={userSuggestions}
+                                                            onSearch={handleEmailSearch}
+                                                            onChange={(value: string) => {
+                                                                setEmailSearch(value);
+                                                                const selected = userSuggestions.find(s => s.value === value);
+                                                                setSelectedInviteeId(selected ? value : null);
+                                                            }}
+                                                            placeholder="Start typing email or name..."
+                                                            notFoundContent={emailSearch.length < 2 ? "Type at least 2 characters" : "No users found"}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-medium mb-2">Optional Message</label>
+                                                        <Input.TextArea
+                                                            rows={2}
+                                                            placeholder="Add a personal message..."
+                                                            value={inviteMessage}
+                                                            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setInviteMessage(e.target.value)}
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <Button
+                                                    type="primary"
+                                                    loading={inviteLoading}
+                                                    disabled={!selectedInviteeId}
+                                                    onClick={handleSendInvite}
+                                                    block
+                                                >
+                                                    Send Invitation
+                                                </Button>
                                             </div>
-                                        ) : (
-                                            <Table
-                                                columns={[
-                                                    {
-                                                        title: "User",
-                                                        key: "user",
-                                                        render: (_: any, record: any) => (
-                                                            <div>
-                                                                <div className="font-medium">{record.invitee?.name || record.invitee?.email}</div>
-                                                                <div className="text-xs text-gray-500">{record.invitee?.email}</div>
-                                                            </div>
-                                                        )
-                                                    },
-                                                    {
-                                                        title: "Status",
-                                                        dataIndex: "status",
-                                                        key: "status",
-                                                        render: (status: string) => {
-                                                            const colors: Record<string, string> = {
-                                                                PENDING: "orange",
-                                                                ACCEPTED: "green",
-                                                                DECLINED: "red"
-                                                            };
-                                                            return <Tag color={colors[status]}>{status}</Tag>;
-                                                        }
-                                                    },
-                                                    {
-                                                        title: "Sent",
-                                                        dataIndex: "createdAt",
-                                                        key: "createdAt",
-                                                        render: (date: string) => new Date(date).toLocaleDateString()
-                                                    },
-                                                    {
-                                                        title: "Actions",
-                                                        key: "actions",
-                                                        render: (_: any, record: any) => (
-                                                            <Space>
-                                                                {record.status === 'PENDING' && (
+                                        </div>
+
+                                        {/* Sent Invitations Section */}
+                                        <div>
+                                            <h3 className="font-semibold text-gray-900 mb-3">Sent Invitations</h3>
+                                            {projectInvitations.length === 0 ? (
+                                                <div className="text-center text-gray-500 py-6">
+                                                    No invitations sent yet
+                                                </div>
+                                            ) : (
+                                                <Table
+                                                    columns={[
+                                                        {
+                                                            title: "User",
+                                                            key: "user",
+                                                            render: (_: any, record: any) => (
+                                                                <div>
+                                                                    <div className="font-medium">{record.invitee?.name || record.invitee?.email}</div>
+                                                                    <div className="text-xs text-gray-500">{record.invitee?.email}</div>
+                                                                </div>
+                                                            )
+                                                        },
+                                                        {
+                                                            title: "Status",
+                                                            dataIndex: "status",
+                                                            key: "status",
+                                                            render: (status: string) => {
+                                                                const colors: Record<string, string> = {
+                                                                    PENDING: "orange",
+                                                                    ACCEPTED: "green",
+                                                                    DECLINED: "red"
+                                                                };
+                                                                return <Tag color={colors[status]}>{status}</Tag>;
+                                                            }
+                                                        },
+                                                        {
+                                                            title: "Sent",
+                                                            dataIndex: "createdAt",
+                                                            key: "createdAt",
+                                                            render: (date: string) => new Date(date).toLocaleDateString()
+                                                        },
+                                                        {
+                                                            title: "Actions",
+                                                            key: "actions",
+                                                            render: (_: any, record: any) => (
+                                                                <Space>
+                                                                    {record.status === 'PENDING' && (
+                                                                        <Button
+                                                                            size="small"
+                                                                            onClick={() => handleResendInvite(record.id)}
+                                                                        >
+                                                                            Resend
+                                                                        </Button>
+                                                                    )}
                                                                     <Button
                                                                         size="small"
-                                                                        onClick={() => handleResendInvite(record.id)}
+                                                                        danger
+                                                                        onClick={() => handleDeleteInvite(record.id)}
                                                                     >
-                                                                        Resend
+                                                                        Delete
                                                                     </Button>
-                                                                )}
-                                                                <Button
-                                                                    size="small"
-                                                                    danger
-                                                                    onClick={() => handleDeleteInvite(record.id)}
-                                                                >
-                                                                    Delete
-                                                                </Button>
-                                                            </Space>
-                                                        )
-                                                    }
-                                                ]}
-                                                dataSource={projectInvitations}
-                                                rowKey="id"
-                                                pagination={false}
-                                                size="small"
-                                            />
-                                        )}
+                                                                </Space>
+                                                            )
+                                                        }
+                                                    ]}
+                                                    dataSource={projectInvitations}
+                                                    rowKey="id"
+                                                    pagination={false}
+                                                    size="small"
+                                                />
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-                            </Tabs.TabPane>
-                        )}
-
-                        {/* Actions Tab */}
-                        <Tabs.TabPane tab="Actions" key="actions">
-                            <div className="space-y-4 mt-4">
-                                {/* Assign */}
-                                <div className="border rounded-lg p-4">
-                                    <h3 className="font-semibold text-gray-900 mb-3">Assign Project</h3>
-                                    <Form form={assignForm} layout="vertical" onFinish={handleAssign}>
-                                        <Form.Item name="assignedToId" label="Assign To" rules={[{ required: true, message: 'Please select a user' }]}>
-                                            <Select
-                                                showSearch
-                                                optionFilterProp="label"
-                                                options={assignableUsers.map(u => ({ value: u.id, label: u.name || u.email }))}
-                                            />
-                                        </Form.Item>
-                                        <Button type="primary" htmlType="submit" block>Assign</Button>
-                                    </Form>
-                                </div>
-
-                                {/* Project Actions */}
-                                <div className="border rounded-lg p-4 space-y-3">
-                                    <h3 className="font-semibold text-gray-900">Project Status Actions</h3>
-
-                                    {editingProject?.status !== 'CANCELLED' && editingProject?.status !== 'COMPLETED' && (
-                                        <div>
-                                            <label className="block text-sm font-medium mb-2">Start Project</label>
-                                            <Form form={startForm} layout="vertical" onFinish={handleStart}>
-                                                <Form.Item name="taskTitle" label="First Task Title" rules={[{ required: true }]}>
-                                                    <Input />
-                                                </Form.Item>
-                                                <Form.Item name="assigneeId" label="Assign Task To" rules={[{ required: true, message: 'Please select an assignee' }]}>
+                                )
+                            }] : []),
+                            {
+                                key: "actions",
+                                label: "Actions",
+                                children: (
+                                    <div className="space-y-4 mt-4">
+                                        {/* Assign */}
+                                        <div className="border rounded-lg p-4">
+                                            <h3 className="font-semibold text-gray-900 mb-3">Assign Project</h3>
+                                            <Form form={assignForm} layout="vertical" onFinish={handleAssign}>
+                                                <Form.Item name="assignedToId" label="Assign To" rules={[{ required: true, message: 'Please select a user' }]}>
                                                     <Select
                                                         showSearch
                                                         optionFilterProp="label"
                                                         options={assignableUsers.map(u => ({ value: u.id, label: u.name || u.email }))}
                                                     />
                                                 </Form.Item>
-                                                <Button type="primary" htmlType="submit" style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }} block>Start Project</Button>
+                                                <Button type="primary" htmlType="submit" block>Assign</Button>
                                             </Form>
                                         </div>
-                                    )}
 
-                                    {editingProject?.status !== 'CANCELLED' && editingProject?.status !== 'COMPLETED' && (
-                                        <div>
-                                            <label className="block text-sm font-medium mb-2">Cancel Project</label>
-                                            <Form form={cancelForm} layout="vertical" onFinish={handleCancel}>
-                                                <Form.Item name="cancellationReason" label="Reason for Cancellation" rules={[{ required: true, message: 'Please provide a reason' }]}>
-                                                    <Input.TextArea rows={2} />
-                                                </Form.Item>
-                                                <Button danger htmlType="submit" block>Cancel Project</Button>
-                                            </Form>
+                                        {/* Project Actions */}
+                                        <div className="border rounded-lg p-4 space-y-3">
+                                            <h3 className="font-semibold text-gray-900">Project Status Actions</h3>
+
+                                            {editingProject?.status !== 'CANCELLED' && editingProject?.status !== 'COMPLETED' && (
+                                                <div>
+                                                    <label className="block text-sm font-medium mb-2">Start Project</label>
+                                                    <Form form={startForm} layout="vertical" onFinish={handleStart}>
+                                                        <Form.Item name="taskTitle" label="First Task Title" rules={[{ required: true }]}>
+                                                            <Input />
+                                                        </Form.Item>
+                                                        <Form.Item name="assigneeId" label="Assign Task To" rules={[{ required: true, message: 'Please select an assignee' }]}>
+                                                            <Select
+                                                                showSearch
+                                                                optionFilterProp="label"
+                                                                options={assignableUsers.map(u => ({ value: u.id, label: u.name || u.email }))}
+                                                            />
+                                                        </Form.Item>
+                                                        <Button type="primary" htmlType="submit" style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }} block>Start Project</Button>
+                                                    </Form>
+                                                </div>
+                                            )}
+
+                                            {editingProject?.status !== 'CANCELLED' && editingProject?.status !== 'COMPLETED' && (
+                                                <div>
+                                                    <label className="block text-sm font-medium mb-2">Cancel Project</label>
+                                                    <Form form={cancelForm} layout="vertical" onFinish={handleCancel}>
+                                                        <Form.Item name="cancellationReason" label="Reason for Cancellation" rules={[{ required: true, message: 'Please provide a reason' }]}>
+                                                            <Input.TextArea rows={2} />
+                                                        </Form.Item>
+                                                        <Button danger htmlType="submit" block>Cancel Project</Button>
+                                                    </Form>
+                                                </div>
+                                            )}
+
+                                            {editingProject?.status !== 'CANCELLED' && editingProject?.status !== 'COMPLETED' && (
+                                                <div>
+                                                    <label className="block text-sm font-medium mb-2">Close Project</label>
+                                                    <Form form={closeForm} layout="vertical" onFinish={handleClose}>
+                                                        <Form.Item name="completionNote" label="Completion Note (optional)">
+                                                            <Input.TextArea rows={2} />
+                                                        </Form.Item>
+                                                        <Button type="primary" htmlType="submit" block>Close Project</Button>
+                                                    </Form>
+                                                </div>
+                                            )}
+
+                                            {editingProject?.status === 'CANCELLED' && (
+                                                <Button icon={<UndoOutlined />} onClick={() => handleRestore(editingProject)} block>
+                                                    Restore Project
+                                                </Button>
+                                            )}
+
+                                            {editingProject?.cancellationReason && (
+                                                <div className="bg-gray-50 p-3 rounded-lg border border-red-200">
+                                                    <div className="text-sm font-semibold text-gray-900 mb-1">Cancellation Reason:</div>
+                                                    <div className="text-sm text-gray-700">{editingProject.cancellationReason}</div>
+                                                </div>
+                                            )}
                                         </div>
-                                    )}
-
-                                    {editingProject?.status !== 'CANCELLED' && editingProject?.status !== 'COMPLETED' && (
-                                        <div>
-                                            <label className="block text-sm font-medium mb-2">Close Project</label>
-                                            <Form form={closeForm} layout="vertical" onFinish={handleClose}>
-                                                <Form.Item name="completionNote" label="Completion Note (optional)">
-                                                    <Input.TextArea rows={2} />
-                                                </Form.Item>
-                                                <Button type="primary" htmlType="submit" block>Close Project</Button>
-                                            </Form>
-                                        </div>
-                                    )}
-
-                                    {editingProject?.status === 'CANCELLED' && (
-                                        <Button icon={<UndoOutlined />} onClick={() => handleRestore(editingProject)} block>
-                                            Restore Project
-                                        </Button>
-                                    )}
-
-                                    {editingProject?.cancellationReason && (
-                                        <div className="bg-gray-50 p-3 rounded-lg border border-red-200">
-                                            <div className="text-sm font-semibold text-gray-900 mb-1">Cancellation Reason:</div>
-                                            <div className="text-sm text-gray-700">{editingProject.cancellationReason}</div>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </Tabs.TabPane>
-                    </Tabs>
+                                    </div>
+                                )
+                            }
+                        ]}
+                    />
                 )}
             </Modal>
 
