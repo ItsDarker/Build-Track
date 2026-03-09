@@ -19,6 +19,8 @@ import {
   Empty,
   Tooltip,
   Popconfirm,
+  AutoComplete,
+  Space,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
@@ -29,6 +31,7 @@ import {
   EditOutlined,
   CrownOutlined,
   PlusOutlined,
+  LoadingOutlined,
 } from "@ant-design/icons";
 import { apiClient } from "@/lib/api/client";
 
@@ -82,6 +85,14 @@ export default function TeamPage() {
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [inviting, setInviting] = useState(false);
   const [inviteForm] = Form.useForm();
+  const [emailSearch, setEmailSearch] = useState('');
+  const [emailSuggestions, setEmailSuggestions] = useState<any[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [roles, setRoles] = useState<any[]>([]);
+
+  // Sent invitations state
+  const [sentInvitations, setSentInvitations] = useState<any[]>([]);
+  const [sentInvitationsLoading, setSentInvitationsLoading] = useState(false);
 
   // Team Entities state
   const [teams, setTeams] = useState<TeamEntity[]>([]);
@@ -98,18 +109,55 @@ export default function TeamPage() {
       if (userResult.error || !userResult.data) { router.push("/login"); return; }
       setUser((userResult.data as any).user);
 
-      const [membersResult, teamsResult] = await Promise.all([
+      const [membersResult, teamsResult, rolesResult] = await Promise.all([
         apiClient.getTeamMembers(),
         apiClient.getTeams(),
+        apiClient.getRoles(),
       ]);
       if (membersResult.data) setMembers((membersResult.data as any).members || []);
       if (teamsResult.data)   setTeams((teamsResult.data as any).teams || []);
+      if (rolesResult.data) setRoles((rolesResult.data as any).roles || []);
       setLoading(false);
     };
     init();
+
+    // Refresh members list every 10 seconds to catch updates from accepted invites
+    const interval = setInterval(() => {
+      fetchMembers();
+    }, 10000);
+
+    return () => clearInterval(interval);
   }, [router]);
 
   // ── Team Members handlers ────────────────────────────────────────────────────
+  const handleEmailSearch = async (value: string) => {
+    setEmailSearch(value);
+    if (value.length < 2) {
+      setEmailSuggestions([]);
+      setSelectedUserId(null);
+      return;
+    }
+
+    const result = await apiClient.searchTeamUsers(value);
+    if (result.data) {
+      const users = (result.data as any).users || [];
+      setEmailSuggestions(users.map((u: any) => ({
+        label: `${u.name || u.email} (${u.email})`,
+        value: u.id,
+        email: u.email,
+        user: u
+      })));
+    }
+  };
+
+  const handleEmailSelect = (value: string) => {
+    setSelectedUserId(value);
+    const selected = emailSuggestions.find(s => s.value === value);
+    if (selected) {
+      inviteForm.setFieldsValue({ email: selected.email });
+    }
+  };
+
   const handleInvite = async (values: { email: string; role: string }) => {
     setInviting(true);
     const result = await apiClient.inviteTeamMember(values);
@@ -119,6 +167,9 @@ export default function TeamPage() {
       message.success(`Invitation sent to ${values.email}`);
       setIsInviteModalOpen(false);
       inviteForm.resetFields();
+      setEmailSearch('');
+      setSelectedUserId(null);
+      setEmailSuggestions([]);
       const r = await apiClient.getTeamMembers();
       if (r.data) setMembers((r.data as any).members || []);
     }
@@ -132,6 +183,42 @@ export default function TeamPage() {
     } else {
       message.success("Member removed");
       setMembers((prev) => prev.filter((m) => m.id !== memberId));
+    }
+  };
+
+  const fetchMembers = async () => {
+    const result = await apiClient.getTeamMembers();
+    if (result.data) {
+      setMembers((result.data as any).members || []);
+    }
+  };
+
+  const fetchSentInvitations = async () => {
+    setSentInvitationsLoading(true);
+    const result = await apiClient.getSentTeamInvitations();
+    if (result.data) {
+      setSentInvitations((result.data as any).invitations || []);
+    }
+    setSentInvitationsLoading(false);
+  };
+
+  const handleResendInvitation = async (invitationId: string) => {
+    const result = await apiClient.resendTeamInvitation(invitationId);
+    if (result.error) {
+      message.error(result.error);
+    } else {
+      message.success("Invitation resent");
+      await fetchSentInvitations();
+    }
+  };
+
+  const handleRevokeInvitation = async (invitationId: string) => {
+    const result = await apiClient.revokeTeamInvitation(invitationId);
+    if (result.error) {
+      message.error(result.error);
+    } else {
+      message.success("Invitation revoked");
+      setSentInvitations((prev) => prev.filter((i) => i.id !== invitationId));
     }
   };
 
@@ -294,7 +381,14 @@ export default function TeamPage() {
           </div>
 
           {/* Members list */}
-          <Card title="Members">
+          <Card
+            title="Members"
+            extra={
+              <Button size="small" onClick={fetchMembers}>
+                Refresh
+              </Button>
+            }
+          >
             {members.length === 0 ? (
               <Empty description="No team members yet. Invite someone to get started!" />
             ) : (
@@ -377,7 +471,13 @@ export default function TeamPage() {
         <Button
           type="primary"
           icon={<UserAddOutlined />}
-          onClick={() => setIsInviteModalOpen(true)}
+          onClick={() => {
+            setIsInviteModalOpen(true);
+            inviteForm.resetFields();
+            setEmailSearch('');
+            setSelectedUserId(null);
+            setEmailSuggestions([]);
+          }}
           size="large"
         >
           Invite Member
@@ -388,40 +488,122 @@ export default function TeamPage() {
 
       {/* Invite Member Modal */}
       <Modal
-        title="Invite Team Member"
+        title="Team Invitations"
         open={isInviteModalOpen}
-        onCancel={() => { setIsInviteModalOpen(false); inviteForm.resetFields(); }}
-        forceRender
+        onCancel={() => { setIsInviteModalOpen(false); inviteForm.resetFields(); setEmailSearch(''); setSelectedUserId(null); setEmailSuggestions([]); }}
         footer={null}
+        width={800}
       >
-        <Form form={inviteForm} layout="vertical" onFinish={handleInvite} className="mt-4">
-          <Form.Item
-            name="email"
-            label="Email Address"
-            rules={[
-              { required: true, message: "Please enter an email" },
-              { type: "email", message: "Please enter a valid email" },
-            ]}
-          >
-            <Input prefix={<MailOutlined />} placeholder="colleague@company.com" size="large" />
-          </Form.Item>
-          <Form.Item
-            name="role"
-            label="Role"
-            rules={[{ required: true, message: "Please select a role" }]}
-            initialValue="SUBCONTRACTOR"
-          >
-            <select className="w-full h-10 px-3 border border-gray-300 rounded-md">
-              <option value="PM">Project Manager</option>
-              <option value="SUBCONTRACTOR">Subcontractor</option>
-              <option value="CLIENT">Client Portal Access</option>
-            </select>
-          </Form.Item>
-          <div className="flex justify-end gap-2">
-            <Button onClick={() => { setIsInviteModalOpen(false); inviteForm.resetFields(); }}>Cancel</Button>
-            <Button type="primary" htmlType="submit" loading={inviting}>Send Invitation</Button>
-          </div>
-        </Form>
+        <Tabs
+          items={[
+            {
+              key: "send",
+              label: "Send Invitation",
+              children: (
+                <Form form={inviteForm} layout="vertical" onFinish={handleInvite} className="mt-4">
+                  <Form.Item
+                    name="email"
+                    label="Email Address"
+                    rules={[
+                      { required: true, message: "Please enter an email" },
+                      { type: "email", message: "Please enter a valid email" },
+                    ]}
+                  >
+                    <AutoComplete
+                      value={emailSearch}
+                      options={emailSuggestions}
+                      onSearch={handleEmailSearch}
+                      onSelect={handleEmailSelect}
+                      placeholder="Start typing email or name..."
+                      notFoundContent={emailSearch.length < 2 ? "Type at least 2 characters" : "No users found"}
+                      size="large"
+                    />
+                  </Form.Item>
+                  <div className="flex justify-end gap-2">
+                    <Button onClick={() => { setIsInviteModalOpen(false); inviteForm.resetFields(); setEmailSearch(''); setSelectedUserId(null); setEmailSuggestions([]); }}>Cancel</Button>
+                    <Button type="primary" htmlType="submit" loading={inviting}>Send Invitation</Button>
+                  </div>
+                </Form>
+              )
+            },
+            {
+              key: "sent",
+              label: "Sent Invitations",
+              children: (
+                <div className="mt-4">
+                  <Button type="primary" size="small" onClick={fetchSentInvitations} loading={sentInvitationsLoading} className="mb-4">
+                    Refresh
+                  </Button>
+                  {sentInvitations.length === 0 ? (
+                    <Empty description="No invitations sent yet" />
+                  ) : (
+                    <Table
+                      columns={[
+                        {
+                          title: "Email",
+                          dataIndex: "email",
+                          key: "email",
+                        },
+                        {
+                          title: "Role",
+                          dataIndex: "role",
+                          key: "role",
+                        },
+                        {
+                          title: "Status",
+                          dataIndex: "status",
+                          key: "status",
+                          render: (status: string) => {
+                            const colors: Record<string, string> = {
+                              PENDING: "orange",
+                              ACCEPTED: "green",
+                              DECLINED: "red",
+                            };
+                            return <Tag color={colors[status]}>{status}</Tag>;
+                          },
+                        },
+                        {
+                          title: "Sent",
+                          dataIndex: "createdAt",
+                          key: "createdAt",
+                          render: (date: string) => new Date(date).toLocaleDateString(),
+                        },
+                        {
+                          title: "Actions",
+                          key: "actions",
+                          render: (_: any, record: any) => (
+                            <Space>
+                              {record.status === "PENDING" && (
+                                <Button
+                                  size="small"
+                                  onClick={() => handleResendInvitation(record.id)}
+                                >
+                                  Resend
+                                </Button>
+                              )}
+                              <Button
+                                size="small"
+                                danger
+                                onClick={() => handleRevokeInvitation(record.id)}
+                              >
+                                Revoke
+                              </Button>
+                            </Space>
+                          ),
+                        },
+                      ]}
+                      dataSource={sentInvitations}
+                      rowKey="id"
+                      loading={sentInvitationsLoading}
+                      pagination={false}
+                      size="small"
+                    />
+                  )}
+                </div>
+              )
+            },
+          ]}
+        />
       </Modal>
 
       {/* Add / Edit Team Modal */}

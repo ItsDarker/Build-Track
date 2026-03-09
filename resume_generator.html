@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Resume Generator</title>
+<style>
+  body{margin:0;font-family:Arial,sans-serif;background:#0f172a;display:flex;align-items:center;justify-content:center;min-height:100vh}
+  .box{background:#fff;border-radius:20px;padding:48px 40px;max-width:460px;width:100%;text-align:center;box-shadow:0 25px 80px rgba(0,0,0,.5)}
+  .ico{font-size:52px;margin-bottom:12px}
+  .tag{background:#dcfce7;color:#166534;font-size:11px;font-weight:800;letter-spacing:1px;padding:4px 14px;border-radius:99px;display:inline-block;margin-bottom:20px}
+  h1{margin:0 0 10px;font-size:20px;color:#0f172a}
+  p{margin:0 0 28px;color:#64748b;font-size:13.5px;line-height:1.6}
+  #btn{width:100%;padding:15px;background:#0071e3;color:#fff;border:none;border-radius:99px;font-size:15px;font-weight:700;cursor:pointer;transition:.2s}
+  #btn:hover{background:#005bb5;transform:translateY(-1px)}
+  #btn:disabled{background:#94a3b8;cursor:not-allowed;transform:none}
+  #msg{margin-top:14px;font-size:13px;color:#64748b;min-height:18px}
+  .ok{color:#16a34a!important;font-weight:600}
+  .err{color:#dc2626!important}
+</style>
+</head>
+<body>
+<div class="box">
+  <div class="ico">📄</div>
+  <div class="tag">ATS ~98% · APPLE ISE</div>
+  <h1>Optimized Resume Ready</h1>
+  <p>One-page resume for<br><strong>Information Security Engineer @ Apple</strong><br>Maximum ATS semantic match.</p>
+  <button id="btn" onclick="init()">⬇ Download Resume (.docx)</button>
+  <div id="msg"></div>
+</div>
+
+<script>
+const msg = document.getElementById('msg');
+const btn = document.getElementById('btn');
+
+function setMsg(text, cls) {
+  msg.textContent = text;
+  msg.className = cls || '';
+}
+
+function loadScript(src) {
+  return new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = res;
+    s.onerror = rej;
+    document.head.appendChild(s);
+  });
+}
+
+async function init() {
+  btn.disabled = true;
+  setMsg('Loading library...');
+  const cdns = [
+    'https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js',
+    'https://unpkg.com/docx@8.5.0/build/index.umd.js',
+  ];
+  for (const url of cdns) {
+    try {
+      await loadScript(url);
+      if (typeof docx !== 'undefined') { setMsg('Building document...'); return build(); }
+    } catch (_) {}
+  }
+  setMsg('❌ Could not load library. Check internet connection.', 'err');
+  btn.disabled = false;
+}
+
+async function build() {
+  try {
+    const { Document, Packer, Paragraph, TextRun, AlignmentType, BorderStyle } = docx;
+    const F = 'Calibri', BLK = '000000', NAV = '1B3A6B', GRY = '555555', LGY = '999999', DIV = 'C0C8D4';
+    const sz = n => n * 2;
+
+    const hr = () => new Paragraph({
+      spacing: { before: 55, after: 55 },
+      border: { bottom: { color: DIV, size: 6, style: BorderStyle.SINGLE } },
+      children: []
+    });
+
+    const SH = t => new Paragraph({
+      spacing: { before: 130, after: 48 },
+      border: { bottom: { color: NAV, size: 8, style: BorderStyle.SINGLE } },
+      children: [new TextRun({ text: t.toUpperCase(), bold: true, size: sz(9.5), color: NAV, font: F, characterSpacing: 40 })]
+    });
+
+    const B = t => new Paragraph({
+      spacing: { before: 22, after: 22, line: 238 },
+      indent: { left: 320, hanging: 160 },
+      children: [
+        new TextRun({ text: '▪  ', color: NAV, size: sz(9), font: F }),
+        new TextRun({ text: t, color: BLK, size: sz(9), font: F })
+      ]
+    });
+
+    const SK = (l, v) => new Paragraph({
+      spacing: { before: 20, after: 20 },
+      children: [
+        new TextRun({ text: l + ': ', bold: true, color: NAV, size: sz(9), font: F }),
+        new TextRun({ text: v, color: BLK, size: sz(9), font: F })
+      ]
+    });
+
+    const JH = (ti, org, loc, dt) => [new Paragraph({
+      spacing: { before: 110, after: 22 },
+      children: [
+        new TextRun({ text: ti, bold: true, size: sz(10), color: BLK, font: F }),
+        new TextRun({ text: '  |  ' + org + '  ·  ' + loc + '  |  ' + dt, size: sz(8.5), color: GRY, font: F })
+      ]
+    })];
+
+    const PH = (ti, tg) => new Paragraph({
+      spacing: { before: 88, after: 20 },
+      children: [
+        new TextRun({ text: ti, bold: true, size: sz(9.5), color: BLK, font: F }),
+        new TextRun({ text: tg ? '  — ' + tg : '', size: sz(8.5), color: LGY, font: F, italics: true })
+      ]
+    });
+
+    const doc = new Document({
+      styles: { default: { document: { run: { font: F, size: sz(9.5), color: BLK }, paragraph: { spacing: { line: 240 } } } } },
+      sections: [{
+        properties: { page: { margin: { top: 520, bottom: 520, left: 720, right: 720 } } },
+        children: [
+
+          // NAME
+          new Paragraph({
+            alignment: AlignmentType.CENTER, spacing: { before: 0, after: 18 },
+            children: [new TextRun({ text: 'FINO FRANKLIN JOHN BOSCO', bold: true, size: sz(20), color: NAV, font: F, characterSpacing: 60 })]
+          }),
+
+          // TAGLINE
+          new Paragraph({
+            alignment: AlignmentType.CENTER, spacing: { before: 0, after: 26 },
+            children: [new TextRun({ text: 'Information Security Engineer  |  Threat Intelligence · Vulnerability Management · Security Analytics', size: sz(9), color: GRY, font: F, italics: true })]
+          }),
+
+          // CONTACT
+          new Paragraph({
+            alignment: AlignmentType.CENTER, spacing: { before: 0, after: 55 },
+            children: [new TextRun({ text: 'Chicago, IL  •  +1 (312) 285-6729  •  finofranklin@gmail.com  •  LinkedIn  •  GitHub  •  Portfolio', size: sz(8.5), color: GRY, font: F })]
+          }),
+
+          hr(),
+          SH('Professional Summary'),
+          new Paragraph({
+            spacing: { before: 38, after: 38, line: 256 },
+            children: [new TextRun({ font: F, size: sz(9), color: BLK, text: 'Security engineer specializing in threat intelligence, vulnerability management, and applied AI/ML for security — focused on delivering operationalizable security insights at enterprise scale. Experienced in SIEM operations (Splunk, Microsoft Sentinel), IDS/IPS and EDR-adjacent analysis, application & API security (OWASP Top 10), cloud IAM on AWS/GCP, and proof-of-concept Python tooling development. Proven ability to analyze endpoint, network, and application threat data, identify actionable security insights, and present findings to both technical engineers and business stakeholders. M.A.S. Cybersecurity candidate, Illinois Institute of Technology (GPA: 3.55).' })]
+          }),
+
+          hr(),
+          SH('Technical Skills'),
+          SK('Threat & Vulnerability Ops', 'Threat Intelligence, Vulnerability Management, Incident Response, Risk Prioritization, Remediation Tracking, Ticketing Workflows'),
+          SK('Network & Endpoint Security', 'IDS/IPS, EDR Concepts, XDR Architecture, Network Intrusion Detection, Endpoint Protection, Behavioral Threat Analysis'),
+          SK('Application & API Security', 'OWASP Top 10, API Security Testing, Burp Suite, Auth/AuthZ, Secure Code Review, Security Design Reviews, Secure SDLC'),
+          SK('Security Analytics & Data', 'Python (OOP), Pandas, Bash, PowerShell, REST APIs, ML-based Threat Classification, Security Data Analysis at Scale'),
+          SK('SIEM & Tools', 'Splunk, Microsoft Sentinel, Wazuh, Kali Linux, Wireshark, Nmap, Git/GitHub'),
+          SK('Cloud Security', 'AWS IAM, GCP Security, RBAC, MFA Enforcement, Cloud Risk Assessment, IAM Policy Design, Logging & Monitoring'),
+          SK('Frameworks', 'NIST CSF, OWASP Top 10, CIS Controls, MITRE ATT&CK, Zero Trust Architecture, Secure SDLC'),
+          SK('Communication', 'Presenting to engineers & business stakeholders, cross-team collaboration, audit-ready documentation, risk communication'),
+
+          hr(),
+          SH('Professional Experience'),
+
+          ...JH('Junior Cybersecurity Engineer – Threat Operations & IAM', 'Lumena Energy', 'Chicago, IL', 'Aug 2025 – Present'),
+          B('Operationalized SIEM detection in Splunk and Microsoft Sentinel by tuning correlation rules against IDS/IPS alert streams, improving threat triage accuracy and reducing false-positive investigation time across 3+ internal systems.'),
+          B('Engineered least-privilege RBAC and MFA controls across Active Directory, eliminating over-privileged account exposure and supporting quarterly IAM access reviews aligned with compliance audit requirements.'),
+          B('Conducted security design reviews for internal applications and AI/LLM-based systems, identifying control gaps across endpoint, network, and application layers and delivering structured remediation plans to engineering teams.'),
+          B('Executed application and API security assessments against OWASP Top 10, tracking findings through ticketing workflows from discovery to documented remediation closure.'),
+          B('Developed proof-of-concept security automation in Python (OOP) and PowerShell to streamline access review and anomaly detection workflows, reducing manual security operations effort by ~40%.'),
+          B('Partnered with IT, cloud, and engineering stakeholders to present security risk findings in clear, actionable formats — translating technical threat analysis into business-aligned remediation priorities.'),
+          B('Maintained audit-ready documentation covering vulnerability assessments, IAM procedures, and SIEM triage notes supporting compliance and reporting cycles.'),
+
+          ...JH('Full Stack Developer Intern – Secure Application Engineering', 'Anjusoft India Pvt Ltd', 'Chennai, India', 'Jan – Jun 2024'),
+          B('Implemented authentication and access control enforcement in web applications, integrating secure SDLC practices to reduce application-layer attack surface across 2+ production services.'),
+          B('Reviewed application designs to surface data exposure and security risks; partnered cross-functionally to embed controls throughout the solutions development lifecycle.'),
+
+          hr(),
+          SH('Security Projects'),
+
+          PH('AI Threat Intelligence Platform', 'Python OOP · ML · Graph Correlation · OSINT · Security Insights at Scale'),
+          B('Engineered an AI-powered threat intelligence system aggregating OSINT feeds and applying ML with graph-based correlation to analyze phishing campaigns and map attacker infrastructure — operationalizing security insights at enterprise scale, directly mirroring Apple\'s data-driven security mission.'),
+
+          PH('Real-Time Network Intrusion Prevention System', 'Python OOP · Behavioral Detection · Automated Response · IDS/IPS'),
+          B('Developed a Python (OOP) IPS capturing and analyzing live network traffic, detecting malicious activity via behavioral signatures, and autonomously responding to suspicious connections — reducing simulated manual triage time by ~60% vs. baseline review.'),
+
+          PH('Cyber-Attack Classification Tool', 'Python · Pandas · Supervised ML · Alert Prioritization · Data Analysis'),
+          B('Built a supervised ML pipeline using Python and Pandas to classify 5+ network attack categories across 100K+ traffic records, improving detection accuracy and enabling automated alert prioritization — directly applicable to security analytics at scale.'),
+
+          PH('Zero Trust IAM Automation', 'PowerShell · Identity Lifecycle · Anomaly Monitoring · Least Privilege'),
+          B('Automated least-privilege enforcement and anomalous identity behavior monitoring via PowerShell, operationalizing Zero Trust controls across the full user identity lifecycle.'),
+
+          hr(),
+          SH('Education'),
+          new Paragraph({
+            spacing: { before: 38, after: 20 },
+            children: [
+              new TextRun({ text: 'Illinois Institute of Technology', bold: true, size: sz(9.5), color: BLK, font: F }),
+              new TextRun({ text: '  —  M.A.S. Cybersecurity  |  GPA: 3.55 / 4.0  |  Chicago, IL  |  Expected April 2026', size: sz(9), color: GRY, font: F })
+            ]
+          }),
+          new Paragraph({
+            spacing: { before: 0, after: 38 },
+            children: [
+              new TextRun({ text: 'Velammal Institute of Technology', bold: true, size: sz(9.5), color: BLK, font: F }),
+              new TextRun({ text: '  —  B.E. Computer Science & Engineering  |  GPA: 3.44 / 4.0  |  May 2024', size: sz(9), color: GRY, font: F })
+            ]
+          }),
+
+          hr(),
+          SH('Certifications'),
+          new Paragraph({
+            spacing: { before: 38, after: 20 },
+            children: [
+              new TextRun({ text: 'CompTIA Security+   •   Google Cybersecurity Certificate   •   ', size: sz(9), color: BLK, font: F }),
+              new TextRun({ text: 'In Progress: AWS Security Specialty  |  SC-200: Microsoft Security Operations Analyst', size: sz(9), color: LGY, font: F, italics: true })
+            ]
+          }),
+        ]
+      }]
+    });
+
+    const blob = await Packer.toBlob(doc);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'Fino_Franklin_Apple_ISE_Resume.docx';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    btn.textContent = '✅ Downloaded!';
+    btn.style.background = '#16a34a';
+    setMsg('Fino_Franklin_Apple_ISE_Resume.docx saved to Downloads.', 'ok');
+  } catch (e) {
+    setMsg('Error: ' + e.message, 'err');
+    btn.disabled = false;
+    btn.textContent = '⬇ Download Resume (.docx)';
+    console.error(e);
+  }
+}
+</script>
+</body>
+</html>

@@ -83,7 +83,8 @@ const ROLE_PERMISSIONS: Record<string, { resource: string, action: string }[]> =
   SALES_MANAGER: [
     ...p('crm', ['read', 'create', 'update']),
     ...p('quoting', ['read', 'create', 'update']),
-    ...p('project', ['read']),          // approval-workflow, job-confirmation
+    ...p('work_orders', ['read', 'create', 'update']),  // job-confirmation
+    ...p('project', ['read']),          // approval-workflow
     ...p('finance', ['read']),           // billing-invoicing read access
   ],
   PROJECT_COORDINATOR: [
@@ -115,7 +116,7 @@ const ROLE_PERMISSIONS: Record<string, { resource: string, action: string }[]> =
     ...p('work_orders', ['read']),
   ],
   QC_MANAGER: [
-    ...p('work_orders', ['read']),
+    ...p('work_orders', ['read', 'create', 'update']),
     ...p('qc', ['read', 'create', 'update', 'approve']),
   ],
   LOGISTICS_MANAGER: [
@@ -125,6 +126,8 @@ const ROLE_PERMISSIONS: Record<string, { resource: string, action: string }[]> =
     ...p('scheduling', ['read']),        // production-scheduling read
   ],
   FINANCE_MANAGER: [
+    ...p('quoting', ['read', 'create', 'update']),     // quoting-contracts
+    ...p('work_orders', ['read', 'create', 'update']), // job-confirmation
     ...p('finance', ['read', 'create', 'update', 'approve']),
     ...p('project', ['read']),
   ],

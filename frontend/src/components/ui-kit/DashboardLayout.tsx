@@ -1,9 +1,9 @@
 "use client";
 
-import React, { ReactNode, useState } from "react";
+import React, { ReactNode, useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Layout, Dropdown, Space, Input } from "antd";
+import { Layout, Dropdown, Space, Input, App, Badge, Button, Modal, Tag } from "antd";
 import {
   UserOutlined,
   LogoutOutlined,
@@ -17,6 +17,7 @@ import {
   QuestionCircleOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  BellOutlined,
 } from "@ant-design/icons";
 import {
   ChevronDown,
@@ -89,7 +90,19 @@ const topNavIcons: Record<string, React.ReactNode> = {
   PROFILE: <UserOutlined />,
 };
 
+interface UserNotification {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  read: boolean;
+  invitationId?: string;
+  data?: string;
+  createdAt: string;
+}
+
 export function DashboardLayout({ user, children }: DashboardLayoutProps) {
+  const { message } = App.useApp();
   const router = useRouter();
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
@@ -97,6 +110,12 @@ export function DashboardLayout({ user, children }: DashboardLayoutProps) {
     pathname.startsWith("/app/tasks")
   );
   const [searchVisible, setSearchVisible] = useState(false);
+
+  // Notification state
+  const [notifications, setNotifications] = useState<UserNotification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [activeInvite, setActiveInvite] = useState<UserNotification | null>(null);
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
 
   // Filter sidebar items based on user role
   const filteredSidebar = navigation.sidebar
@@ -126,6 +145,135 @@ export function DashboardLayout({ user, children }: DashboardLayoutProps) {
     router.push("/");
     router.refresh();
   };
+
+  // Fetch notifications
+  const fetchUserNotifications = async () => {
+    try {
+      const result = await apiClient.getUserNotifications({ limit: 20 });
+      if (result.data) {
+        const notifs = (result.data as any).notifications || [];
+        setNotifications(notifs);
+        setUnreadCount(notifs.filter((n: UserNotification) => !n.read).length);
+      }
+    } catch (error) {
+      console.warn('Failed to fetch notifications:', error);
+    }
+  };
+
+  // Polling for notifications
+  useEffect(() => {
+    fetchUserNotifications();
+    const interval = setInterval(fetchUserNotifications, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleNotificationClick = async (notif: UserNotification) => {
+    if (!notif.read) {
+      await apiClient.markUserNotificationRead(notif.id);
+      setNotifications(prev =>
+        prev.map(n => n.id === notif.id ? { ...n, read: true } : n)
+      );
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    }
+
+    if (notif.type === 'PROJECT_INVITE') {
+      setActiveInvite(notif);
+      setInviteModalOpen(true);
+    } else if (notif.type === 'TEAM_INVITE') {
+      // Show team invite modal
+      setActiveInvite(notif);
+      setInviteModalOpen(true);
+    }
+  };
+
+  const handleAcceptInvite = async (notifId: string) => {
+    const inviteType = activeInvite?.type;
+    const apiCall = inviteType === 'TEAM_INVITE'
+      ? apiClient.acceptTeamInvite(notifId)
+      : apiClient.acceptProjectInvite(notifId);
+
+    const result = await apiCall;
+    if (result.data) {
+      message.success(inviteType === 'TEAM_INVITE' ? 'Invitation accepted!' : 'You joined the project!');
+      setInviteModalOpen(false);
+      setActiveInvite(null);
+      await fetchUserNotifications();
+      if (inviteType === 'PROJECT_INVITE' && (result.data as any).projectId) {
+        router.push(`/app/projects`);
+      }
+    } else {
+      message.error(result.error || 'Failed to accept invitation');
+    }
+  };
+
+  const handleDeclineInvite = async (notifId: string) => {
+    const inviteType = activeInvite?.type;
+    const apiCall = inviteType === 'TEAM_INVITE'
+      ? apiClient.declineTeamInvite(notifId)
+      : apiClient.declineProjectInvite(notifId);
+
+    const result = await apiCall;
+    if (result.data) {
+      message.success('Invitation declined');
+      setInviteModalOpen(false);
+      setActiveInvite(null);
+      await fetchUserNotifications();
+    } else {
+      message.error(result.error || 'Failed to decline invitation');
+    }
+  };
+
+  const notificationDropdown = (
+    <div
+      style={{
+        background: '#fff',
+        borderRadius: 8,
+        boxShadow: '0 6px 16px rgba(0,0,0,0.12)',
+        minWidth: 320,
+        maxWidth: 380,
+      }}
+    >
+      <div style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0', fontWeight: 600 }}>
+        Notifications {unreadCount > 0 && <span style={{ color: '#1677ff', fontSize: 12 }}>({unreadCount} unread)</span>}
+      </div>
+
+      {notifications.length === 0 ? (
+        <div style={{ padding: '32px 16px', textAlign: 'center', color: '#999' }}>
+          <BellOutlined style={{ fontSize: 28, marginBottom: 8, display: 'block' }} />
+          <span>No notifications</span>
+        </div>
+      ) : (
+        notifications.slice(0, 5).map((notif) => (
+          <div
+            key={notif.id}
+            onClick={() => handleNotificationClick(notif)}
+            style={{
+              padding: '12px 16px',
+              borderBottom: '1px solid #f0f0f0',
+              cursor: 'pointer',
+              background: notif.read ? 'transparent' : '#f0f7ff',
+              transition: 'background 0.2s',
+            }}
+          >
+            <div style={{ marginBottom: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontWeight: notif.read ? 'normal' : '600' }}>
+                {notif.title}
+              </span>
+              {notif.type === 'PROJECT_INVITE' && (
+                <Tag color="orange" style={{ marginLeft: 8 }}>Pending invite</Tag>
+              )}
+              {notif.type === 'TEAM_INVITE' && (
+                <Tag color="blue" style={{ marginLeft: 8 }}>Team invite</Tag>
+              )}
+            </div>
+            <div style={{ fontSize: 12, color: '#999' }}>
+              {notif.message.length > 60 ? notif.message.substring(0, 60) + '…' : notif.message}
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  );
 
   const userMenuItems = [
     {
@@ -260,6 +408,12 @@ export function DashboardLayout({ user, children }: DashboardLayoutProps) {
 
           {/* Right: top nav items from config */}
           <Space size="middle">
+            <Dropdown popupRender={() => notificationDropdown} trigger={["click"]} placement="bottomRight">
+              <Badge count={unreadCount} size="small">
+                <Button type="text" icon={<BellOutlined style={{ fontSize: 18 }} />} />
+              </Badge>
+            </Dropdown>
+
             {navigation.topNav.map((item) => {
               if (item === "PROFILE") {
                 return (
@@ -328,6 +482,65 @@ export function DashboardLayout({ user, children }: DashboardLayoutProps) {
           BuildTrack &copy;{new Date().getFullYear()} Created by BuildTrack Team
         </Footer>
       </Layout>
+
+      {/* Invitation Modal (Project or Team) */}
+      {activeInvite && (
+        <Modal
+          title={activeInvite.type === 'TEAM_INVITE' ? 'Team Invitation' : 'Project Invitation'}
+          open={inviteModalOpen}
+          onCancel={() => {
+            setInviteModalOpen(false);
+            setActiveInvite(null);
+          }}
+          footer={[
+            <Button key="decline" onClick={() => handleDeclineInvite(activeInvite.id)}>
+              Decline
+            </Button>,
+            <Button key="accept" type="primary" onClick={() => handleAcceptInvite(activeInvite.id)}>
+              Accept
+            </Button>,
+          ]}
+        >
+          <div style={{ padding: '12px 0' }}>
+            {activeInvite.data && (
+              <>
+                {(() => {
+                  try {
+                    const inviteData = JSON.parse(activeInvite.data);
+                    if (activeInvite.type === 'TEAM_INVITE') {
+                      return (
+                        <div style={{ lineHeight: '1.8' }}>
+                          <p><strong>Role:</strong> {inviteData.role}</p>
+                          <p><strong>Invited by:</strong> {inviteData.inviterName} ({inviteData.inviterEmail})</p>
+                          {inviteData.invitationToken && (
+                            <p><strong>Invitation Token:</strong> <code>{inviteData.invitationToken.slice(0, 16)}...</code></p>
+                          )}
+                          <p style={{ marginTop: '16px', color: '#666', fontSize: '12px' }}>
+                            By accepting, you will join the team and have access to team resources.
+                          </p>
+                        </div>
+                      );
+                    } else {
+                      // PROJECT_INVITE
+                      return (
+                        <div style={{ lineHeight: '1.8' }}>
+                          <p><strong>Project:</strong> {inviteData.projectName}</p>
+                          <p><strong>Invited by:</strong> {inviteData.inviterName} ({inviteData.inviterEmail})</p>
+                          {inviteData.pmMessage && (
+                            <p><strong>Message:</strong> {inviteData.pmMessage}</p>
+                          )}
+                        </div>
+                      );
+                    }
+                  } catch {
+                    return <p>{activeInvite.message}</p>;
+                  }
+                })()}
+              </>
+            )}
+          </div>
+        </Modal>
+      )}
     </Layout>
   );
 }

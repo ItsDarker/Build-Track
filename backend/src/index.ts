@@ -15,6 +15,8 @@ import { prisma } from "./config/prisma";
 import moduleRecordsRoutes from './routes/moduleRecords.routes';
 import lookupRoutes from './routes/lookup.routes';
 import attachmentRoutes from './routes/attachment.routes';
+import notificationRoutes from './routes/notification.routes';
+import projectInvitationRoutes from './routes/project-invitations.routes';
 
 
 const app = express();
@@ -62,12 +64,14 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/cms', cmsRoutes);
 app.use('/api/clients', clientRoutes);
 app.use('/api/projects', projectRoutes);
+app.use('/api/projects', projectInvitationRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/teams', teamRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/modules', moduleRecordsRoutes);
 app.use('/api/lookups', lookupRoutes);
 app.use('/api/attachments', attachmentRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 
 // Error handler

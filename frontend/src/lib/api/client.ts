@@ -534,6 +534,105 @@ class ApiClient {
   async deleteTask(taskId: string) {
     return this.request(`/backend-api/tasks/${taskId}`, { method: 'DELETE' });
   }
+
+  // User search for project invitations
+  async searchUsers(emailPrefix: string, projectId?: string) {
+    const params = new URLSearchParams();
+    params.set('email', emailPrefix);
+    if (projectId) params.set('projectId', projectId);
+    return this.request(`/backend-api/teams/search-users?${params.toString()}`, { method: 'GET' });
+  }
+
+  async searchTeamUsers(emailPrefix: string) {
+    const params = new URLSearchParams();
+    params.set('email', emailPrefix);
+    return this.request(`/backend-api/teams/search-users?${params.toString()}`, { method: 'GET' });
+  }
+
+  // Project invitations
+  async getProjectInvitations(projectId: string, status?: string) {
+    const url = status
+      ? `/backend-api/projects/${projectId}/invitations?status=${status}`
+      : `/backend-api/projects/${projectId}/invitations`;
+    return this.request(url, { method: 'GET' });
+  }
+
+  async sendProjectInvitation(projectId: string, data: { inviteeId: string; message?: string }) {
+    return this.request(`/backend-api/projects/${projectId}/invitations`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteProjectInvitation(projectId: string, invitationId: string) {
+    return this.request(`/backend-api/projects/${projectId}/invitations/${invitationId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async resendProjectInvitation(projectId: string, invitationId: string) {
+    return this.request(`/backend-api/projects/${projectId}/invitations/${invitationId}/resend`, {
+      method: 'POST',
+    });
+  }
+
+  // User notifications
+  async getUserNotifications(params?: { unreadOnly?: boolean; limit?: number }) {
+    const searchParams = new URLSearchParams();
+    if (params?.unreadOnly) searchParams.set('unreadOnly', 'true');
+    if (params?.limit) searchParams.set('limit', params.limit.toString());
+    return this.request(`/backend-api/notifications?${searchParams.toString()}`, { method: 'GET' });
+  }
+
+  async markUserNotificationRead(notificationId: string) {
+    return this.request(`/backend-api/notifications/${notificationId}/read`, { method: 'PUT' });
+  }
+
+  async markAllUserNotificationsRead() {
+    return this.request('/backend-api/notifications/read-all', { method: 'PUT' });
+  }
+
+  async acceptProjectInvite(notificationId: string) {
+    return this.request(`/backend-api/notifications/${notificationId}/accept-invite`, {
+      method: 'POST',
+    });
+  }
+
+  async declineProjectInvite(notificationId: string) {
+    return this.request(`/backend-api/notifications/${notificationId}/decline-invite`, {
+      method: 'POST',
+    });
+  }
+
+  // Team invitations (user side)
+  async acceptTeamInvite(notificationId: string) {
+    return this.request(`/backend-api/teams/accept-invite/${notificationId}`, {
+      method: 'POST',
+    });
+  }
+
+  async declineTeamInvite(notificationId: string) {
+    return this.request(`/backend-api/teams/decline-invite/${notificationId}`, {
+      method: 'POST',
+    });
+  }
+
+  // Team invitations (sender side - view/resend/revoke)
+  async getSentTeamInvitations() {
+    return this.request('/backend-api/teams/invitations', { method: 'GET' });
+  }
+
+  async resendTeamInvitation(invitationId: string) {
+    return this.request(`/backend-api/teams/invitations/${invitationId}/resend`, {
+      method: 'POST',
+    });
+  }
+
+  async revokeTeamInvitation(invitationId: string) {
+    return this.request(`/backend-api/teams/invitations/${invitationId}`, {
+      method: 'DELETE',
+    });
+  }
 }
 
 export const apiClient = new ApiClient(API_URL);

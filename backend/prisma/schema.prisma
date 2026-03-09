@@ -42,6 +42,11 @@ model User {
   createdModuleRecords ModuleRecord[]      @relation("ModuleRecordCreatedBy")
   updatedModuleRecords ModuleRecord[]      @relation("ModuleRecordUpdatedBy")
   attachments          Attachment[]
+  sentInvitations      ProjectInvitation[] @relation("SentInvitations")
+  receivedInvitations  ProjectInvitation[] @relation("ReceivedInvitations")
+  notifications        Notification[]
+  projectMemberships   ProjectMember[]
+  teamInvitations      Invitation[]
 
   @@map("users")
 }
@@ -253,6 +258,8 @@ model Project {
   assignedTo         User?     @relation("ProjectAssignee", fields: [assignedToId], references: [id])
   tasks              Task[]
   attachments        Attachment[]
+  invitations        ProjectInvitation[]
+  members            ProjectMember[]
 
   @@map("projects")
 }
@@ -295,6 +302,8 @@ model Invitation {
   expiresAt DateTime @map("expires_at")
   createdAt DateTime @default(now()) @map("created_at")
   status    String   @default("PENDING")
+  userId    String?  @map("user_id")
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("invitations")
 }
@@ -302,7 +311,7 @@ model Invitation {
 model Lookup {
   id         String   @id @default(cuid())
   moduleSlug String?  @map("module_slug")
-  category   String   
+  category   String
   value      String
   label      String?
   order      Int      @default(0)
@@ -312,4 +321,59 @@ model Lookup {
 
   @@unique([moduleSlug, category, value])
   @@map("lookups")
+}
+
+model ProjectInvitation {
+  id           String    @id @default(cuid())
+  projectId    String    @map("project_id")
+  inviterId    String    @map("inviter_id")
+  inviteeId    String    @map("invitee_id")
+  status       String    @default("PENDING")
+  message      String?
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  project      Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  inviter      User      @relation("SentInvitations", fields: [inviterId], references: [id])
+  invitee      User      @relation("ReceivedInvitations", fields: [inviteeId], references: [id])
+  notification Notification?
+
+  @@unique([projectId, inviteeId])
+  @@index([inviterId])
+  @@index([inviteeId])
+  @@map("project_invitations")
+}
+
+model Notification {
+  id           String             @id @default(cuid())
+  userId       String             @map("user_id")
+  type         String
+  title        String
+  message      String
+  read         Boolean            @default(false)
+  data         String?
+  invitationId String?            @unique @map("invitation_id")
+  createdAt    DateTime           @default(now()) @map("created_at")
+
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invitation   ProjectInvitation? @relation(fields: [invitationId], references: [id], onDelete: SetNull)
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
+  @@map("notifications")
+}
+
+model ProjectMember {
+  id        String   @id @default(cuid())
+  projectId String   @map("project_id")
+  userId    String   @map("user_id")
+  joinedAt  DateTime @default(now()) @map("joined_at")
+
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([projectId])
+  @@index([userId])
+  @@map("project_members")
 }

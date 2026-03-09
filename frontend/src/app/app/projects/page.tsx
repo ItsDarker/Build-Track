@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Table, Button, Card, Tag, Space, Modal, Form, Input, Select, DatePicker, App, Upload, List } from "antd";
-import { PlusOutlined, EditOutlined, DeleteOutlined, DownloadOutlined, UserAddOutlined, PlayCircleOutlined, CloseCircleOutlined, CheckCircleOutlined, UndoOutlined, FolderOpenOutlined, InboxOutlined } from "@ant-design/icons";
+import { Table, Button, Card, Tag, Space, Modal, Form, Input, Select, DatePicker, App, Upload, List, AutoComplete } from "antd";
+import { PlusOutlined, EditOutlined, DeleteOutlined, DownloadOutlined, UserAddOutlined, PlayCircleOutlined, CloseCircleOutlined, CheckCircleOutlined, UndoOutlined, FolderOpenOutlined, InboxOutlined, TeamOutlined } from "@ant-design/icons";
+import { getAllModules } from "@/config/buildtrack.config";
 import { apiClient } from "@/lib/api/client";
 import { downloadExcel } from "@/lib/downloadExcel";
 import dayjs from "dayjs";
@@ -49,6 +50,16 @@ export default function ProjectsPage() {
     // Project Files modal states
     const [filesModalOpen, setFilesModalOpen] = useState(false);
     const [filesProject, setFilesProject] = useState<any>(null);
+
+    // Team Invitations modal states
+    const [inviteModalOpen, setInviteModalOpen] = useState(false);
+    const [inviteProject, setInviteProject] = useState<any>(null);
+    const [projectInvitations, setProjectInvitations] = useState<any[]>([]);
+    const [inviteLoading, setInviteLoading] = useState(false);
+    const [emailSearch, setEmailSearch] = useState('');
+    const [userSuggestions, setUserSuggestions] = useState<any[]>([]);
+    const [selectedInviteeId, setSelectedInviteeId] = useState<string | null>(null);
+    const [inviteMessage, setInviteMessage] = useState('');
 
     useEffect(() => {
         fetchProjects();
@@ -99,7 +110,10 @@ export default function ProjectsPage() {
         setDetailsModalOpen(true);
         setDetailsLoading(true);
         const result = await apiClient.getProject(record.id);
-        if (result.data) {
+        if (result.error) {
+            message.error(result.error);
+            setDetailsModalOpen(false);
+        } else if (result.data) {
             setDetailsProject((result.data as any).project);
         }
         setDetailsLoading(false);
@@ -213,6 +227,94 @@ export default function ProjectsPage() {
         });
     };
 
+    const openInviteManager = async (project: any) => {
+        setInviteProject(project);
+        setProjectInvitations([]);
+        setEmailSearch('');
+        setSelectedInviteeId(null);
+        setInviteMessage('');
+        setUserSuggestions([]);
+        setInviteModalOpen(true);
+
+        // Fetch existing invitations
+        const result = await apiClient.getProjectInvitations(project.id);
+        if (result.data) {
+            setProjectInvitations((result.data as any).invitations || []);
+        }
+    };
+
+    const handleEmailSearch = async (value: string) => {
+        setEmailSearch(value);
+        if (value.length < 2) {
+            setUserSuggestions([]);
+            return;
+        }
+
+        const result = await apiClient.searchUsers(value, inviteProject?.id);
+        if (result.data) {
+            const users = (result.data as any).users || [];
+            setUserSuggestions(users.map((u: any) => ({
+                label: `${u.name || u.email} (${u.email})`,
+                value: u.id,
+                user: u
+            })));
+        }
+    };
+
+    const handleSendInvite = async () => {
+        if (!selectedInviteeId) {
+            message.error('Please select a user');
+            return;
+        }
+
+        setInviteLoading(true);
+        const result = await apiClient.sendProjectInvitation(inviteProject.id, {
+            inviteeId: selectedInviteeId,
+            message: inviteMessage || undefined
+        });
+
+        if (result.error) {
+            message.error(result.error);
+        } else {
+            message.success('Invitation sent');
+            setEmailSearch('');
+            setSelectedInviteeId(null);
+            setInviteMessage('');
+            setUserSuggestions([]);
+
+            // Refresh invitations list
+            const refreshResult = await apiClient.getProjectInvitations(inviteProject.id);
+            if (refreshResult.data) {
+                setProjectInvitations((refreshResult.data as any).invitations || []);
+            }
+        }
+        setInviteLoading(false);
+    };
+
+    const handleDeleteInvite = async (inviteId: string) => {
+        const result = await apiClient.deleteProjectInvitation(inviteProject.id, inviteId);
+        if (result.error) {
+            message.error(result.error);
+        } else {
+            message.success('Invitation deleted');
+            setProjectInvitations(prev => prev.filter(i => i.id !== inviteId));
+        }
+    };
+
+    const handleResendInvite = async (inviteId: string) => {
+        const result = await apiClient.resendProjectInvitation(inviteProject.id, inviteId);
+        if (result.error) {
+            message.error(result.error);
+        } else {
+            message.success('Invitation resent');
+            // Refresh invitations list
+            const refreshResult = await apiClient.getProjectInvitations(inviteProject.id);
+            if (refreshResult.data) {
+                setProjectInvitations((refreshResult.data as any).invitations || []);
+            }
+        }
+    };
+
     const openModal = (project?: any) => {
         setEditingProject(project);
         if (project) {
@@ -321,6 +423,13 @@ export default function ProjectsPage() {
                         title="Project Files"
                         onClick={() => { setFilesProject(record); setFilesModalOpen(true); }}
                     />
+                    {['PROJECT_MANAGER', 'SUPER_ADMIN', 'ORG_ADMIN'].includes(currentUser?.role?.name) && (
+                        <Button
+                            icon={<TeamOutlined />}
+                            title="Team Invitations"
+                            onClick={() => openInviteManager(record)}
+                        />
+                    )}
                     <Button
                         icon={<UserAddOutlined />}
                         title="Assign"
@@ -660,46 +769,129 @@ export default function ProjectsPage() {
                 </Form>
             </Modal>
 
-            {/* Project Details Modal */}
-            <Modal
-                title="Project Details"
-                open={detailsModalOpen}
-                onCancel={() => setDetailsModalOpen(false)}
-                footer={null}
-                width={600}
-            >
-                {activeProject && (
-                    <div className="space-y-4">
-                        <div>
-                            <label className="font-semibold text-gray-700">Project Name</label>
-                            <p className="text-gray-600">{activeProject.name}</p>
-                        </div>
-                        <div>
-                            <label className="font-semibold text-gray-700">Status</label>
-                            <p className="mt-1">
-                                <Tag color={activeProject.status === 'CANCELLED' ? 'red' : activeProject.status === 'COMPLETED' ? 'green' : 'orange'}>
-                                    {activeProject.status.replace(/_/g, ' ')}
-                                </Tag>
-                            </p>
-                        </div>
-                        {activeProject.cancellationReason && (
-                            <div>
-                                <label className="font-semibold text-gray-700">Reason for Cancellation</label>
-                                <p className="text-gray-600 whitespace-pre-wrap">{activeProject.cancellationReason}</p>
+            {/* Team Invitations Modal */}
+            {inviteProject && (
+                <Modal
+                    title="Team Invitations"
+                    open={inviteModalOpen}
+                    onCancel={() => setInviteModalOpen(false)}
+                    footer={null}
+                    width={640}
+                >
+                    <div className="space-y-6">
+                        {/* Send New Invitation Section */}
+                        <div className="border rounded-lg p-4 bg-gray-50">
+                            <h3 className="font-semibold text-gray-900 mb-3">Send New Invitation</h3>
+                            <div className="space-y-3">
+                                <Form layout="vertical">
+                                    <Form.Item label="Search Users" className="mb-2">
+                                        <AutoComplete
+                                            value={emailSearch}
+                                            options={userSuggestions}
+                                            onSearch={handleEmailSearch}
+                                            onChange={(value: string) => {
+                                                setEmailSearch(value);
+                                                const selected = userSuggestions.find(s => s.value === value);
+                                                setSelectedInviteeId(selected ? value : null);
+                                            }}
+                                            placeholder="Start typing email or name..."
+                                            notFoundContent={emailSearch.length < 2 ? "Type at least 2 characters" : "No users found"}
+                                        />
+                                    </Form.Item>
+                                    <Form.Item label="Optional Message" className="mb-0">
+                                        <Input.TextArea
+                                            rows={2}
+                                            placeholder="Add a personal message..."
+                                            value={inviteMessage}
+                                            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setInviteMessage(e.target.value)}
+                                        />
+                                    </Form.Item>
+                                </Form>
+                                <Button
+                                    type="primary"
+                                    loading={inviteLoading}
+                                    disabled={!selectedInviteeId}
+                                    onClick={handleSendInvite}
+                                    block
+                                >
+                                    Send Invitation
+                                </Button>
                             </div>
-                        )}
-                        {activeProject.completionNote && (
-                            <div>
-                                <label className="font-semibold text-gray-700">Completion Note</label>
-                                <p className="text-gray-600 whitespace-pre-wrap">{activeProject.completionNote}</p>
-                            </div>
-                        )}
-                        <div className="flex justify-end gap-2 mt-6">
-                            <Button onClick={() => setDetailsModalOpen(false)}>Close</Button>
+                        </div>
+
+                        {/* Sent Invitations Section */}
+                        <div>
+                            <h3 className="font-semibold text-gray-900 mb-3">Sent Invitations</h3>
+                            {projectInvitations.length === 0 ? (
+                                <div className="text-center text-gray-500 py-6">
+                                    No invitations sent yet
+                                </div>
+                            ) : (
+                                <Table
+                                    columns={[
+                                        {
+                                            title: "User",
+                                            key: "user",
+                                            render: (_: any, record: any) => (
+                                                <div>
+                                                    <div className="font-medium">{record.invitee?.name || record.invitee?.email}</div>
+                                                    <div className="text-xs text-gray-500">{record.invitee?.email}</div>
+                                                </div>
+                                            )
+                                        },
+                                        {
+                                            title: "Status",
+                                            dataIndex: "status",
+                                            key: "status",
+                                            render: (status: string) => {
+                                                const colors: Record<string, string> = {
+                                                    PENDING: "orange",
+                                                    ACCEPTED: "green",
+                                                    DECLINED: "red"
+                                                };
+                                                return <Tag color={colors[status]}>{status}</Tag>;
+                                            }
+                                        },
+                                        {
+                                            title: "Sent",
+                                            dataIndex: "createdAt",
+                                            key: "createdAt",
+                                            render: (date: string) => new Date(date).toLocaleDateString()
+                                        },
+                                        {
+                                            title: "Actions",
+                                            key: "actions",
+                                            render: (_: any, record: any) => (
+                                                <Space>
+                                                    {record.status === 'PENDING' && (
+                                                        <Button
+                                                            size="small"
+                                                            onClick={() => handleResendInvite(record.id)}
+                                                        >
+                                                            Resend
+                                                        </Button>
+                                                    )}
+                                                    <Button
+                                                        size="small"
+                                                        danger
+                                                        onClick={() => handleDeleteInvite(record.id)}
+                                                    >
+                                                        Delete
+                                                    </Button>
+                                                </Space>
+                                            )
+                                        }
+                                    ]}
+                                    dataSource={projectInvitations}
+                                    rowKey="id"
+                                    pagination={false}
+                                    size="small"
+                                />
+                            )}
                         </div>
                     </div>
-                )}
-            </Modal>
+                </Modal>
+            )}
         </div>
     );
 }
