@@ -1,20 +1,30 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Table, Tag, Button, Modal, List, Select, App } from "antd";
-import { EyeOutlined } from "@ant-design/icons";
+import { Table, Tag, Button, Modal, List, Select, App, Form, Input, Space } from "antd";
+import { EyeOutlined, EditOutlined, DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import { apiClient } from "@/lib/api/client";
+import { useUser } from "@/lib/context/UserContext";
+import { canWriteModule } from "@/config/rbac";
 
 const LEAD_STATUSES = ["New", "Contacted", "Qualified", "Closed"];
 const TASK_STATUSES = ["New", "In Progress", "Completed"];
 
 export default function LeadsPage() {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
+  const { role } = useUser();
+  const hasWriteAccess = canWriteModule(role.name, "crm-leads");
+  const [form] = Form.useForm();
   const [records, setRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [detailsProject, setDetailsProject] = useState<any>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
+  const [formModalOpen, setFormModalOpen] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<any>(null);
+  const [clients, setClients] = useState<any[]>([]);
+  const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [viewRecord, setViewRecord] = useState<any>(null);
 
   const fetchRecords = async () => {
     setLoading(true);
@@ -32,8 +42,16 @@ export default function LeadsPage() {
     setLoading(false);
   };
 
+  const fetchClients = async () => {
+    const result = await apiClient.getClients();
+    if (result.data) {
+      setClients((result.data as any).clients);
+    }
+  };
+
   useEffect(() => {
     fetchRecords();
+    fetchClients();
   }, []);
 
   const openProjectDetails = async (projectId: string) => {
@@ -45,6 +63,11 @@ export default function LeadsPage() {
       setDetailsProject((result.data as any).project);
     }
     setDetailsLoading(false);
+  };
+
+  const openViewModal = (record: any) => {
+    setViewRecord(record);
+    setViewModalOpen(true);
   };
 
   const handleStatusChange = async (record: any, field: string, value: string) => {
@@ -67,6 +90,75 @@ export default function LeadsPage() {
     }
   };
 
+  const openModal = (record?: any) => {
+    setEditingRecord(record);
+    if (record) {
+      form.setFieldsValue(record.data || {});
+    } else {
+      form.resetFields();
+    }
+    setFormModalOpen(true);
+  };
+
+  const handleSave = async (values: any) => {
+    try {
+      if (editingRecord) {
+        const res = await fetch(`/backend-api/modules/crm-leads/records/${editingRecord.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(values),
+        });
+        if (res.ok) {
+          message.success("Lead updated");
+          fetchRecords();
+          setFormModalOpen(false);
+        } else {
+          message.error("Failed to update lead");
+        }
+      } else {
+        const res = await fetch("/backend-api/modules/crm-leads/records", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(values),
+        });
+        if (res.ok) {
+          message.success("Lead created");
+          fetchRecords();
+          setFormModalOpen(false);
+        } else {
+          message.error("Failed to create lead");
+        }
+      }
+    } catch (e) {
+      message.error("Error saving lead");
+    }
+  };
+
+  const handleDelete = (id: string) => {
+    modal.confirm({
+      title: "Delete Lead",
+      content: "Are you sure you want to delete this lead?",
+      onOk: async () => {
+        try {
+          const res = await fetch(`/backend-api/modules/crm-leads/records/${id}`, {
+            method: "DELETE",
+            credentials: "include",
+          });
+          if (res.ok) {
+            message.success("Lead deleted");
+            fetchRecords();
+          } else {
+            message.error("Failed to delete lead");
+          }
+        } catch (e) {
+          message.error("Error deleting lead");
+        }
+      }
+    });
+  };
+
   const taskStatusColors: Record<string, string> = {
     New: "default",
     "In Progress": "orange",
@@ -86,11 +178,10 @@ export default function LeadsPage() {
       key: "leadId",
       render: (_: any, record: any) => {
         const leadId = record.data?.["Lead ID"] || record.id.slice(-6).toUpperCase();
-        const projectId = record.data?._projectId;
         return (
           <span
             className="text-blue-500 underline cursor-pointer"
-            onClick={() => openProjectDetails(projectId)}
+            onClick={() => openViewModal(record)}
           >
             {leadId}
           </span>
@@ -151,11 +242,28 @@ export default function LeadsPage() {
       title: "Actions",
       key: "actions",
       render: (_: any, record: any) => (
-        <Button
-          size="small"
-          icon={<EyeOutlined />}
-          onClick={() => openProjectDetails(record.data?._projectId)}
-        />
+        <Space>
+          <Button
+            size="small"
+            icon={<EyeOutlined />}
+            onClick={() => openViewModal(record)}
+          />
+          {hasWriteAccess && (
+            <Button
+              size="small"
+              icon={<EditOutlined />}
+              onClick={() => openModal(record)}
+            />
+          )}
+          {hasWriteAccess && (
+            <Button
+              size="small"
+              icon={<DeleteOutlined />}
+              danger
+              onClick={() => handleDelete(record.id)}
+            />
+          )}
+        </Space>
       ),
     },
   ];
@@ -164,6 +272,15 @@ export default function LeadsPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">CRM / Leads</h1>
+        {hasWriteAccess && (
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => openModal()}
+          >
+            Create New Lead
+          </Button>
+        )}
       </div>
 
       <Table
@@ -234,6 +351,98 @@ export default function LeadsPage() {
               ) : (
                 <div className="text-gray-400 text-sm">No tasks yet.</div>
               )}
+            </div>
+          </div>
+        ) : null}
+      </Modal>
+
+      {/* Create/Edit Lead Modal */}
+      <Modal
+        title={editingRecord ? "Edit Lead" : "Create New Lead"}
+        open={formModalOpen}
+        onCancel={() => setFormModalOpen(false)}
+        footer={null}
+        width={600}
+      >
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleSave}
+          className="mt-4"
+        >
+          <Form.Item
+            name="Lead ID"
+            label="Lead ID"
+            rules={[{ required: true, message: "Lead ID is required" }]}
+          >
+            <Input placeholder="e.g., LD-001" />
+          </Form.Item>
+          <Form.Item
+            name="Customer Name (text)"
+            label="Customer Name"
+            rules={[{ required: true, message: "Customer name is required" }]}
+          >
+            <Select
+              showSearch
+              optionFilterProp="label"
+              placeholder="Search and select a client"
+              options={clients.map(c => ({ value: c.name, label: c.name }))}
+            />
+          </Form.Item>
+          <Form.Item
+            name="Lead Status (New, Contacted, Qualified, Closed)"
+            label="Lead Status"
+            initialValue="New"
+          >
+            <Select
+              options={LEAD_STATUSES.map(s => ({ value: s, label: s }))}
+            />
+          </Form.Item>
+          <Form.Item
+            name="Task Status (New, In Progress, Completed)"
+            label="Task Status"
+            initialValue="New"
+          >
+            <Select
+              options={TASK_STATUSES.map(s => ({ value: s, label: s }))}
+            />
+          </Form.Item>
+          <Form.Item
+            name="Project Name / Reference"
+            label="Project Name / Reference"
+          >
+            <Input placeholder="Enter project reference" />
+          </Form.Item>
+          <div className="flex justify-end gap-2">
+            <Button onClick={() => setFormModalOpen(false)}>Cancel</Button>
+            <Button type="primary" htmlType="submit">
+              {editingRecord ? "Update" : "Create"}
+            </Button>
+          </div>
+        </Form>
+      </Modal>
+
+      {/* View Lead Details Modal */}
+      <Modal
+        title="Lead Details"
+        open={viewModalOpen}
+        onCancel={() => { setViewModalOpen(false); setViewRecord(null); }}
+        footer={null}
+        width={700}
+      >
+        {viewRecord ? (
+          <div className="space-y-4 mt-4">
+            <div className="grid grid-cols-2 gap-4">
+              {Object.entries(viewRecord.data || {}).map(([key, value]: [string, any]) => {
+                // Skip empty values
+                if (!value) return null;
+                return (
+                  <div key={key}>
+                    <div className="text-xs text-gray-500 mb-1">{key}</div>
+                    <div className="font-medium text-sm">{String(value)}</div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         ) : null}

@@ -1,33 +1,33 @@
 import { Router, Response, NextFunction } from "express";
 import multer from "multer";
-import path from "path";
-import fs from "fs";
 import { authenticate, AuthRequest } from "../middleware/auth";
 import { RBACRequest } from "../middleware/rbac";
 import { prisma } from "../config/prisma";
+import { config } from "../config/env";
+import {
+  uploadFileToDrive,
+  getFileStream,
+  getFileContent,
+  deleteFileFromDrive,
+  getFileMetadata,
+  initializeGoogleDrive,
+} from "../services/googleDrive";
 
 const router = Router();
 
-// Configure multer storage with file size limits
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        const uploadDir = path.join(process.cwd(), "uploads");
-        if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir, { recursive: true });
-        }
-        cb(null, uploadDir);
-    },
-    filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-        cb(null, uniqueSuffix + path.extname(file.originalname));
-    },
-});
+// Configure multer for memory storage (files will be uploaded to Google Drive)
+const storage = multer.memoryStorage();
 
 const upload = multer({
     storage,
     limits: {
         fileSize: 50 * 1024 * 1024 // 50MB max
     }
+});
+
+// Initialize Google Drive on startup
+initializeGoogleDrive().catch(err => {
+    console.error('Failed to initialize Google Drive:', err);
 });
 
 /**
@@ -86,7 +86,7 @@ const enrichUser = async (req: RBACRequest, res: Response, next: NextFunction) =
 /**
  * POST /api/attachments/upload
  * Upload files and link to moduleRecord, project, or task
- * Accessible to authenticated users with read/write access to the module
+ * Files are uploaded to Google Drive and stored in database with Drive file IDs
  */
 router.post(
     "/upload",
@@ -118,21 +118,39 @@ router.post(
                 }
             }
 
+            // Check if Google Drive is enabled
+            if (!config.googleDrive.enabled) {
+                return res.status(503).json({ error: "File upload service is not available" });
+            }
+
             const attachments = await Promise.all(
-                uploadedFiles.map((file) =>
-                    prisma.attachment.create({
-                        data: {
-                            filename: file.originalname,
-                            path: file.filename,
-                            mimeType: file.mimetype,
-                            size: file.size,
-                            moduleRecordId: moduleRecordId || null,
-                            projectId: projectId || null,
-                            taskId: taskId || null,
-                            uploadedById: enrichedUser.userId,
-                        },
-                    })
-                )
+                uploadedFiles.map(async (file) => {
+                    try {
+                        // Upload to Google Drive
+                        const { fileId } = await uploadFileToDrive(
+                            file.buffer, // Buffer will be converted to stream by googleDrive service
+                            file.originalname,
+                            file.mimetype
+                        );
+
+                        // Store in database with Drive file ID instead of local path
+                        return await prisma.attachment.create({
+                            data: {
+                                filename: file.originalname,
+                                path: fileId, // Store Google Drive file ID
+                                mimeType: file.mimetype,
+                                size: file.size,
+                                moduleRecordId: moduleRecordId || null,
+                                projectId: projectId || null,
+                                taskId: taskId || null,
+                                uploadedById: enrichedUser.userId,
+                            },
+                        });
+                    } catch (err) {
+                        console.error(`Failed to upload file ${file.originalname}:`, err);
+                        throw err;
+                    }
+                })
             );
 
             res.status(201).json({
@@ -146,15 +164,6 @@ router.post(
             });
         } catch (err) {
             console.error("Upload error:", err);
-            // Clean up uploaded files on error
-            if (req.files) {
-                (req.files as Express.Multer.File[]).forEach(file => {
-                    const filePath = path.join(process.cwd(), "uploads", file.filename);
-                    if (fs.existsSync(filePath)) {
-                        fs.unlinkSync(filePath);
-                    }
-                });
-            }
             res.status(500).json({ error: "Failed to upload files" });
         }
     }
@@ -206,6 +215,7 @@ router.get(
 /**
  * GET /api/attachments/view/:id
  * View attachment (stream for previewing, not downloading)
+ * Retrieves file from Google Drive
  */
 router.get(
     "/view/:id",
@@ -222,17 +232,19 @@ router.get(
                 return res.status(404).json({ error: "Attachment not found" });
             }
 
-            const filePath = path.join(process.cwd(), "uploads", attachment.path);
-            if (!fs.existsSync(filePath)) {
-                return res.status(404).json({ error: "File not found on disk" });
+            if (!config.googleDrive.enabled) {
+                return res.status(503).json({ error: "File service is not available" });
             }
+
+            // Get file stream from Google Drive (path contains Drive file ID)
+            const fileStream = await getFileStream(attachment.path);
 
             // For viewing, set inline content disposition (for images/pdfs)
             res.setHeader("Content-Disposition", `inline; filename="${attachment.filename}"`);
             res.setHeader("Content-Type", attachment.mimeType);
             res.setHeader("Cache-Control", "public, max-age=3600");
 
-            fs.createReadStream(filePath).pipe(res);
+            fileStream.pipe(res);
         } catch (err) {
             console.error("View error:", err);
             res.status(500).json({ error: "Failed to view file" });
@@ -243,6 +255,7 @@ router.get(
 /**
  * GET /api/attachments/download/:id
  * Download attachment (forced download)
+ * Retrieves file from Google Drive
  */
 router.get(
     "/download/:id",
@@ -259,14 +272,16 @@ router.get(
                 return res.status(404).json({ error: "Attachment not found" });
             }
 
-            const filePath = path.join(process.cwd(), "uploads", attachment.path);
-            if (!fs.existsSync(filePath)) {
-                return res.status(404).json({ error: "File not found on disk" });
+            if (!config.googleDrive.enabled) {
+                return res.status(503).json({ error: "File service is not available" });
             }
+
+            // Get file stream from Google Drive (path contains Drive file ID)
+            const fileStream = await getFileStream(attachment.path);
 
             res.setHeader("Content-Disposition", `attachment; filename="${attachment.filename}"`);
             res.setHeader("Content-Type", attachment.mimeType);
-            fs.createReadStream(filePath).pipe(res);
+            fileStream.pipe(res);
         } catch (err) {
             console.error("Download error:", err);
             res.status(500).json({ error: "Failed to download file" });
@@ -277,6 +292,7 @@ router.get(
 /**
  * DELETE /api/attachments/:id
  * Delete an attachment (only uploader or admin can delete)
+ * Deletes file from Google Drive and database
  */
 router.delete(
     "/:id",
@@ -300,14 +316,18 @@ router.delete(
                 return res.status(403).json({ error: "Cannot delete attachment uploaded by another user" });
             }
 
+            // Delete from Google Drive if enabled
+            if (config.googleDrive.enabled) {
+                try {
+                    await deleteFileFromDrive(attachment.path);
+                } catch (err) {
+                    console.warn(`Failed to delete file from Google Drive: ${attachment.path}`, err);
+                    // Continue with DB deletion even if Drive deletion fails
+                }
+            }
+
             // Delete from DB
             await prisma.attachment.delete({ where: { id } });
-
-            // Delete from disk
-            const filePath = path.join(process.cwd(), "uploads", attachment.path);
-            if (fs.existsSync(filePath)) {
-                fs.unlinkSync(filePath);
-            }
 
             res.status(204).send();
         } catch (err) {

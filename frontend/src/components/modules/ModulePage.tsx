@@ -24,6 +24,7 @@ import { ShieldCheck } from "lucide-react";
 import { downloadExcel } from "@/lib/downloadExcel";
 import { useUser } from "@/lib/context/UserContext";
 import {
+  canAccessModule,
   canWriteModule,
   MODULE_ACCESS,
   REVERSE_ROLE_MAP,
@@ -88,7 +89,7 @@ function findIdFields(fields: string[]): string[] {
 }
 
 /** Generates an ID value based on module name and a timestamp */
-function generateId(moduleName: string): string {
+function generateId(moduleName: string, index: number = 0): string {
   const prefix = moduleName
     .split(/[\s\/]+/)
     .map((w) => w[0])
@@ -96,9 +97,10 @@ function generateId(moduleName: string): string {
     .toUpperCase()
     .slice(0, 3);
 
-  // Use timestamp-based suffix for uniqueness
+  // Use timestamp-based suffix for uniqueness, with index offset to ensure uniqueness when multiple IDs are generated
   const timestamp = Date.now().toString().slice(-6);
-  return `${prefix}-${timestamp}`;
+  const suffix = index > 0 ? `${timestamp}${index}` : timestamp;
+  return `${prefix}-${suffix}`;
 }
 
 /** Detects Status fields */
@@ -287,6 +289,7 @@ export function ModulePage({ module }: ModulePageProps) {
   const router = useRouter();
   const { modal } = App.useApp();
   const { role } = useUser();
+  const hasReadAccess = canAccessModule(role.name, module.slug);
   const hasWriteAccess = canWriteModule(role.name, module.slug);
   const [records, setRecords] = useState<Record<string, any>[]>([]);
   const [loading, setLoading] = useState(false);
@@ -310,6 +313,12 @@ export function ModulePage({ module }: ModulePageProps) {
 
     (async () => {
       try {
+        // Check if user has read access before fetching
+        if (!hasReadAccess) {
+          if (!cancelled) setRecords([]);
+          return;
+        }
+
         setLoading(true);
         const res = await fetch(`/backend-api/modules/${module.slug}/records`, {
           credentials: "include"
@@ -339,7 +348,7 @@ export function ModulePage({ module }: ModulePageProps) {
     return () => {
       cancelled = true;
     };
-  }, [module.slug]);
+  }, [module.slug, hasReadAccess]);
 
   // Fetch assignable users for the Assign action (optional feature)
   useEffect(() => {
@@ -623,10 +632,10 @@ export function ModulePage({ module }: ModulePageProps) {
       const initialValues: Record<string, string> = {};
       // Auto-populate in create mode
       if (mode === "create") {
-        // Auto-populate ID fields
+        // Auto-populate ID fields with index offset to ensure uniqueness
         const idFields = findIdFields(module.fields);
-        idFields.forEach((field) => {
-          initialValues[field] = generateId(module.name);
+        idFields.forEach((field, index) => {
+          initialValues[field] = generateId(module.name, index);
         });
 
         // Auto-populate Status fields with their default value
@@ -945,6 +954,19 @@ export function ModulePage({ module }: ModulePageProps) {
       })
     ),
   ];
+
+  // Check if user has access to this module
+  if (!hasReadAccess) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center py-12">
+          <h1 className="text-2xl font-bold text-slate-900">{module.name}</h1>
+          <p className="text-red-600 mt-4">Access Denied</p>
+          <p className="text-gray-500 mt-2">You don't have permission to view this module.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

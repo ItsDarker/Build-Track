@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Table, Button, Card, Tag, Space, Modal, Form, Input, Select, DatePicker, App, Upload, List, AutoComplete } from "antd";
+import { Table, Button, Card, Tag, Space, Modal, Form, Input, Select, DatePicker, App, Upload, List, AutoComplete, Tabs } from "antd";
 import { PlusOutlined, EditOutlined, DeleteOutlined, DownloadOutlined, UserAddOutlined, PlayCircleOutlined, CloseCircleOutlined, CheckCircleOutlined, UndoOutlined, FolderOpenOutlined, InboxOutlined, TeamOutlined } from "@ant-design/icons";
 import { getAllModules } from "@/config/buildtrack.config";
 import { apiClient } from "@/lib/api/client";
@@ -33,33 +33,21 @@ export default function ProjectsPage() {
     const [currentUser, setCurrentUser] = useState<any>(null);
     const [form] = Form.useForm();
 
-    // Action modal states
-    const [assignModalOpen, setAssignModalOpen] = useState(false);
-    const [startModalOpen, setStartModalOpen] = useState(false);
-    const [cancelModalOpen, setCancelModalOpen] = useState(false);
-    const [closeModalOpen, setCloseModalOpen] = useState(false);
-    const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+    // Action modal states (now inside edit modal)
     const [activeProject, setActiveProject] = useState<any>(null);
     const [assignForm] = Form.useForm();
     const [startForm] = Form.useForm();
     const [cancelForm] = Form.useForm();
     const [closeForm] = Form.useForm();
-    const [detailsProject, setDetailsProject] = useState<any>(null);
-    const [detailsLoading, setDetailsLoading] = useState(false);
 
-    // Project Files modal states
-    const [filesModalOpen, setFilesModalOpen] = useState(false);
-    const [filesProject, setFilesProject] = useState<any>(null);
-
-    // Team Invitations modal states
-    const [inviteModalOpen, setInviteModalOpen] = useState(false);
-    const [inviteProject, setInviteProject] = useState<any>(null);
+    // Team Invitations modal states (now inside edit modal)
     const [projectInvitations, setProjectInvitations] = useState<any[]>([]);
     const [inviteLoading, setInviteLoading] = useState(false);
     const [emailSearch, setEmailSearch] = useState('');
     const [userSuggestions, setUserSuggestions] = useState<any[]>([]);
     const [selectedInviteeId, setSelectedInviteeId] = useState<string | null>(null);
     const [inviteMessage, setInviteMessage] = useState('');
+    const [editModalTab, setEditModalTab] = useState('details');
 
     useEffect(() => {
         fetchProjects();
@@ -86,7 +74,7 @@ export default function ProjectsPage() {
     };
 
     const fetchManagers = async () => {
-        const result = await apiClient.getAssignableUsers('PROJECT_MANAGER,SUPER_ADMIN,ORG_ADMIN');
+        const result = await apiClient.getAssignableUsers('PROJECT_MANAGER');
         if (result.data) {
             setManagers((result.data as any).users);
         }
@@ -106,18 +94,6 @@ export default function ProjectsPage() {
         }
     };
 
-    const openDetailsModal = async (record: any) => {
-        setDetailsModalOpen(true);
-        setDetailsLoading(true);
-        const result = await apiClient.getProject(record.id);
-        if (result.error) {
-            message.error(result.error);
-            setDetailsModalOpen(false);
-        } else if (result.data) {
-            setDetailsProject((result.data as any).project);
-        }
-        setDetailsLoading(false);
-    };
 
     const handleSave = async (values: any) => {
         const payload = {
@@ -170,7 +146,6 @@ export default function ProjectsPage() {
         } else {
             message.success("Project assigned");
             fetchProjects();
-            setAssignModalOpen(false);
             assignForm.resetFields();
         }
     };
@@ -182,7 +157,6 @@ export default function ProjectsPage() {
         } else {
             message.success("Project started and task created");
             fetchProjects();
-            setStartModalOpen(false);
             startForm.resetFields();
         }
     };
@@ -194,7 +168,6 @@ export default function ProjectsPage() {
         } else {
             message.success("Project cancelled");
             fetchProjects();
-            setCancelModalOpen(false);
             cancelForm.resetFields();
         }
     };
@@ -206,7 +179,6 @@ export default function ProjectsPage() {
         } else {
             message.success("Project closed");
             fetchProjects();
-            setCloseModalOpen(false);
             closeForm.resetFields();
         }
     };
@@ -227,21 +199,6 @@ export default function ProjectsPage() {
         });
     };
 
-    const openInviteManager = async (project: any) => {
-        setInviteProject(project);
-        setProjectInvitations([]);
-        setEmailSearch('');
-        setSelectedInviteeId(null);
-        setInviteMessage('');
-        setUserSuggestions([]);
-        setInviteModalOpen(true);
-
-        // Fetch existing invitations
-        const result = await apiClient.getProjectInvitations(project.id);
-        if (result.data) {
-            setProjectInvitations((result.data as any).invitations || []);
-        }
-    };
 
     const handleEmailSearch = async (value: string) => {
         setEmailSearch(value);
@@ -250,7 +207,7 @@ export default function ProjectsPage() {
             return;
         }
 
-        const result = await apiClient.searchUsers(value, inviteProject?.id);
+        const result = await apiClient.searchUsers(value, activeProject?.id);
         if (result.data) {
             const users = (result.data as any).users || [];
             setUserSuggestions(users.map((u: any) => ({
@@ -268,7 +225,7 @@ export default function ProjectsPage() {
         }
 
         setInviteLoading(true);
-        const result = await apiClient.sendProjectInvitation(inviteProject.id, {
+        const result = await apiClient.sendProjectInvitation(activeProject.id, {
             inviteeId: selectedInviteeId,
             message: inviteMessage || undefined
         });
@@ -283,7 +240,7 @@ export default function ProjectsPage() {
             setUserSuggestions([]);
 
             // Refresh invitations list
-            const refreshResult = await apiClient.getProjectInvitations(inviteProject.id);
+            const refreshResult = await apiClient.getProjectInvitations(activeProject.id);
             if (refreshResult.data) {
                 setProjectInvitations((refreshResult.data as any).invitations || []);
             }
@@ -292,7 +249,7 @@ export default function ProjectsPage() {
     };
 
     const handleDeleteInvite = async (inviteId: string) => {
-        const result = await apiClient.deleteProjectInvitation(inviteProject.id, inviteId);
+        const result = await apiClient.deleteProjectInvitation(activeProject.id, inviteId);
         if (result.error) {
             message.error(result.error);
         } else {
@@ -302,33 +259,43 @@ export default function ProjectsPage() {
     };
 
     const handleResendInvite = async (inviteId: string) => {
-        const result = await apiClient.resendProjectInvitation(inviteProject.id, inviteId);
+        const result = await apiClient.resendProjectInvitation(activeProject.id, inviteId);
         if (result.error) {
             message.error(result.error);
         } else {
             message.success('Invitation resent');
             // Refresh invitations list
-            const refreshResult = await apiClient.getProjectInvitations(inviteProject.id);
+            const refreshResult = await apiClient.getProjectInvitations(activeProject.id);
             if (refreshResult.data) {
                 setProjectInvitations((refreshResult.data as any).invitations || []);
             }
         }
     };
 
-    const openModal = (project?: any) => {
+    const openModal = async (project?: any) => {
         setEditingProject(project);
+        setEditModalTab('details');
+        setActiveProject(project);
+
         if (project) {
             form.setFieldsValue({
                 ...project,
                 startDate: project.startDate ? dayjs(project.startDate) : undefined,
                 endDate: project.endDate ? dayjs(project.endDate) : undefined,
             });
+
+            // Fetch invitations if editing
+            const invResult = await apiClient.getProjectInvitations(project.id);
+            if (invResult.data) {
+                setProjectInvitations((invResult.data as any).invitations || []);
+            }
         } else {
             form.resetFields();
             // Auto-populate Project ID in create mode with a placeholder
             form.setFieldsValue({
                 code: generateProjectId("PRJ"),
             });
+            setProjectInvitations([]);
         }
         setIsModalOpen(true);
     };
@@ -359,7 +326,7 @@ export default function ProjectsPage() {
             render: (text: string, record: any) => (
                 <div
                     className="cursor-pointer hover:text-blue-600"
-                    onClick={() => openDetailsModal(record)}
+                    onClick={() => openModal(record)}
                 >
                     <div className="font-medium text-blue-500 underline">{text}</div>
                     <div className="text-xs text-gray-500">{record.code}</div>
@@ -407,69 +374,9 @@ export default function ProjectsPage() {
             title: "Actions",
             key: "actions",
             render: (_: any, record: any) => (
-                <Space wrap>
+                <Space>
                     <Button icon={<EditOutlined />} onClick={() => openModal(record)} />
-                    {record.cancellationReason && (
-                        <Button
-                            title="View Cancellation Reason"
-                            onClick={() => { setActiveProject(record); setDetailsModalOpen(true); }}
-                        >
-                            Details
-                        </Button>
-                    )}
                     <Button icon={<DeleteOutlined />} danger onClick={() => handleDelete(record.id)} />
-                    <Button
-                        icon={<FolderOpenOutlined />}
-                        title="Project Files"
-                        onClick={() => { setFilesProject(record); setFilesModalOpen(true); }}
-                    />
-                    {['PROJECT_MANAGER', 'SUPER_ADMIN', 'ORG_ADMIN'].includes(currentUser?.role?.name) && (
-                        <Button
-                            icon={<TeamOutlined />}
-                            title="Team Invitations"
-                            onClick={() => openInviteManager(record)}
-                        />
-                    )}
-                    <Button
-                        icon={<UserAddOutlined />}
-                        title="Assign"
-                        onClick={() => { setActiveProject(record); assignForm.resetFields(); setAssignModalOpen(true); }}
-                    />
-                    {record.status !== 'CANCELLED' && record.status !== 'COMPLETED' && (
-                        <Button
-                            icon={<PlayCircleOutlined />}
-                            title="Start"
-                            style={{ color: '#52c41a', borderColor: '#52c41a' }}
-                            onClick={() => {
-                                setActiveProject(record);
-                                startForm.setFieldsValue({ taskTitle: 'CRM / Lead', assigneeId: currentUser?.id });
-                                setStartModalOpen(true);
-                            }}
-                        />
-                    )}
-                    {record.status !== 'CANCELLED' && record.status !== 'COMPLETED' && (
-                        <Button
-                            icon={<CloseCircleOutlined />}
-                            title="Cancel"
-                            style={{ color: '#ff4d4f', borderColor: '#ff4d4f' }}
-                            onClick={() => { setActiveProject(record); cancelForm.resetFields(); setCancelModalOpen(true); }}
-                        />
-                    )}
-                    {record.status !== 'CANCELLED' && record.status !== 'COMPLETED' && (
-                        <Button
-                            icon={<CheckCircleOutlined />}
-                            title="Close"
-                            style={{ color: '#1677ff', borderColor: '#1677ff' }}
-                            onClick={() => { setActiveProject(record); closeForm.resetFields(); setCloseModalOpen(true); }}
-                        />
-                    )}
-                    {record.status === 'CANCELLED' && (
-                        <Button
-                            icon={<UndoOutlined />}
-                            title="Restore"
-                            onClick={() => handleRestore(record)}
-                        />
-                    )}
                 </Space>
             ),
         },
@@ -517,381 +424,357 @@ export default function ProjectsPage() {
                 />
             </Card>
 
-            {/* Project Details Modal */}
-            <Modal
-                title="Project Details"
-                open={detailsModalOpen}
-                onCancel={() => { setDetailsModalOpen(false); setDetailsProject(null); }}
-                footer={null}
-                width={700}
-            >
-                {detailsLoading ? (
-                    <div className="text-center py-8 text-gray-400">Loading...</div>
-                ) : detailsProject ? (
-                    <div className="space-y-6">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <div className="text-xs text-gray-500 mb-1">Project Name</div>
-                                <div className="font-medium">{detailsProject.name}</div>
-                            </div>
-                            <div>
-                                <div className="text-xs text-gray-500 mb-1">Project Code</div>
-                                <div className="font-medium">{detailsProject.code || "-"}</div>
-                            </div>
-                            <div>
-                                <div className="text-xs text-gray-500 mb-1">Client</div>
-                                <div className="font-medium">{detailsProject.client?.name || "-"}</div>
-                            </div>
-                            <div>
-                                <div className="text-xs text-gray-500 mb-1">Project Manager</div>
-                                <div className="font-medium">{detailsProject.manager?.name || "-"}</div>
-                            </div>
-                            <div>
-                                <div className="text-xs text-gray-500 mb-1">Status</div>
-                                <Tag color={{
-                                    PLANNING: "blue",
-                                    IN_PROGRESS: "orange",
-                                    COMPLETED: "green",
-                                    ON_HOLD: "default",
-                                    CANCELLED: "red",
-                                }[detailsProject.status as string]}>
-                                    {detailsProject.status?.replace("_", " ")}
-                                </Tag>
-                            </div>
-                            <div>
-                                <div className="text-xs text-gray-500 mb-1">Description</div>
-                                <div className="font-medium">{detailsProject.description || "-"}</div>
-                            </div>
-                            <div>
-                                <div className="text-xs text-gray-500 mb-1">Target Start Date</div>
-                                <div className="font-medium">{detailsProject.startDate ? new Date(detailsProject.startDate).toLocaleDateString() : "-"}</div>
-                            </div>
-                            <div>
-                                <div className="text-xs text-gray-500 mb-1">Target End Date</div>
-                                <div className="font-medium">{detailsProject.endDate ? new Date(detailsProject.endDate).toLocaleDateString() : "-"}</div>
-                            </div>
-                        </div>
-
-                        <div>
-                            <div className="font-semibold mb-2">Tasks</div>
-                            {detailsProject.tasks && detailsProject.tasks.length > 0 ? (
-                                <List
-                                    bordered
-                                    dataSource={detailsProject.tasks}
-                                    renderItem={(task: any) => (
-                                        <List.Item>
-                                            <div className="flex justify-between w-full items-center">
-                                                <span>{task.title}</span>
-                                                <Tag color={taskStatusColors[task.status] || "default"}>
-                                                    {task.status?.replace("_", " ")}
-                                                </Tag>
-                                            </div>
-                                        </List.Item>
-                                    )}
-                                />
-                            ) : (
-                                <div className="text-gray-400 text-sm">No tasks yet.</div>
-                            )}
-                        </div>
-                    </div>
-                ) : null}
-            </Modal>
-
-            {/* Project Files Modal */}
-            <Modal
-                title={`Project Files — ${filesProject?.name || ""}`}
-                open={filesModalOpen}
-                onCancel={() => { setFilesModalOpen(false); setFilesProject(null); }}
-                footer={null}
-                width={600}
-            >
-                <div className="space-y-4">
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center text-gray-400">
-                        <InboxOutlined style={{ fontSize: 40, marginBottom: 8 }} />
-                        <div className="text-base font-medium">File uploads coming soon</div>
-                        <div className="text-sm mt-1">This area will allow you to upload and manage files for this project.</div>
-                    </div>
-                    <div className="text-gray-400 text-sm text-center">No files uploaded yet.</div>
-                </div>
-            </Modal>
-
-            {/* Edit / New Project Modal */}
+            {/* Edit / New Project Modal with Tabs */}
             <Modal
                 title={editingProject ? "Edit Project" : "New Project"}
                 open={isModalOpen}
                 onCancel={() => setIsModalOpen(false)}
                 footer={null}
-                width={700}
+                width={900}
             >
-                <Form form={form} layout="vertical" onFinish={handleSave}>
-                    <div className="grid grid-cols-2 gap-4">
-                        <Form.Item name="name" label="Project Name" rules={[{ required: true }]}>
-                            <Input onChange={handleProjectNameChange} />
-                        </Form.Item>
-                        <Form.Item
-                          name="code"
-                          label="Project ID"
-                          tooltip={editingProject ? "Project ID cannot be changed after creation" : "Auto-generated based on project name"}
-                        >
-                            <Input
-                              placeholder="Auto-generated"
-                              disabled={!!editingProject}
-                              className={editingProject ? "bg-gray-50" : ""}
-                            />
-                        </Form.Item>
-                    </div>
-                    <Form.Item name="description" label="Description">
-                        <Input.TextArea rows={3} />
-                    </Form.Item>
-                    <div className="grid grid-cols-2 gap-4">
-                        <Form.Item name="clientId" label="Client">
-                            <Select
-                                showSearch
-                                optionFilterProp="label"
-                                options={clients.map(c => ({ value: c.id, label: c.name }))}
-                            />
-                        </Form.Item>
-                        <Form.Item name="managerId" label="Project Manager">
-                            <Select
-                                showSearch
-                                optionFilterProp="label"
-                                options={managers.map(u => ({ value: u.id, label: u.name || u.email }))}
-                            />
-                        </Form.Item>
-                    </div>
-                    <div className="grid grid-cols-3 gap-4">
-                        <Form.Item name="status" label="Status" initialValue="PLANNING">
-                            <Select
-                                options={[
-                                    { value: "PLANNING", label: "Planning" },
-                                    { value: "IN_PROGRESS", label: "In Progress" },
-                                    { value: "ON_HOLD", label: "On Hold" },
-                                    { value: "COMPLETED", label: "Completed" },
-                                    { value: "CANCELLED", label: "Cancelled" },
-                                ]}
-                            />
-                        </Form.Item>
-                        <Form.Item name="startDate" label="Target Start Date">
-                            <DatePicker className="w-full" />
-                        </Form.Item>
-                        <Form.Item name="endDate" label="Target End Date">
-                            <DatePicker className="w-full" />
-                        </Form.Item>
-                    </div>
-                    <div className="flex justify-end gap-2 mt-4">
-                        <Button onClick={() => setIsModalOpen(false)}>Cancel</Button>
-                        <Button type="primary" htmlType="submit">Save</Button>
-                    </div>
-                </Form>
-            </Modal>
-
-            {/* Assign Modal */}
-            <Modal
-                title="Assign Project"
-                open={assignModalOpen}
-                onCancel={() => setAssignModalOpen(false)}
-                footer={null}
-            >
-                <Form form={assignForm} layout="vertical" onFinish={handleAssign}>
-                    <Form.Item name="assignedToId" label="Assign To" rules={[{ required: true, message: 'Please select a user' }]}>
-                        <Select
-                            showSearch
-                            optionFilterProp="label"
-                            options={assignableUsers.map(u => ({ value: u.id, label: u.name || u.email }))}
-                        />
-                    </Form.Item>
-                    <div className="flex justify-end gap-2 mt-4">
-                        <Button onClick={() => setAssignModalOpen(false)}>Cancel</Button>
-                        <Button type="primary" htmlType="submit">Assign</Button>
-                    </div>
-                </Form>
-            </Modal>
-
-            {/* Start Modal */}
-            <Modal
-                title="Start Project"
-                open={startModalOpen}
-                onCancel={() => setStartModalOpen(false)}
-                footer={null}
-            >
-                <Form form={startForm} layout="vertical" onFinish={handleStart}>
-                    <Form.Item name="taskTitle" label="First Task Title" rules={[{ required: true }]}>
-                        <Input />
-                    </Form.Item>
-                    <Form.Item name="assigneeId" label="Assign Task To" rules={[{ required: true, message: 'Please select an assignee' }]}>
-                        <Select
-                            showSearch
-                            optionFilterProp="label"
-                            options={assignableUsers.map(u => ({ value: u.id, label: u.name || u.email }))}
-                        />
-                    </Form.Item>
-                    <div className="flex justify-end gap-2 mt-4">
-                        <Button onClick={() => setStartModalOpen(false)}>Cancel</Button>
-                        <Button type="primary" htmlType="submit" style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}>Start Project</Button>
-                    </div>
-                </Form>
-            </Modal>
-
-            {/* Cancel Modal */}
-            <Modal
-                title="Cancel Project"
-                open={cancelModalOpen}
-                onCancel={() => setCancelModalOpen(false)}
-                footer={null}
-            >
-                <Form form={cancelForm} layout="vertical" onFinish={handleCancel}>
-                    <Form.Item name="cancellationReason" label="Reason for Cancellation" rules={[{ required: true, message: 'Please provide a reason' }]}>
-                        <Input.TextArea rows={3} />
-                    </Form.Item>
-                    <div className="flex justify-end gap-2 mt-4">
-                        <Button onClick={() => setCancelModalOpen(false)}>Back</Button>
-                        <Button danger htmlType="submit">Cancel Project</Button>
-                    </div>
-                </Form>
-            </Modal>
-
-            {/* Close Modal */}
-            <Modal
-                title="Close Project"
-                open={closeModalOpen}
-                onCancel={() => setCloseModalOpen(false)}
-                footer={null}
-            >
-                <Form form={closeForm} layout="vertical" onFinish={handleClose}>
-                    <p className="mb-4 text-gray-600">Are you sure you want to close this project?</p>
-                    <Form.Item name="completionNote" label="Completion Note (optional)">
-                        <Input.TextArea rows={3} />
-                    </Form.Item>
-                    <div className="flex justify-end gap-2 mt-4">
-                        <Button onClick={() => setCloseModalOpen(false)}>Back</Button>
-                        <Button type="primary" htmlType="submit">Close Project</Button>
-                    </div>
-                </Form>
-            </Modal>
-
-            {/* Team Invitations Modal */}
-            {inviteProject && (
-                <Modal
-                    title="Team Invitations"
-                    open={inviteModalOpen}
-                    onCancel={() => setInviteModalOpen(false)}
-                    footer={null}
-                    width={640}
-                >
-                    <div className="space-y-6">
-                        {/* Send New Invitation Section */}
-                        <div className="border rounded-lg p-4 bg-gray-50">
-                            <h3 className="font-semibold text-gray-900 mb-3">Send New Invitation</h3>
-                            <div className="space-y-3">
-                                <Form layout="vertical">
-                                    <Form.Item label="Search Users" className="mb-2">
-                                        <AutoComplete
-                                            value={emailSearch}
-                                            options={userSuggestions}
-                                            onSearch={handleEmailSearch}
-                                            onChange={(value: string) => {
-                                                setEmailSearch(value);
-                                                const selected = userSuggestions.find(s => s.value === value);
-                                                setSelectedInviteeId(selected ? value : null);
-                                            }}
-                                            placeholder="Start typing email or name..."
-                                            notFoundContent={emailSearch.length < 2 ? "Type at least 2 characters" : "No users found"}
-                                        />
-                                    </Form.Item>
-                                    <Form.Item label="Optional Message" className="mb-0">
-                                        <Input.TextArea
-                                            rows={2}
-                                            placeholder="Add a personal message..."
-                                            value={inviteMessage}
-                                            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setInviteMessage(e.target.value)}
-                                        />
-                                    </Form.Item>
-                                </Form>
-                                <Button
-                                    type="primary"
-                                    loading={inviteLoading}
-                                    disabled={!selectedInviteeId}
-                                    onClick={handleSendInvite}
-                                    block
-                                >
-                                    Send Invitation
-                                </Button>
-                            </div>
-                        </div>
-
-                        {/* Sent Invitations Section */}
-                        <div>
-                            <h3 className="font-semibold text-gray-900 mb-3">Sent Invitations</h3>
-                            {projectInvitations.length === 0 ? (
-                                <div className="text-center text-gray-500 py-6">
-                                    No invitations sent yet
-                                </div>
-                            ) : (
-                                <Table
-                                    columns={[
-                                        {
-                                            title: "User",
-                                            key: "user",
-                                            render: (_: any, record: any) => (
-                                                <div>
-                                                    <div className="font-medium">{record.invitee?.name || record.invitee?.email}</div>
-                                                    <div className="text-xs text-gray-500">{record.invitee?.email}</div>
-                                                </div>
-                                            )
-                                        },
-                                        {
-                                            title: "Status",
-                                            dataIndex: "status",
-                                            key: "status",
-                                            render: (status: string) => {
-                                                const colors: Record<string, string> = {
-                                                    PENDING: "orange",
-                                                    ACCEPTED: "green",
-                                                    DECLINED: "red"
-                                                };
-                                                return <Tag color={colors[status]}>{status}</Tag>;
-                                            }
-                                        },
-                                        {
-                                            title: "Sent",
-                                            dataIndex: "createdAt",
-                                            key: "createdAt",
-                                            render: (date: string) => new Date(date).toLocaleDateString()
-                                        },
-                                        {
-                                            title: "Actions",
-                                            key: "actions",
-                                            render: (_: any, record: any) => (
-                                                <Space>
-                                                    {record.status === 'PENDING' && (
-                                                        <Button
-                                                            size="small"
-                                                            onClick={() => handleResendInvite(record.id)}
-                                                        >
-                                                            Resend
-                                                        </Button>
-                                                    )}
-                                                    <Button
-                                                        size="small"
-                                                        danger
-                                                        onClick={() => handleDeleteInvite(record.id)}
-                                                    >
-                                                        Delete
-                                                    </Button>
-                                                </Space>
-                                            )
-                                        }
-                                    ]}
-                                    dataSource={projectInvitations}
-                                    rowKey="id"
-                                    pagination={false}
-                                    size="small"
+                {!editingProject ? (
+                    // Create mode - just show the form
+                    <Form form={form} layout="vertical" onFinish={handleSave}>
+                        <div className="grid grid-cols-2 gap-4">
+                            <Form.Item name="name" label="Project Name" rules={[{ required: true }]}>
+                                <Input onChange={handleProjectNameChange} />
+                            </Form.Item>
+                            <Form.Item
+                              name="code"
+                              label="Project ID"
+                              tooltip="Auto-generated based on project name"
+                            >
+                                <Input
+                                  placeholder="Auto-generated"
+                                  disabled={!!editingProject}
+                                  className={editingProject ? "bg-gray-50" : ""}
                                 />
-                            )}
+                            </Form.Item>
                         </div>
-                    </div>
-                </Modal>
-            )}
+                        <Form.Item name="description" label="Description">
+                            <Input.TextArea rows={3} />
+                        </Form.Item>
+                        <div className="grid grid-cols-2 gap-4">
+                            <Form.Item name="clientId" label="Client">
+                                <Select
+                                    showSearch
+                                    optionFilterProp="label"
+                                    options={clients.map(c => ({ value: c.id, label: c.name }))}
+                                />
+                            </Form.Item>
+                            <Form.Item name="managerId" label="Project Manager">
+                                <Select
+                                    showSearch
+                                    optionFilterProp="label"
+                                    options={managers.map(u => ({ value: u.id, label: u.name || u.email }))}
+                                />
+                            </Form.Item>
+                        </div>
+                        <div className="grid grid-cols-3 gap-4">
+                            <Form.Item name="status" label="Status" initialValue="PLANNING">
+                                <Select
+                                    options={[
+                                        { value: "PLANNING", label: "Planning" },
+                                        { value: "IN_PROGRESS", label: "In Progress" },
+                                        { value: "ON_HOLD", label: "On Hold" },
+                                        { value: "COMPLETED", label: "Completed" },
+                                        { value: "CANCELLED", label: "Cancelled" },
+                                    ]}
+                                />
+                            </Form.Item>
+                            <Form.Item name="startDate" label="Target Start Date">
+                                <DatePicker className="w-full" />
+                            </Form.Item>
+                            <Form.Item name="endDate" label="Target End Date">
+                                <DatePicker className="w-full" />
+                            </Form.Item>
+                        </div>
+                        <div className="flex justify-end gap-2 mt-4">
+                            <Button onClick={() => setIsModalOpen(false)}>Cancel</Button>
+                            <Button type="primary" htmlType="submit">Create</Button>
+                        </div>
+                    </Form>
+                ) : (
+                    // Edit mode - show tabs
+                    <Tabs activeKey={editModalTab} onChange={setEditModalTab}>
+                        {/* Details Tab */}
+                        <Tabs.TabPane tab="Details" key="details">
+                            <Form form={form} layout="vertical" onFinish={handleSave} className="mt-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <Form.Item name="name" label="Project Name" rules={[{ required: true }]}>
+                                        <Input onChange={handleProjectNameChange} />
+                                    </Form.Item>
+                                    <Form.Item
+                                      name="code"
+                                      label="Project ID"
+                                      tooltip="Project ID cannot be changed after creation"
+                                    >
+                                        <Input
+                                          placeholder="Auto-generated"
+                                          disabled={true}
+                                          className="bg-gray-50"
+                                        />
+                                    </Form.Item>
+                                </div>
+                                <Form.Item name="description" label="Description">
+                                    <Input.TextArea rows={3} />
+                                </Form.Item>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <Form.Item name="clientId" label="Client">
+                                        <Select
+                                            showSearch
+                                            optionFilterProp="label"
+                                            options={clients.map(c => ({ value: c.id, label: c.name }))}
+                                        />
+                                    </Form.Item>
+                                    <Form.Item name="managerId" label="Project Manager">
+                                        <Select
+                                            showSearch
+                                            optionFilterProp="label"
+                                            options={managers.map(u => ({ value: u.id, label: u.name || u.email }))}
+                                        />
+                                    </Form.Item>
+                                </div>
+                                <div className="grid grid-cols-3 gap-4">
+                                    <Form.Item name="status" label="Status">
+                                        <Select
+                                            options={[
+                                                { value: "PLANNING", label: "Planning" },
+                                                { value: "IN_PROGRESS", label: "In Progress" },
+                                                { value: "ON_HOLD", label: "On Hold" },
+                                                { value: "COMPLETED", label: "Completed" },
+                                                { value: "CANCELLED", label: "Cancelled" },
+                                            ]}
+                                        />
+                                    </Form.Item>
+                                    <Form.Item name="startDate" label="Target Start Date">
+                                        <DatePicker className="w-full" />
+                                    </Form.Item>
+                                    <Form.Item name="endDate" label="Target End Date">
+                                        <DatePicker className="w-full" />
+                                    </Form.Item>
+                                </div>
+                                <div className="flex justify-end gap-2 mt-4">
+                                    <Button onClick={() => setIsModalOpen(false)}>Cancel</Button>
+                                    <Button type="primary" htmlType="submit">Save</Button>
+                                </div>
+                            </Form>
+                        </Tabs.TabPane>
+
+                        {/* Project Files Tab */}
+                        <Tabs.TabPane tab="Files" key="files">
+                            <div className="space-y-4 mt-4">
+                                <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center text-gray-400">
+                                    <InboxOutlined style={{ fontSize: 40, marginBottom: 8 }} />
+                                    <div className="text-base font-medium">File uploads coming soon</div>
+                                    <div className="text-sm mt-1">This area will allow you to upload and manage files for this project.</div>
+                                </div>
+                                <div className="text-gray-400 text-sm text-center">No files uploaded yet.</div>
+                            </div>
+                        </Tabs.TabPane>
+
+                        {/* Team Invitations Tab */}
+                        {['PROJECT_MANAGER', 'SUPER_ADMIN', 'ORG_ADMIN'].includes(currentUser?.role?.name) && (
+                            <Tabs.TabPane tab="Team" key="invitations">
+                                <div className="space-y-6 mt-4">
+                                    {/* Send New Invitation Section */}
+                                    <div className="border rounded-lg p-4 bg-gray-50">
+                                        <h3 className="font-semibold text-gray-900 mb-3">Send New Invitation</h3>
+                                        <div className="space-y-3">
+                                            <Form layout="vertical">
+                                                <Form.Item label="Search Users" className="mb-2">
+                                                    <AutoComplete
+                                                        value={emailSearch}
+                                                        options={userSuggestions}
+                                                        onSearch={handleEmailSearch}
+                                                        onChange={(value: string) => {
+                                                            setEmailSearch(value);
+                                                            const selected = userSuggestions.find(s => s.value === value);
+                                                            setSelectedInviteeId(selected ? value : null);
+                                                        }}
+                                                        placeholder="Start typing email or name..."
+                                                        notFoundContent={emailSearch.length < 2 ? "Type at least 2 characters" : "No users found"}
+                                                    />
+                                                </Form.Item>
+                                                <Form.Item label="Optional Message" className="mb-0">
+                                                    <Input.TextArea
+                                                        rows={2}
+                                                        placeholder="Add a personal message..."
+                                                        value={inviteMessage}
+                                                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setInviteMessage(e.target.value)}
+                                                    />
+                                                </Form.Item>
+                                            </Form>
+                                            <Button
+                                                type="primary"
+                                                loading={inviteLoading}
+                                                disabled={!selectedInviteeId}
+                                                onClick={handleSendInvite}
+                                                block
+                                            >
+                                                Send Invitation
+                                            </Button>
+                                        </div>
+                                    </div>
+
+                                    {/* Sent Invitations Section */}
+                                    <div>
+                                        <h3 className="font-semibold text-gray-900 mb-3">Sent Invitations</h3>
+                                        {projectInvitations.length === 0 ? (
+                                            <div className="text-center text-gray-500 py-6">
+                                                No invitations sent yet
+                                            </div>
+                                        ) : (
+                                            <Table
+                                                columns={[
+                                                    {
+                                                        title: "User",
+                                                        key: "user",
+                                                        render: (_: any, record: any) => (
+                                                            <div>
+                                                                <div className="font-medium">{record.invitee?.name || record.invitee?.email}</div>
+                                                                <div className="text-xs text-gray-500">{record.invitee?.email}</div>
+                                                            </div>
+                                                        )
+                                                    },
+                                                    {
+                                                        title: "Status",
+                                                        dataIndex: "status",
+                                                        key: "status",
+                                                        render: (status: string) => {
+                                                            const colors: Record<string, string> = {
+                                                                PENDING: "orange",
+                                                                ACCEPTED: "green",
+                                                                DECLINED: "red"
+                                                            };
+                                                            return <Tag color={colors[status]}>{status}</Tag>;
+                                                        }
+                                                    },
+                                                    {
+                                                        title: "Sent",
+                                                        dataIndex: "createdAt",
+                                                        key: "createdAt",
+                                                        render: (date: string) => new Date(date).toLocaleDateString()
+                                                    },
+                                                    {
+                                                        title: "Actions",
+                                                        key: "actions",
+                                                        render: (_: any, record: any) => (
+                                                            <Space>
+                                                                {record.status === 'PENDING' && (
+                                                                    <Button
+                                                                        size="small"
+                                                                        onClick={() => handleResendInvite(record.id)}
+                                                                    >
+                                                                        Resend
+                                                                    </Button>
+                                                                )}
+                                                                <Button
+                                                                    size="small"
+                                                                    danger
+                                                                    onClick={() => handleDeleteInvite(record.id)}
+                                                                >
+                                                                    Delete
+                                                                </Button>
+                                                            </Space>
+                                                        )
+                                                    }
+                                                ]}
+                                                dataSource={projectInvitations}
+                                                rowKey="id"
+                                                pagination={false}
+                                                size="small"
+                                            />
+                                        )}
+                                    </div>
+                                </div>
+                            </Tabs.TabPane>
+                        )}
+
+                        {/* Actions Tab */}
+                        <Tabs.TabPane tab="Actions" key="actions">
+                            <div className="space-y-4 mt-4">
+                                {/* Assign */}
+                                <div className="border rounded-lg p-4">
+                                    <h3 className="font-semibold text-gray-900 mb-3">Assign Project</h3>
+                                    <Form form={assignForm} layout="vertical" onFinish={handleAssign}>
+                                        <Form.Item name="assignedToId" label="Assign To" rules={[{ required: true, message: 'Please select a user' }]}>
+                                            <Select
+                                                showSearch
+                                                optionFilterProp="label"
+                                                options={assignableUsers.map(u => ({ value: u.id, label: u.name || u.email }))}
+                                            />
+                                        </Form.Item>
+                                        <Button type="primary" htmlType="submit" block>Assign</Button>
+                                    </Form>
+                                </div>
+
+                                {/* Project Actions */}
+                                <div className="border rounded-lg p-4 space-y-3">
+                                    <h3 className="font-semibold text-gray-900">Project Status Actions</h3>
+
+                                    {editingProject?.status !== 'CANCELLED' && editingProject?.status !== 'COMPLETED' && (
+                                        <div>
+                                            <label className="block text-sm font-medium mb-2">Start Project</label>
+                                            <Form form={startForm} layout="vertical" onFinish={handleStart}>
+                                                <Form.Item name="taskTitle" label="First Task Title" rules={[{ required: true }]}>
+                                                    <Input />
+                                                </Form.Item>
+                                                <Form.Item name="assigneeId" label="Assign Task To" rules={[{ required: true, message: 'Please select an assignee' }]}>
+                                                    <Select
+                                                        showSearch
+                                                        optionFilterProp="label"
+                                                        options={assignableUsers.map(u => ({ value: u.id, label: u.name || u.email }))}
+                                                    />
+                                                </Form.Item>
+                                                <Button type="primary" htmlType="submit" style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }} block>Start Project</Button>
+                                            </Form>
+                                        </div>
+                                    )}
+
+                                    {editingProject?.status !== 'CANCELLED' && editingProject?.status !== 'COMPLETED' && (
+                                        <div>
+                                            <label className="block text-sm font-medium mb-2">Cancel Project</label>
+                                            <Form form={cancelForm} layout="vertical" onFinish={handleCancel}>
+                                                <Form.Item name="cancellationReason" label="Reason for Cancellation" rules={[{ required: true, message: 'Please provide a reason' }]}>
+                                                    <Input.TextArea rows={2} />
+                                                </Form.Item>
+                                                <Button danger htmlType="submit" block>Cancel Project</Button>
+                                            </Form>
+                                        </div>
+                                    )}
+
+                                    {editingProject?.status !== 'CANCELLED' && editingProject?.status !== 'COMPLETED' && (
+                                        <div>
+                                            <label className="block text-sm font-medium mb-2">Close Project</label>
+                                            <Form form={closeForm} layout="vertical" onFinish={handleClose}>
+                                                <Form.Item name="completionNote" label="Completion Note (optional)">
+                                                    <Input.TextArea rows={2} />
+                                                </Form.Item>
+                                                <Button type="primary" htmlType="submit" block>Close Project</Button>
+                                            </Form>
+                                        </div>
+                                    )}
+
+                                    {editingProject?.status === 'CANCELLED' && (
+                                        <Button icon={<UndoOutlined />} onClick={() => handleRestore(editingProject)} block>
+                                            Restore Project
+                                        </Button>
+                                    )}
+
+                                    {editingProject?.cancellationReason && (
+                                        <div className="bg-gray-50 p-3 rounded-lg border border-red-200">
+                                            <div className="text-sm font-semibold text-gray-900 mb-1">Cancellation Reason:</div>
+                                            <div className="text-sm text-gray-700">{editingProject.cancellationReason}</div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </Tabs.TabPane>
+                    </Tabs>
+                )}
+            </Modal>
+
         </div>
     );
 }

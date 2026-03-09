@@ -1,51 +1,21 @@
 "use client";
 
-import React, { useState } from "react";
-import { Calendar, Badge, Drawer, Tag } from "antd";
+import React, { useState, useEffect } from "react";
+import { Calendar, Badge, Drawer, Tag, Spin } from "antd";
 import type { Dayjs } from "dayjs";
 import dayjs from "dayjs";
 import { Button } from "@/components/ui/button";
 import { CalendarDays, Clock } from "lucide-react";
+import { getAllModules } from "@/config/buildtrack.config";
 
-// Mock scheduled items — TODO: replace with backend API data
-const mockScheduledItems: Record<
-  string,
-  Array<{ title: string; type: string; module: string; time?: string }>
-> = {
-  // Current month items
-  [dayjs().format("YYYY-MM-DD")]: [
-    { title: "Client consultation - Acme Corp", type: "meeting", module: "Project Requirements", time: "10:00 AM" },
-    { title: "WO-1001 Due: Kitchen cabinets", type: "deadline", module: "Work Orders", time: "5:00 PM" },
-  ],
-  [dayjs().add(1, "day").format("YYYY-MM-DD")]: [
-    { title: "Design review - Modern Office", type: "review", module: "Design Configurator", time: "2:00 PM" },
-  ],
-  [dayjs().add(3, "day").format("YYYY-MM-DD")]: [
-    { title: "Delivery: Home Pro Ltd bathroom set", type: "delivery", module: "Delivery & Installation", time: "9:00 AM" },
-    { title: "QC Inspection - Order #2045", type: "inspection", module: "Quality Control", time: "11:00 AM" },
-    { title: "Invoice due - BuildRight Inc", type: "billing", module: "Billing & Invoicing" },
-  ],
-  [dayjs().add(5, "day").format("YYYY-MM-DD")]: [
-    { title: "Production start: Custom shelving", type: "production", module: "Manufacturing", time: "8:00 AM" },
-  ],
-  [dayjs().add(7, "day").format("YYYY-MM-DD")]: [
-    { title: "Follow up lead: Urban Design Co", type: "lead", module: "CRM / Leads", time: "3:00 PM" },
-    { title: "Material delivery from supplier", type: "procurement", module: "Procurement", time: "10:00 AM" },
-  ],
-  [dayjs().add(10, "day").format("YYYY-MM-DD")]: [
-    { title: "Packaging job: Order #3022", type: "production", module: "Packaging" },
-    { title: "Final inspection before delivery", type: "inspection", module: "Quality Control", time: "1:00 PM" },
-  ],
-  [dayjs().add(14, "day").format("YYYY-MM-DD")]: [
-    { title: "Project closure meeting", type: "meeting", module: "Closure", time: "4:00 PM" },
-  ],
-  [dayjs().subtract(2, "day").format("YYYY-MM-DD")]: [
-    { title: "Quote sent: GreenBuild LLC", type: "quote", module: "Quoting & Contracts" },
-  ],
-  [dayjs().subtract(5, "day").format("YYYY-MM-DD")]: [
-    { title: "Approval pending - Design v3", type: "review", module: "Approval Workflow" },
-  ],
-};
+interface ScheduledItem {
+  title: string;
+  type: string;
+  module: string;
+  time?: string;
+  recordId: string;
+  moduleSlug: string;
+}
 
 const typeBadgeColor: Record<string, "success" | "processing" | "error" | "warning" | "default"> = {
   meeting: "processing",
@@ -58,15 +28,154 @@ const typeBadgeColor: Record<string, "success" | "processing" | "error" | "warni
   lead: "warning",
   procurement: "success",
   quote: "processing",
+  "site-visit": "processing",
+  "scheduled-start": "default",
+  "scheduled-end": "warning",
+  "target-delivery": "success",
+  "actual-start": "processing",
+  "actual-end": "success",
+  "expected-resolution": "warning",
+  "closure-date": "success",
+  "order-date": "default",
+  "quote-date": "processing",
+  "decision-date": "warning",
+  "assigned-date": "default",
 };
 
+// Date field keywords to detect date fields in modules
+const dateFieldKeywords = [
+  "date",
+  "due",
+  "deadline",
+  "delivery",
+  "scheduled",
+  "start",
+  "end",
+  "visit",
+  "resolution",
+  "closure",
+  "created",
+  "updated",
+];
+
+function isDateField(fieldName: string): boolean {
+  const lower = fieldName.toLowerCase();
+  return dateFieldKeywords.some((keyword) => lower.includes(keyword));
+}
+
+function parseDate(value: any): dayjs.Dayjs | null {
+  if (!value) return null;
+  try {
+    const parsed = dayjs(value);
+    if (parsed.isValid()) return parsed;
+  } catch {
+    // Ignore parsing errors
+  }
+  return null;
+}
+
+function inferEventType(fieldName: string): string {
+  const lower = fieldName.toLowerCase();
+  if (lower.includes("deadline") || lower.includes("due")) return "deadline";
+  if (lower.includes("delivery")) return "delivery";
+  if (lower.includes("inspection") || lower.includes("quality")) return "inspection";
+  if (lower.includes("production") || lower.includes("manufacturing")) return "production";
+  if (lower.includes("review") || lower.includes("approval")) return "review";
+  if (lower.includes("billing") || lower.includes("invoice")) return "billing";
+  if (lower.includes("procurement")) return "procurement";
+  if (lower.includes("quote")) return "quote";
+  if (lower.includes("visit")) return "site-visit";
+  if (lower.includes("scheduled")) return "scheduled-start";
+  if (lower.includes("start")) return "scheduled-start";
+  if (lower.includes("end")) return "scheduled-end";
+  if (lower.includes("resolution")) return "expected-resolution";
+  if (lower.includes("closure")) return "closure-date";
+  if (lower.includes("order")) return "order-date";
+  return "default";
+}
+
 export default function CalendarPage() {
+  const [scheduledItems, setScheduledItems] = useState<Record<string, ScheduledItem[]>>({});
+  const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<Dayjs | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const getItems = (date: Dayjs) => {
+  useEffect(() => {
+    const fetchAllModuleRecords = async () => {
+      try {
+        setLoading(true);
+        const modules = getAllModules();
+        const items: Record<string, ScheduledItem[]> = {};
+
+        // Fetch records from each module
+        for (const module of modules) {
+          try {
+            const res = await fetch(
+              `/backend-api/modules/${module.slug}/records`,
+              { credentials: "include" }
+            );
+
+            if (!res.ok) continue;
+
+            const data = await res.json();
+            const records = data.records || [];
+
+            // Extract date fields from each record
+            for (const record of records) {
+              const recordData = record.data || {};
+
+              // Look for date fields
+              for (const [fieldName, fieldValue] of Object.entries(recordData)) {
+                if (!isDateField(fieldName)) continue;
+
+                const parsedDate = parseDate(fieldValue);
+                if (!parsedDate) continue;
+
+                const dateKey = parsedDate.format("YYYY-MM-DD");
+                if (!items[dateKey]) items[dateKey] = [];
+
+                // Generate title from record data (look for ID or name fields)
+                let title = `${fieldName}`;
+                const idField = Object.entries(recordData).find(
+                  ([key]) => key.toLowerCase().includes("id") && key !== "_id"
+                );
+                const nameField = Object.entries(recordData).find(
+                  ([key]) => key.toLowerCase().includes("name") || key.toLowerCase().includes("title")
+                );
+
+                if (idField && idField[1]) {
+                  title = `${idField[1]} - ${fieldName}`;
+                } else if (nameField && nameField[1]) {
+                  title = `${nameField[1]} - ${fieldName}`;
+                }
+
+                items[dateKey].push({
+                  title,
+                  type: inferEventType(fieldName),
+                  module: module.name,
+                  recordId: record.id,
+                  moduleSlug: module.slug,
+                });
+              }
+            }
+          } catch (err) {
+            console.warn(`Failed to fetch ${module.slug} records:`, err);
+            // Continue with next module
+          }
+        }
+
+        setScheduledItems(items);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAllModuleRecords();
+  }, []);
+
+  const getItems = (date: Dayjs): ScheduledItem[] => {
     const key = date.format("YYYY-MM-DD");
-    return mockScheduledItems[key] || [];
+    return scheduledItems[key] || [];
   };
 
   const handleDateSelect = (date: Dayjs) => {
@@ -116,14 +225,26 @@ export default function CalendarPage() {
             View scheduled items across all modules.
           </p>
         </div>
+        {loading && (
+          <div className="flex items-center gap-2 text-gray-500">
+            <Spin size="small" />
+            <span className="text-sm">Loading calendar data...</span>
+          </div>
+        )}
       </div>
 
       {/* Calendar grid using AntD Calendar */}
       <div className="bg-white rounded-lg border p-4">
-        <Calendar
-          cellRender={cellRender}
-          onSelect={handleDateSelect}
-        />
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <Spin />
+          </div>
+        ) : (
+          <Calendar
+            cellRender={cellRender}
+            onSelect={handleDateSelect}
+          />
+        )}
       </div>
 
       {/* Scheduled items drawer */}

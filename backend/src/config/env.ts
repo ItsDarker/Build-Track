@@ -61,4 +61,14 @@ export const config = {
     secure: process.env.COOKIE_SECURE === 'true',
     sameSite: (process.env.COOKIE_SAME_SITE || 'lax') as 'strict' | 'lax' | 'none',
   },
+
+  // Google Drive
+  googleDrive: {
+    enabled: process.env.GOOGLE_DRIVE_ENABLED === 'true',
+    serviceAccountEmail: process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_EMAIL || '',
+    serviceAccountPrivateKeyId: process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_PRIVATE_KEY_ID || '',
+    serviceAccountPrivateKey: process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, '\n') || '',
+    serviceAccountProjectId: process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_PROJECT_ID || '',
+    uploadsFolderId: process.env.GOOGLE_DRIVE_UPLOADS_FOLDER_ID || '',
+  },
 } as const;

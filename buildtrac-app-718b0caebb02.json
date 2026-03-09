@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "buildtrac-app",
+  "private_key_id": "718b0caebb028bf2cda4109d7a5069b4a08350a6",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCo4x1stQIyJV/i\nUUwjV5hJEGHZIPCMssE2y4Njx6l7ZoslBrLm2oix0EPViZoztkKs3o5atch7+smz\nJZ0abDLQb2iN2E7g3nENhpYGVC9v7gjk1PmTwuMG2+7CTdcjLDKMZ85d7gDYiINa\ny5HzTgiAMrFJMtcAP5rE6t372Cuk3fbieIlDEeeqzGKj0DepBFGPn8cdr7ZUEVKU\nPhRsNQSCw0jYxSkuB3BfC76kqUUM3cgOnMfQ1q+gxQKAIw+7oPOKDPY0X8+IyNoe\nFBOt5Lt1w74VTbelxTrWWdC3Fn7Oj4+D/xe4t1jk48U33m9Sp5WQOx82/hTkfEX+\nbcSiXjnnAgMBAAECggEABsDCEfEw68ljypxek4EypSVDDFgNVkrlf+fmUoyOwdDp\nWmsopyNw2M9Pjw/H+y5b/yaNAaKIKDDwdLnZzM8rvvrdbuKJ0OMEGTra79jY5rxZ\nXbEIY7iktEcCBoHvSsg/Iy8ZaNcV8JKQ0gYWyWhC3cFpJliikS955ErR4nqT0C1B\nS4OiMwo8N6ehSTr3C+sOXPfHbZ5Zz4hlHaQ1CKt0qzRG1apiSnafhT/KNc75Bxvk\nOeAVqETEk8Wo/o3MfwzpwShiyj3BZTk4NnaDB1Ubj9YYT7q/G+8VHZ5GOyRWm7Jx\n1Q2V5MZbn6qecTdwTeaOrnCpUzLVPbbGXKTBOJp+IQKBgQDQvgegRVyCAKBeX7Ff\n7GopYG8LxKW1yLTtJtU3XuOl566TjBqGVrux08qUGrM6LCQFrEcw8PWeuvvHxSFk\nLJNUWvxWkeZ3jqrJulCcp0uSVNDBSFE1Fz/JfH2cfMNmRjpPt2pYvtycFzqixjRv\nUFG1yp3d7tW18Pjg3RheGkodRwKBgQDPHzi3flNWuozVodSrAWpoRHkhl3xCTU6O\n8U9l1PN0hZgZY8xLhRjZRmaV/V2P+WaK3pE6CIaq8+2X6DV9j5lv5PPPS6u9L+8h\nLL3Mt1t6m9RYy1HoblyzXubqeqXEXjkP+r+KPIERG8o9w8kD1bQ8Yi4Ocn3OzZuE\ncr91JnbOYQKBgApM9k9gXNpFcaR2kGgtYGe+THyGLa80wkjZm7fpxM4RCrpZNY3f\nhc+Wpe59Cs8aEoT9JV4y5cv5aidHgQhScsq82qri9D5+GctumD/CuaX07YA8M1Wt\nWgZ1UDWCqpnHaWU5pdPPR0+kjc4ufbPogL+5yeSDvqQFyiI+hs9N+M5NAoGALaEt\nN4+HAKZcfHwIhBvtu0bKgNIEt/6b/fW/jimZ8OO1nHJWAZUy4jsWQpjs0dkZ9CIQ\nUH6sXGEcyMiJcD4AiZwg8lwzW5yBzAc1UTJb3ukRoPY590DI/2M68BFRD6/KVnDh\nXazyqjg7F9xYHpYn/N2MU/Z5LOQzDLzS3RY6OkECgYEAozNf7IAzGXRPBmlWb2Gp\nX8g721ydm+/wo6yO6F8WCoVdoz7tIzwReJNL56lAP+u7krnRrbydABxL8darcbjL\n1/GiRWQaUdAuIcjAwx6ou8QKAIKzvKxVgpXhz5JybOM4HOF1Q6MIOvP7Kn20wT8A\nmq5dxNf/kSlYKRzXBI3NT/w=\n-----END PRIVATE KEY-----\n",
+  "client_email": "buildtrack-file-service@buildtrac-app.iam.gserviceaccount.com",
+  "client_id": "117497640784131731703",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/buildtrack-file-service%40buildtrac-app.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}
