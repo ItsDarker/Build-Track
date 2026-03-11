@@ -54,6 +54,11 @@ router.post('/login', rateLimiter('login'), async (req, res) => {
     const ip = req.ip || 'unknown';
     const result = await authService.login(data, ip);
 
+    // Determine refresh token expiration based on rememberMe
+    const refreshTokenMaxAge = data.rememberMe
+      ? 15 * 24 * 60 * 60 * 1000  // 15 days if "Remember Me" is checked
+      : 7 * 24 * 60 * 60 * 1000;  // 7 days default
+
     // Set cookies
     res.cookie('accessToken', result.accessToken, {
       httpOnly: true,
@@ -67,7 +72,7 @@ router.post('/login', rateLimiter('login'), async (req, res) => {
       httpOnly: true,
       secure: config.cookie.secure,
       sameSite: config.cookie.sameSite,
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      maxAge: refreshTokenMaxAge,
       domain: config.cookie.domain === 'localhost' ? undefined : config.cookie.domain,
     });
 
