@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Table, Button, Card, Tag, Space, Modal, Form, Input, Select, DatePicker, App, Upload, List, AutoComplete, Tabs } from "antd";
-import { PlusOutlined, EditOutlined, DeleteOutlined, DownloadOutlined, UserAddOutlined, PlayCircleOutlined, CloseCircleOutlined, CheckCircleOutlined, UndoOutlined, FolderOpenOutlined, InboxOutlined, TeamOutlined } from "@ant-design/icons";
+import { Table, Button, Card, Tag, Space, Modal, Form, Input, Select, DatePicker, App, Upload, List, AutoComplete, Tabs, Segmented } from "antd";
+import { PlusOutlined, EditOutlined, DeleteOutlined, DownloadOutlined, UserAddOutlined, PlayCircleOutlined, CloseCircleOutlined, CheckCircleOutlined, UndoOutlined, FolderOpenOutlined, InboxOutlined, TeamOutlined, UnorderedListOutlined, AppstoreOutlined } from "@ant-design/icons";
 import { getAllModules } from "@/config/buildtrack.config";
 import { apiClient } from "@/lib/api/client";
 import { downloadExcel } from "@/lib/downloadExcel";
+import KanbanBoardBase, { Card as KanbanCard, Column as KanbanColumn } from "@/components/kanban/KanbanBoardBase";
+import { PROJECT_KANBAN_CONFIG } from "@/components/kanban/moduleKanbanConfig";
 import dayjs from "dayjs";
 
 /** Generate a Project ID based on project name and timestamp */
@@ -32,6 +34,12 @@ export default function ProjectsPage() {
     const [assignableUsers, setAssignableUsers] = useState<any[]>([]);
     const [currentUser, setCurrentUser] = useState<any>(null);
     const [form] = Form.useForm();
+    const [viewMode, setViewMode] = useState<"table" | "kanban">(() => {
+      if (typeof window !== "undefined") {
+        return (localStorage.getItem("bt_view_projects") as "table" | "kanban") || "table";
+      }
+      return "table";
+    });
 
     // Action modal states (now inside edit modal)
     const [activeProject, setActiveProject] = useState<any>(null);
@@ -56,6 +64,22 @@ export default function ProjectsPage() {
         fetchAssignableUsers();
         fetchCurrentUser();
     }, []);
+
+    // Defer form field population until modal is open and Form is rendered
+    useEffect(() => {
+        if (isModalOpen && editingProject) {
+            form.setFieldsValue({
+                ...editingProject,
+                startDate: editingProject.startDate ? dayjs(editingProject.startDate) : undefined,
+                endDate: editingProject.endDate ? dayjs(editingProject.endDate) : undefined,
+            });
+        } else if (isModalOpen && !editingProject) {
+            form.resetFields();
+            form.setFieldsValue({
+                code: generateProjectId("PRJ"),
+            });
+        }
+    }, [isModalOpen, editingProject, form]);
 
     const fetchProjects = async () => {
         setLoading(true);
@@ -278,23 +302,12 @@ export default function ProjectsPage() {
         setActiveProject(project);
 
         if (project) {
-            form.setFieldsValue({
-                ...project,
-                startDate: project.startDate ? dayjs(project.startDate) : undefined,
-                endDate: project.endDate ? dayjs(project.endDate) : undefined,
-            });
-
             // Fetch invitations if editing
             const invResult = await apiClient.getProjectInvitations(project.id);
             if (invResult.data) {
                 setProjectInvitations((invResult.data as any).invitations || []);
             }
         } else {
-            form.resetFields();
-            // Auto-populate Project ID in create mode with a placeholder
-            form.setFieldsValue({
-                code: generateProjectId("PRJ"),
-            });
             setProjectInvitations([]);
         }
         setIsModalOpen(true);
@@ -307,6 +320,44 @@ export default function ProjectsPage() {
             form.setFieldsValue({
                 code: generateProjectId(projectName),
             });
+        }
+    };
+
+    const handleProjectStatusChange = async (projectId: string, newStatus: string): Promise<boolean> => {
+        try {
+            // Find the current project
+            const currentProject = projects.find((p) => p.id === projectId);
+            if (!currentProject) throw new Error("Project not found");
+
+            // Update project with new status - only send fields the backend expects
+            const result = await apiClient.updateProject(projectId, {
+                name: currentProject.name,
+                code: currentProject.code,
+                description: currentProject.description,
+                clientId: currentProject.clientId,
+                managerId: currentProject.managerId,
+                status: newStatus,
+                startDate: currentProject.startDate,
+                endDate: currentProject.endDate,
+            });
+
+            if (result.data) {
+                setProjects((prev) =>
+                    prev.map((p) =>
+                        p.id === projectId ? { ...p, status: newStatus } : p
+                    )
+                );
+                modal.success({
+                    title: "Status Updated",
+                    content: `Project status changed to ${newStatus}`,
+                });
+                return true;
+            }
+            return false;
+        } catch (e) {
+            console.error("Status update failed:", e);
+            modal.error({ title: "Update failed", content: String(e) });
+            return false;
         }
     };
 
@@ -387,6 +438,18 @@ export default function ProjectsPage() {
             <div className="flex justify-between items-center">
                 <h1 className="text-2xl font-bold">Projects</h1>
                 <Space>
+                    <Segmented
+                        value={viewMode}
+                        onChange={(v: string | number) => {
+                            const newMode = v as "table" | "kanban";
+                            setViewMode(newMode);
+                            localStorage.setItem("bt_view_projects", newMode);
+                        }}
+                        options={[
+                            { value: "table", icon: <UnorderedListOutlined /> },
+                            { value: "kanban", icon: <AppstoreOutlined /> },
+                        ]}
+                    />
                     <Button
                         icon={<DownloadOutlined />}
                         onClick={() => {
@@ -414,15 +477,40 @@ export default function ProjectsPage() {
                 </Space>
             </div>
 
-            <Card>
-                <Table
-                    columns={columns}
-                    dataSource={projects}
-                    rowKey="id"
-                    loading={loading}
-                    pagination={{ pageSize: 10 }}
-                />
-            </Card>
+            {viewMode === "kanban" ? (
+                <Card>
+                    <KanbanBoardBase
+                        columns={PROJECT_KANBAN_CONFIG.columns as KanbanColumn[]}
+                        initialCards={projects.map((p) => ({
+                            id: p.id,
+                            title: p.name || p.code || p.id,
+                            status: p.status,
+                            tags: [
+                                p.client?.name,
+                                p.manager?.name,
+                                p.startDate ? new Date(p.startDate).toLocaleDateString() : null,
+                            ].filter(Boolean) as string[],
+                        })) as KanbanCard[]}
+                        onCardMove={handleProjectStatusChange}
+                        onCardClick={(card) => {
+                            const project = projects.find((p) => p.id === card.id);
+                            if (project) openModal(project);
+                        }}
+                        isLoading={loading}
+                        emptyColumnMessage="No projects"
+                    />
+                </Card>
+            ) : (
+                <Card>
+                    <Table
+                        columns={columns}
+                        dataSource={projects}
+                        rowKey="id"
+                        loading={loading}
+                        pagination={{ pageSize: 10 }}
+                    />
+                </Card>
+            )}
 
             {/* Edit / New Project Modal with Tabs */}
             <Modal

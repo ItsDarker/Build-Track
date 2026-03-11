@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Table, Tag, Button, Modal, List, Select, App, Form, Input, Space } from "antd";
-import { EyeOutlined, EditOutlined, DeleteOutlined, PlusOutlined } from "@ant-design/icons";
+import { Table, Tag, Button, Modal, List, Select, App, Form, Input, Space, Segmented } from "antd";
+import { EyeOutlined, EditOutlined, DeleteOutlined, PlusOutlined, UnorderedListOutlined, AppstoreOutlined } from "@ant-design/icons";
 import { apiClient } from "@/lib/api/client";
 import { useUser } from "@/lib/context/UserContext";
 import { canWriteModule } from "@/config/rbac";
+import KanbanBoardBase, { Card as KanbanCard, Column as KanbanColumn } from "@/components/kanban/KanbanBoardBase";
+import { MODULE_KANBAN_CONFIGS } from "@/components/kanban/moduleKanbanConfig";
 
 const LEAD_STATUSES = ["New", "Contacted", "Qualified", "Closed"];
 const TASK_STATUSES = ["New", "In Progress", "Completed"];
@@ -25,6 +27,12 @@ export default function LeadsPage() {
   const [clients, setClients] = useState<any[]>([]);
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [viewRecord, setViewRecord] = useState<any>(null);
+  const [viewMode, setViewMode] = useState<"table" | "kanban">(() => {
+    if (typeof window !== "undefined") {
+      return (localStorage.getItem("bt_view_crm-leads") as "table" | "kanban") || "table";
+    }
+    return "table";
+  });
 
   const fetchRecords = async () => {
     setLoading(true);
@@ -87,6 +95,40 @@ export default function LeadsPage() {
       }
     } catch (e) {
       message.error("Failed to update status");
+    }
+  };
+
+  const handleKanbanStatusChange = async (recordId: string, newStatus: string): Promise<boolean> => {
+    const config = MODULE_KANBAN_CONFIGS["crm-leads"];
+    if (!config) return false;
+
+    try {
+      // Find the current record
+      const currentRecord = records.find((r) => r.id === recordId);
+      if (!currentRecord) throw new Error("Record not found");
+
+      // Prepare the updated data
+      const updatedData = { ...currentRecord.data, [config.statusFieldKey]: newStatus };
+
+      const res = await fetch(`/backend-api/modules/crm-leads/records/${recordId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(updatedData),
+      });
+
+      if (res.ok) {
+        message.success("Lead status updated");
+        fetchRecords();
+        return true;
+      } else {
+        const error = await res.json();
+        throw new Error(error.error || `HTTP ${res.status}`);
+      }
+    } catch (e) {
+      console.error("Status update failed:", e);
+      message.error(`Failed to update status: ${String(e)}`);
+      return false;
     }
   };
 
@@ -272,24 +314,61 @@ export default function LeadsPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">CRM / Leads</h1>
-        {hasWriteAccess && (
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={() => openModal()}
-          >
-            Create New Lead
-          </Button>
-        )}
+        <Space>
+          <Segmented
+            value={viewMode}
+            onChange={(v: string | number) => {
+              const newMode = v as "table" | "kanban";
+              setViewMode(newMode);
+              localStorage.setItem("bt_view_crm-leads", newMode);
+            }}
+            options={[
+              { value: "table", icon: <UnorderedListOutlined /> },
+              { value: "kanban", icon: <AppstoreOutlined /> },
+            ]}
+          />
+          {hasWriteAccess && (
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={() => openModal()}
+            >
+              Create New Lead
+            </Button>
+          )}
+        </Space>
       </div>
 
-      <Table
-        dataSource={records}
-        columns={columns}
-        rowKey="id"
-        loading={loading}
-        pagination={{ pageSize: 10 }}
-      />
+      {viewMode === "kanban" ? (
+        <KanbanBoardBase
+          columns={MODULE_KANBAN_CONFIGS["crm-leads"].columns as KanbanColumn[]}
+          initialCards={records.map((r) => ({
+            id: r.id,
+            title: r.data?.["Project Name / Reference"] || r.data?.["Customer Name"] || r.data?.["Lead ID"] || r.id.slice(-6),
+            status: r.data?.["Lead Status"] || "New",
+            tags: [
+              r.data?.["Lead ID"],
+              r.data?.["Customer Name"],
+            ].filter(Boolean) as string[],
+          })) as KanbanCard[]}
+          onCardMove={handleKanbanStatusChange}
+          onCardClick={(card) => {
+            const record = records.find((r) => r.id === card.id);
+            if (record) openViewModal(record);
+          }}
+          isLoading={loading}
+          emptyColumnMessage="No leads"
+          readOnly={!hasWriteAccess}
+        />
+      ) : (
+        <Table
+          dataSource={records}
+          columns={columns}
+          rowKey="id"
+          loading={loading}
+          pagination={{ pageSize: 10 }}
+        />
+      )}
 
       {/* Project Details Modal */}
       <Modal
