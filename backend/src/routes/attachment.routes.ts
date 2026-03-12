@@ -1,30 +1,18 @@
 import { Router, Response, NextFunction } from "express";
 import multer from "multer";
+import { Storage } from "@google-cloud/storage";
 import path from "path";
-import fs from "fs";
 import { authenticate, AuthRequest } from "../middleware/auth";
 import { RBACRequest } from "../middleware/rbac";
 import { prisma } from "../config/prisma";
 
 const router = Router();
+const storage = new Storage();
+const bucket = storage.bucket(process.env.GCS_BUCKET || "buildtrack-dev-storage");
 
-// Configure multer storage with file size limits
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        const uploadDir = path.join(process.cwd(), "uploads");
-        if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir, { recursive: true });
-        }
-        cb(null, uploadDir);
-    },
-    filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-        cb(null, uniqueSuffix + path.extname(file.originalname));
-    },
-});
-
+// Use memory storage — files go to GCS, not disk
 const upload = multer({
-    storage,
+    storage: multer.memoryStorage(),
     limits: {
         fileSize: 50 * 1024 * 1024 // 50MB max
     }
@@ -35,11 +23,10 @@ const upload = multer({
  */
 const enrichUser = async (req: RBACRequest, res: Response, next: NextFunction) => {
     try {
-        const user = req.user;
+        const user = (req as AuthRequest).user;
         if (!user || !user.userId) {
             return res.status(401).json({ error: 'Authentication required' });
         }
-
         const dbUser = await prisma.user.findUnique({
             where: { id: user.userId },
             select: {
@@ -64,7 +51,6 @@ const enrichUser = async (req: RBACRequest, res: Response, next: NextFunction) =
             return res.status(403).json({ error: 'User has no role assigned' });
         }
 
-        // Attach user info with role
         const ADMIN_ROLES = ['SUPER_ADMIN', 'ORG_ADMIN', 'ADMIN'];
         const isAdmin = ADMIN_ROLES.includes(dbUser.role.name);
 
@@ -84,9 +70,22 @@ const enrichUser = async (req: RBACRequest, res: Response, next: NextFunction) =
 };
 
 /**
+ * Upload a file buffer to GCS and return the GCS path
+ */
+async function uploadToGCS(file: Express.Multer.File): Promise<string> {
+    const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(file.originalname)}`;
+    const gcsFile = bucket.file(uniqueName);
+
+    await gcsFile.save(file.buffer, {
+        metadata: { contentType: file.mimetype },
+    });
+
+    return uniqueName;
+}
+
+/**
  * POST /api/attachments/upload
  * Upload files and link to moduleRecord, project, or task
- * Accessible to authenticated users with read/write access to the module
  */
 router.post(
     "/upload",
@@ -103,12 +102,10 @@ router.post(
                 return res.status(400).json({ error: "No files provided" });
             }
 
-            // Verify at least one valid target
             if (!moduleRecordId && !projectId && !taskId) {
                 return res.status(400).json({ error: "Must specify moduleRecordId, projectId, or taskId" });
             }
 
-            // For module records, verify the record exists
             if (moduleRecordId) {
                 const record = await prisma.moduleRecord.findUnique({
                     where: { id: moduleRecordId }
@@ -119,11 +116,12 @@ router.post(
             }
 
             const attachments = await Promise.all(
-                uploadedFiles.map((file) =>
-                    prisma.attachment.create({
+                uploadedFiles.map(async (file) => {
+                    const gcsPath = await uploadToGCS(file);
+                    return prisma.attachment.create({
                         data: {
                             filename: file.originalname,
-                            path: file.filename,
+                            path: gcsPath,
                             mimeType: file.mimetype,
                             size: file.size,
                             moduleRecordId: moduleRecordId || null,
@@ -131,8 +129,8 @@ router.post(
                             taskId: taskId || null,
                             uploadedById: enrichedUser.userId,
                         },
-                    })
-                )
+                    });
+                })
             );
 
             res.status(201).json({
@@ -146,15 +144,6 @@ router.post(
             });
         } catch (err) {
             console.error("Upload error:", err);
-            // Clean up uploaded files on error
-            if (req.files) {
-                (req.files as Express.Multer.File[]).forEach(file => {
-                    const filePath = path.join(process.cwd(), "uploads", file.filename);
-                    if (fs.existsSync(filePath)) {
-                        fs.unlinkSync(filePath);
-                    }
-                });
-            }
             res.status(500).json({ error: "Failed to upload files" });
         }
     }
@@ -172,27 +161,21 @@ router.get(
         try {
             const { recordId } = req.params;
 
-            // Verify record exists
             const record = await prisma.moduleRecord.findUnique({
                 where: { id: recordId }
             });
             if (!record) {
-                return res.status(404).json({ error: "Record not found" });
+                return res.status(404).json({ error: "Module record not found" });
             }
 
             const attachments = await prisma.attachment.findMany({
                 where: { moduleRecordId: recordId },
-                select: {
-                    id: true,
-                    filename: true,
-                    mimeType: true,
-                    size: true,
-                    createdAt: true,
+                include: {
                     uploadedBy: {
-                        select: { id: true, name: true, email: true }
+                        select: { id: true, firstName: true, lastName: true, email: true }
                     }
                 },
-                orderBy: { createdAt: "desc" },
+                orderBy: { createdAt: "desc" }
             });
 
             res.json({ attachments });
@@ -204,45 +187,8 @@ router.get(
 );
 
 /**
- * GET /api/attachments/view/:id
- * View attachment (stream for previewing, not downloading)
- */
-router.get(
-    "/view/:id",
-    authenticate,
-    enrichUser,
-    async (req: AuthRequest, res: Response) => {
-        try {
-            const { id } = req.params;
-            const attachment = await prisma.attachment.findUnique({
-                where: { id },
-            });
-
-            if (!attachment) {
-                return res.status(404).json({ error: "Attachment not found" });
-            }
-
-            const filePath = path.join(process.cwd(), "uploads", attachment.path);
-            if (!fs.existsSync(filePath)) {
-                return res.status(404).json({ error: "File not found on disk" });
-            }
-
-            // For viewing, set inline content disposition (for images/pdfs)
-            res.setHeader("Content-Disposition", `inline; filename="${attachment.filename}"`);
-            res.setHeader("Content-Type", attachment.mimeType);
-            res.setHeader("Cache-Control", "public, max-age=3600");
-
-            fs.createReadStream(filePath).pipe(res);
-        } catch (err) {
-            console.error("View error:", err);
-            res.status(500).json({ error: "Failed to view file" });
-        }
-    }
-);
-
-/**
  * GET /api/attachments/download/:id
- * Download attachment (forced download)
+ * Download attachment from GCS
  */
 router.get(
     "/download/:id",
@@ -254,19 +200,19 @@ router.get(
             const attachment = await prisma.attachment.findUnique({
                 where: { id },
             });
-
             if (!attachment) {
                 return res.status(404).json({ error: "Attachment not found" });
             }
 
-            const filePath = path.join(process.cwd(), "uploads", attachment.path);
-            if (!fs.existsSync(filePath)) {
-                return res.status(404).json({ error: "File not found on disk" });
+            const gcsFile = bucket.file(attachment.path);
+            const [exists] = await gcsFile.exists();
+            if (!exists) {
+                return res.status(404).json({ error: "File not found in storage" });
             }
 
             res.setHeader("Content-Disposition", `attachment; filename="${attachment.filename}"`);
             res.setHeader("Content-Type", attachment.mimeType);
-            fs.createReadStream(filePath).pipe(res);
+            gcsFile.createReadStream().pipe(res);
         } catch (err) {
             console.error("Download error:", err);
             res.status(500).json({ error: "Failed to download file" });
@@ -276,7 +222,7 @@ router.get(
 
 /**
  * DELETE /api/attachments/:id
- * Delete an attachment (only uploader or admin can delete)
+ * Delete an attachment from GCS and DB
  */
 router.delete(
     "/:id",
@@ -290,23 +236,22 @@ router.delete(
             const attachment = await prisma.attachment.findUnique({
                 where: { id },
             });
-
             if (!attachment) {
                 return res.status(404).json({ error: "Attachment not found" });
             }
 
-            // Only the uploader or admin can delete
             if (attachment.uploadedById !== enrichedUser.userId && !enrichedUser.isAdmin) {
                 return res.status(403).json({ error: "Cannot delete attachment uploaded by another user" });
             }
 
-            // Delete from DB
+            // Delete from DB first
             await prisma.attachment.delete({ where: { id } });
 
-            // Delete from disk
-            const filePath = path.join(process.cwd(), "uploads", attachment.path);
-            if (fs.existsSync(filePath)) {
-                fs.unlinkSync(filePath);
+            // Then delete from GCS
+            const gcsFile = bucket.file(attachment.path);
+            const [exists] = await gcsFile.exists();
+            if (exists) {
+                await gcsFile.delete();
             }
 
             res.status(204).send();
