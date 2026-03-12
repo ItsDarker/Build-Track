@@ -150,15 +150,13 @@ export const requireProjectAccess = async (
         }
 
         // Row-Level Security:
+        // Admins and Finance managers can view all projects
         if (roleName === 'SUPER_ADMIN' || roleName === 'ORG_ADMIN' || roleName === 'FINANCE_MANAGER') {
             return next();
         }
 
+        // PROJECT_MANAGERS can view all projects (they may not manage all of them)
         if (roleName === 'PROJECT_MANAGER') {
-            const project = await prisma.project.findFirst({
-                where: { id: projectId as string, managerId: user.userId }
-            });
-            if (!project) return res.status(403).json({ error: 'Not manager of this project' });
             return next();
         }
 

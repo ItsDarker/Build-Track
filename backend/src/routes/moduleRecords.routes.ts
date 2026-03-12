@@ -17,6 +17,7 @@ const SLUG_TO_RESOURCE: Record<string, string> = {
   "design-configurator": "project",
   "approval-workflow": "project",
   "job-confirmation": "work_orders",
+  "work-orders": "work_orders",
   "support-warranty": "work_orders",
   "bom-materials-planning": "inventory",
   "procurement": "inventory",

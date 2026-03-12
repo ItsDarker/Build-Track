@@ -69,21 +69,22 @@ const ROLE_PERMISSIONS: Record<string, { resource: string, action: string }[]> =
     ...p('delivery', ['read', 'create', 'update']),
   ],
   PROJECT_MANAGER: [
-    ...p('crm', ['read']),
-    ...p('quoting', ['read']),
-    ...p('project', ['read', 'create', 'update']),
-    ...p('work_orders', ['read', 'create', 'update']),
-    ...p('scheduling', ['read', 'create', 'update']),
-    ...p('qc', ['read']),
-    ...p('finance', ['read']),
-    ...p('production', ['read']),        // manufacturing read
-    ...p('inventory', ['read']),         // BOM/procurement read
-    ...p('delivery', ['read']),          // delivery read
+    ...p('crm', ['read', 'create', 'update', 'delete']),
+    ...p('quoting', ['read', 'create', 'update', 'delete']),
+    ...p('project', ['read', 'create', 'update', 'delete']),
+    ...p('work_orders', ['read', 'create', 'update', 'delete']),
+    ...p('scheduling', ['read', 'create', 'update', 'delete']),
+    ...p('qc', ['read', 'create', 'update', 'delete']),
+    ...p('finance', ['read', 'create', 'update', 'delete']),
+    ...p('production', ['read', 'create', 'update', 'delete']),
+    ...p('inventory', ['read', 'create', 'update', 'delete']),
+    ...p('delivery', ['read', 'create', 'update', 'delete']),
   ],
   SALES_MANAGER: [
     ...p('crm', ['read', 'create', 'update']),
     ...p('quoting', ['read', 'create', 'update']),
-    ...p('project', ['read']),          // approval-workflow, job-confirmation
+    ...p('work_orders', ['read', 'create', 'update']),  // job-confirmation
+    ...p('project', ['read']),          // approval-workflow
     ...p('finance', ['read']),           // billing-invoicing read access
   ],
   PROJECT_COORDINATOR: [
@@ -115,7 +116,7 @@ const ROLE_PERMISSIONS: Record<string, { resource: string, action: string }[]> =
     ...p('work_orders', ['read']),
   ],
   QC_MANAGER: [
-    ...p('work_orders', ['read']),
+    ...p('work_orders', ['read', 'create', 'update']),
     ...p('qc', ['read', 'create', 'update', 'approve']),
   ],
   LOGISTICS_MANAGER: [
@@ -125,6 +126,8 @@ const ROLE_PERMISSIONS: Record<string, { resource: string, action: string }[]> =
     ...p('scheduling', ['read']),        // production-scheduling read
   ],
   FINANCE_MANAGER: [
+    ...p('quoting', ['read', 'create', 'update']),     // quoting-contracts
+    ...p('work_orders', ['read', 'create', 'update']), // job-confirmation
     ...p('finance', ['read', 'create', 'update', 'approve']),
     ...p('project', ['read']),
   ],

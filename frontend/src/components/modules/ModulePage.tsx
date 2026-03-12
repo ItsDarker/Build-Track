@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Table, Modal, Button as AntButton, Tag, Empty, Tooltip, App, Select as AntSelect } from "antd";
+import { Table, Modal, Button as AntButton, Tag, Empty, Tooltip, App, Select as AntSelect, Segmented } from "antd";
 import {
   PlusOutlined,
   EyeOutlined,
@@ -12,10 +12,15 @@ import {
   UserSwitchOutlined,
   CheckCircleOutlined,
   SettingOutlined,
+  UnorderedListOutlined,
+  AppstoreOutlined,
 } from "@ant-design/icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DynamicFormRenderer, isFileField } from "./DynamicFormRenderer";
+import { ModuleKanbanBoard } from "@/components/kanban/ModuleKanbanBoard";
+import { MODULE_KANBAN_CONFIGS } from "@/components/kanban/moduleKanbanConfig";
+import { RecordActivityLog } from "./RecordActivityLog";
 
 import type { FormMode } from "./DynamicFormRenderer";
 import type { ModuleConfig } from "@/config/buildtrack.config";
@@ -24,6 +29,7 @@ import { ShieldCheck } from "lucide-react";
 import { downloadExcel } from "@/lib/downloadExcel";
 import { useUser } from "@/lib/context/UserContext";
 import {
+  canAccessModule,
   canWriteModule,
   MODULE_ACCESS,
   REVERSE_ROLE_MAP,
@@ -88,7 +94,7 @@ function findIdFields(fields: string[]): string[] {
 }
 
 /** Generates an ID value based on module name and a timestamp */
-function generateId(moduleName: string): string {
+function generateId(moduleName: string, index: number = 0): string {
   const prefix = moduleName
     .split(/[\s\/]+/)
     .map((w) => w[0])
@@ -96,9 +102,10 @@ function generateId(moduleName: string): string {
     .toUpperCase()
     .slice(0, 3);
 
-  // Use timestamp-based suffix for uniqueness
+  // Use timestamp-based suffix for uniqueness, with index offset to ensure uniqueness when multiple IDs are generated
   const timestamp = Date.now().toString().slice(-6);
-  return `${prefix}-${timestamp}`;
+  const suffix = index > 0 ? `${timestamp}${index}` : timestamp;
+  return `${prefix}-${suffix}`;
 }
 
 /** Detects Status fields */
@@ -287,6 +294,7 @@ export function ModulePage({ module }: ModulePageProps) {
   const router = useRouter();
   const { modal } = App.useApp();
   const { role } = useUser();
+  const hasReadAccess = canAccessModule(role.name, module.slug);
   const hasWriteAccess = canWriteModule(role.name, module.slug);
   const [records, setRecords] = useState<Record<string, any>[]>([]);
   const [loading, setLoading] = useState(false);
@@ -303,6 +311,12 @@ export function ModulePage({ module }: ModulePageProps) {
   const [lookups, setLookups] = useState<Record<string, { id: string; value: string; label: string; order: number }[]>>({});
   const [recordAttachments, setRecordAttachments] = useState<Record<string, { id: string; filename: string; path: string; mimeType: string }[]>>({});
   const [assignPickerOpen, setAssignPickerOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<"table" | "kanban">(() => {
+    if (typeof window !== "undefined") {
+      return (localStorage.getItem(`bt_view_${module.slug}`) as "table" | "kanban") || "table";
+    }
+    return "table";
+  });
 
 
   useEffect(() => {
@@ -310,6 +324,12 @@ export function ModulePage({ module }: ModulePageProps) {
 
     (async () => {
       try {
+        // Check if user has read access before fetching
+        if (!hasReadAccess) {
+          if (!cancelled) setRecords([]);
+          return;
+        }
+
         setLoading(true);
         const res = await fetch(`/backend-api/modules/${module.slug}/records`, {
           credentials: "include"
@@ -339,7 +359,7 @@ export function ModulePage({ module }: ModulePageProps) {
     return () => {
       cancelled = true;
     };
-  }, [module.slug]);
+  }, [module.slug, hasReadAccess]);
 
   // Fetch assignable users for the Assign action (optional feature)
   useEffect(() => {
@@ -623,10 +643,10 @@ export function ModulePage({ module }: ModulePageProps) {
       const initialValues: Record<string, string> = {};
       // Auto-populate in create mode
       if (mode === "create") {
-        // Auto-populate ID fields
+        // Auto-populate ID fields with index offset to ensure uniqueness
         const idFields = findIdFields(module.fields);
-        idFields.forEach((field) => {
-          initialValues[field] = generateId(module.name);
+        idFields.forEach((field, index) => {
+          initialValues[field] = generateId(module.name, index);
         });
 
         // Auto-populate Status fields with their default value
@@ -929,6 +949,59 @@ export function ModulePage({ module }: ModulePageProps) {
     downloadExcel(records, columns, module.slug);
   };
 
+  const handleKanbanStatusChange = async (recordId: string, newStatus: string): Promise<boolean> => {
+    const config = MODULE_KANBAN_CONFIGS[module.slug];
+    if (!config) return false;
+
+    try {
+      // Find the current record to merge with updated status
+      const currentRecord = records.find((r) => r._id === recordId);
+      if (!currentRecord) throw new Error("Record not found");
+
+      // Prepare the updated data object (exclude audit fields)
+      const dataToUpdate = { ...currentRecord };
+      delete dataToUpdate._id;
+      delete dataToUpdate["Created at"];
+      delete dataToUpdate["Created by"];
+      delete dataToUpdate["Update at"];
+      delete dataToUpdate["Updated by"];
+
+      // Update the status field
+      dataToUpdate[config.statusFieldKey] = newStatus;
+
+      const res = await fetch(`/backend-api/modules/${module.slug}/records/${recordId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ data: dataToUpdate }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || `HTTP ${res.status}`);
+      }
+
+      // Update local state
+      setRecords((prev) =>
+        prev.map((r) =>
+          r._id === recordId
+            ? { ...r, [config.statusFieldKey]: newStatus }
+            : r
+        )
+      );
+
+      modal.success({
+        title: "Status Updated",
+        content: `Record status changed to ${newStatus}`,
+      });
+      return true;
+    } catch (e) {
+      console.error("Status update failed:", e);
+      modal.error({ title: "Update failed", content: String(e) });
+      return false;
+    }
+  };
+
   const modalTitle =
     modalMode === "create"
       ? `Create New ${module.name}`
@@ -945,6 +1018,19 @@ export function ModulePage({ module }: ModulePageProps) {
       })
     ),
   ];
+
+  // Check if user has access to this module
+  if (!hasReadAccess) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center py-12">
+          <h1 className="text-2xl font-bold text-slate-900">{module.name}</h1>
+          <p className="text-red-600 mt-4">Access Denied</p>
+          <p className="text-gray-500 mt-2">You don't have permission to view this module.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -973,6 +1059,20 @@ export function ModulePage({ module }: ModulePageProps) {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {MODULE_KANBAN_CONFIGS[module.slug] && (
+            <Segmented
+              value={viewMode}
+              onChange={(v: string | number) => {
+                const newMode = v as "table" | "kanban";
+                setViewMode(newMode);
+                localStorage.setItem(`bt_view_${module.slug}`, newMode);
+              }}
+              options={[
+                { value: "table", icon: <UnorderedListOutlined /> },
+                { value: "kanban", icon: <AppstoreOutlined /> },
+              ]}
+            />
+          )}
           <Button
             variant="outline"
             className="gap-2"
@@ -1004,24 +1104,37 @@ export function ModulePage({ module }: ModulePageProps) {
         </div>
       </div>
 
-      {/* Table view */}
-      <div className="bg-white rounded-lg border">
-        {records.length === 0 ? (
-          <div className="p-12">
-            <Empty description="No records yet. Click 'Create New' to add one." />
-          </div>
-        ) : (
-          <Table
-            loading={loading}
-            columns={columns}
-            dataSource={records}
-            rowKey="_id"
-            pagination={{ pageSize: 10 }}
-            scroll={{ x: "max-content" }}
-            size="small"
-          />
-        )}
-      </div>
+      {/* View toggle: Kanban or Table */}
+      {viewMode === "kanban" && MODULE_KANBAN_CONFIGS[module.slug] ? (
+        <ModuleKanbanBoard
+          moduleSlug={module.slug}
+          records={records}
+          onCardClick={(r: Record<string, any>) => openModal("view", r._id)}
+          onCardEdit={(r: Record<string, any>) => openModal("edit", r._id)}
+          onCardDelete={(recordId: string) => handleDelete(recordId)}
+          onStatusChange={handleKanbanStatusChange}
+          isLoading={loading}
+          hasWriteAccess={hasWriteAccess}
+        />
+      ) : (
+        <div className="bg-white rounded-lg border">
+          {records.length === 0 ? (
+            <div className="p-12">
+              <Empty description="No records yet. Click 'Create New' to add one." />
+            </div>
+          ) : (
+            <Table
+              loading={loading}
+              columns={columns}
+              dataSource={records}
+              rowKey="_id"
+              pagination={{ pageSize: 10 }}
+              scroll={{ x: "max-content" }}
+              size="small"
+            />
+          )}
+        </div>
+      )}
 
       {/* Create / Edit / View Modal */}
       <Modal
@@ -1070,20 +1183,31 @@ export function ModulePage({ module }: ModulePageProps) {
         }
       >
         {module.fields.length > 0 ? (
-          <div className="max-h-[60vh] overflow-y-auto pr-1">
-            <DynamicFormRenderer
-              fields={module.fields}
-              values={formValues}
-              onChange={handleFormChange}
-              mode={modalMode}
-              files={formFiles}
-              onFileChange={handleFileChange}
-              errors={fieldErrors}
-              requiredFields={requiredFields}
-              dynamicOptions={dynamicOptions}
-              existingAttachments={recordAttachments}
-              onDeleteAttachment={deleteAttachment}
-            />
+          <div className="flex flex-col gap-4 max-h-[80vh] overflow-y-auto pr-1">
+            <div className="flex-shrink-0">
+              <DynamicFormRenderer
+                fields={module.fields}
+                values={formValues}
+                onChange={handleFormChange}
+                mode={modalMode}
+                files={formFiles}
+                onFileChange={handleFileChange}
+                errors={fieldErrors}
+                requiredFields={requiredFields}
+                dynamicOptions={dynamicOptions}
+                existingAttachments={recordAttachments}
+                onDeleteAttachment={deleteAttachment}
+              />
+            </div>
+
+            {/* Record Activity Log - shown at bottom when viewing */}
+            {modalMode === "view" && activeRecordId && (
+              <div className="flex-shrink-0 border-t pt-4">
+                <RecordActivityLog
+                  record={records.find((r) => r._id === activeRecordId) || formValues}
+                />
+              </div>
+            )}
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center py-12 text-gray-400">

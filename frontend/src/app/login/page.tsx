@@ -16,7 +16,7 @@ export default function LoginPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+  const [rememberMe, setRememberMe] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -27,7 +27,7 @@ export default function LoginPage() {
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
 
-    const result = await apiClient.login({ email, password });
+    const result = await apiClient.login({ email, password, rememberMe });
 
     if (result.error) {
       if (result.error.includes("verify your email")) {
@@ -161,9 +161,13 @@ export default function LoginPage() {
 
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
-                <Checkbox id="remember" />
+                <Checkbox
+                  id="remember"
+                  checked={rememberMe}
+                  onCheckedChange={(checked: boolean | string) => setRememberMe(checked === true)}
+                />
                 <Label htmlFor="remember" className="text-sm text-gray-600 font-normal cursor-pointer">
-                  Remember me
+                  Remember me for 15 days
                 </Label>
               </div>
               <Link
