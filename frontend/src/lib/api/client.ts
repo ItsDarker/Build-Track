@@ -633,6 +633,37 @@ class ApiClient {
       method: 'DELETE',
     });
   }
+
+  // Attachments
+  async getProjectAttachments(projectId: string) {
+    return this.request(`/backend-api/attachments/project/${projectId}`, { method: 'GET' });
+  }
+
+  async uploadProjectFiles(projectId: string, files: File[]) {
+    const formData = new FormData();
+    files.forEach(file => formData.append('files', file));
+    formData.append('projectId', projectId);
+    try {
+      const response = await fetch(`${this.baseUrl}/backend-api/attachments/upload`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      const data = await response.json();
+      if (!response.ok) return { error: data.error || 'Upload failed' };
+      return { data };
+    } catch (error) {
+      return { error: 'Upload failed' };
+    }
+  }
+
+  async deleteAttachment(attachmentId: string) {
+    return this.request(`/backend-api/attachments/${attachmentId}`, { method: 'DELETE' });
+  }
+
+  getAttachmentDownloadUrl(attachmentId: string) {
+    return `/backend-api/attachments/download/${attachmentId}`;
+  }
 }
 
 export const apiClient = new ApiClient(API_URL);

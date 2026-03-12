@@ -56,6 +56,9 @@ export default function ProjectsPage() {
     const [selectedInviteeId, setSelectedInviteeId] = useState<string | null>(null);
     const [inviteMessage, setInviteMessage] = useState('');
     const [editModalTab, setEditModalTab] = useState('details');
+    const [projectFiles, setProjectFiles] = useState<any[]>([]);
+    const [filesLoading, setFilesLoading] = useState(false);
+    const [uploadLoading, setUploadLoading] = useState(false);
 
     useEffect(() => {
         fetchProjects();
@@ -307,10 +310,50 @@ export default function ProjectsPage() {
             if (invResult.data) {
                 setProjectInvitations((invResult.data as any).invitations || []);
             }
+            // Fetch files
+            const filesResult = await apiClient.getProjectAttachments(project.id);
+            if (filesResult.data) {
+                setProjectFiles((filesResult.data as any).attachments || []);
+            }
         } else {
             setProjectInvitations([]);
+            setProjectFiles([]);
         }
         setIsModalOpen(true);
+    };
+
+    const fetchProjectFiles = async (projectId: string) => {
+        setFilesLoading(true);
+        const result = await apiClient.getProjectAttachments(projectId);
+        if (result.data) {
+            setProjectFiles((result.data as any).attachments || []);
+        }
+        setFilesLoading(false);
+    };
+
+    const handleFileUpload = async (file: File) => {
+        if (!editingProject?.id) return false;
+        setUploadLoading(true);
+        const result = await apiClient.uploadProjectFiles(editingProject.id, [file]);
+        if (result.error) {
+            message.error('Upload failed: ' + result.error);
+        } else {
+            message.success('File uploaded successfully');
+            fetchProjectFiles(editingProject.id);
+        }
+        setUploadLoading(false);
+        return false; // prevent default upload behavior
+    };
+
+    const handleDeleteFile = async (attachmentId: string) => {
+        if (!editingProject?.id) return;
+        const result = await apiClient.deleteAttachment(attachmentId);
+        if (result.error) {
+            message.error('Delete failed');
+        } else {
+            message.success('File deleted');
+            fetchProjectFiles(editingProject.id);
+        }
     };
 
     const handleProjectNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -659,12 +702,55 @@ export default function ProjectsPage() {
                                 label: "Files",
                                 children: (
                                     <div className="space-y-4 mt-4">
-                                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center text-gray-400">
-                                            <InboxOutlined style={{ fontSize: 40, marginBottom: 8 }} />
-                                            <div className="text-base font-medium">File uploads coming soon</div>
-                                            <div className="text-sm mt-1">This area will allow you to upload and manage files for this project.</div>
-                                        </div>
-                                        <div className="text-gray-400 text-sm text-center">No files uploaded yet.</div>
+                                        <Upload.Dragger
+                                            multiple
+                                            showUploadList={false}
+                                            beforeUpload={handleFileUpload}
+                                            disabled={uploadLoading}
+                                        >
+                                            <p className="ant-upload-drag-icon">
+                                                <InboxOutlined />
+                                            </p>
+                                            <p className="ant-upload-text">Click or drag files to upload</p>
+                                            <p className="ant-upload-hint">Supports any file type up to 50MB</p>
+                                        </Upload.Dragger>
+                                        {filesLoading ? (
+                                            <div className="text-center text-gray-400 py-4">Loading files...</div>
+                                        ) : projectFiles.length === 0 ? (
+                                            <div className="text-gray-400 text-sm text-center py-4">No files uploaded yet.</div>
+                                        ) : (
+                                            <List
+                                                dataSource={projectFiles}
+                                                renderItem={(file: any) => (
+                                                    <List.Item
+                                                        actions={[
+                                                            
+                                                                          <a
+                                                                key="download"
+                                                                href={apiClient.getAttachmentDownloadUrl(file.id)}
+                                                                download={file.filename}
+                                                            >
+                                                                <DownloadOutlined /> Download
+                                                            </a>,
+                                                            <Button
+                                                                key="delete"
+                                                                type="link"
+                                                                danger
+                                                                size="small"
+                                                                onClick={() => handleDeleteFile(file.id)}
+                                                            >
+                                                                Delete
+                                                            </Button>
+                                                        ]}
+                                                    >
+                                                        <List.Item.Meta
+                                                            title={file.filename}
+                                                            description={`${(file.size / 1024).toFixed(1)} KB · Uploaded by ${file.uploadedBy?.firstName || 'Unknown'} ${file.uploadedBy?.lastName || ''}`}
+                                                        />
+                                                    </List.Item>
+                                                )}
+                                            />
+                                        )}
                                     </div>
                                 )
                             },

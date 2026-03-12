@@ -187,6 +187,43 @@ router.get(
 );
 
 /**
+ * GET /api/attachments/project/:projectId
+ * List attachments for a project
+ */
+router.get(
+    "/project/:projectId",
+    authenticate,
+    enrichUser,
+    async (req: AuthRequest, res: Response) => {
+        try {
+            const { projectId } = req.params;
+
+            const project = await prisma.project.findUnique({
+                where: { id: projectId }
+            });
+            if (!project) {
+                return res.status(404).json({ error: "Project not found" });
+            }
+
+            const attachments = await prisma.attachment.findMany({
+                where: { projectId },
+                include: {
+                    uploadedBy: {
+                        select: { id: true, firstName: true, lastName: true, email: true }
+                    }
+                },
+                orderBy: { createdAt: "desc" }
+            });
+
+            res.json({ attachments });
+        } catch (err) {
+            console.error("List project attachments error:", err);
+            res.status(500).json({ error: "Failed to list attachments" });
+        }
+    }
+);
+
+/**
  * GET /api/attachments/download/:id
  * Download attachment from GCS
  */
