@@ -36,6 +36,7 @@ model User {
   managedProjects      Project[]           @relation("ProjectManager")
   assignedProjects     Project[]           @relation("ProjectAssignee")
   refreshTokens        RefreshToken[]
+  deviceTokens         DeviceToken[]
   assignedTasks        Task[]              @relation("TaskAssignee")
   role                 Role?               @relation(fields: [roleId], references: [id])
   verificationTokens   VerificationToken[]
@@ -157,6 +158,24 @@ model RefreshToken {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("refresh_tokens")
+}
+
+model DeviceToken {
+  id              String   @id @default(cuid())
+  userId          String   @map("user_id")
+  deviceName      String   @map("device_name")
+  deviceFingerprint String @unique @map("device_fingerprint")
+  userAgent       String   @map("user_agent")
+  ipAddress       String   @map("ip_address")
+  deviceToken     String   @unique @map("device_token")
+  expiresAt       DateTime @map("expires_at")
+  lastUsedAt      DateTime @default(now()) @map("last_used_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([deviceFingerprint])
+  @@map("device_tokens")
 }
 
 model VerificationToken {

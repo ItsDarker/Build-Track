@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card as UICard, CardContent } from "@/components/ui/card";
 import { EditOutlined, DeleteOutlined, EyeOutlined } from "@ant-design/icons";
 import { Button } from "antd";
+import { getModuleBySlug } from "@/config/buildtrack.config";
 
 interface ModuleKanbanBoardProps {
   moduleSlug: string;
@@ -45,10 +46,36 @@ export const ModuleKanbanBoard: React.FC<ModuleKanbanBoardProps> = ({
 
   // Convert records to Kanban cards
   const cards = useMemo(() => {
+    // Get the full status field name from module config
+    // (because config fields include parentheses like "Design Status (Draft, ...)")
+    const module = getModuleBySlug(moduleSlug);
+    let fullStatusFieldName = config.statusFieldKey;
+    if (module && config.statusFieldKey) {
+      const statusKeySearch = config.statusFieldKey.split("(")[0].trim();
+      const found = module.fields.find((f) => f.includes(statusKeySearch));
+      if (found) {
+        fullStatusFieldName = found;
+        console.log(`[${moduleSlug}] Using full status field name: ${fullStatusFieldName}`);
+      }
+    }
+
+    // Validate card title field exists
+    if (module && config.cardTitleFieldKey) {
+      const titleFieldExists = module.fields.some((f) =>
+        f.includes(config.cardTitleFieldKey.split("(")[0].trim())
+      );
+      if (!titleFieldExists) {
+        console.warn(
+          `[${moduleSlug}] WARNING: cardTitleFieldKey "${config.cardTitleFieldKey}" not found in module fields!`,
+          `Available fields:`, module.fields
+        );
+      }
+    }
+
     return records.map((record) => {
       const id = (record._id || record.id) as string;
       const title = String(record[config.cardTitleFieldKey] || id);
-      const status = String(record[config.statusFieldKey] || config.columns[0].key);
+      const status = String(record[fullStatusFieldName] || config.columns[0].key);
 
       // Collect metadata fields (non-empty values from specified keys)
       const tags: string[] = [];
@@ -76,8 +103,13 @@ export const ModuleKanbanBoard: React.FC<ModuleKanbanBoardProps> = ({
   }, [records, config]);
 
   const handleCardMove = (cardId: string, newStatus: string): Promise<boolean> | void => {
+    console.log("[ModuleKanbanBoard] handleCardMove called - cardId:", cardId, "newStatus:", newStatus);
+    console.log("[ModuleKanbanBoard] onStatusChange callback exists:", !!onStatusChange);
     if (onStatusChange) {
+      console.log("[ModuleKanbanBoard] Calling onStatusChange");
       return onStatusChange(cardId, newStatus);
+    } else {
+      console.log("[ModuleKanbanBoard] No onStatusChange callback!");
     }
   };
 
@@ -115,8 +147,17 @@ export const ModuleKanbanBoard: React.FC<ModuleKanbanBoardProps> = ({
       <div
         key={card.id}
         draggable
-        onDragStart={(e) => {
-          if (!hasWriteAccess) e.preventDefault();
+        onDragStart={(e: React.DragEvent<HTMLDivElement>) => {
+          console.log("[ModuleKanbanBoard] onDragStart - hasWriteAccess:", hasWriteAccess, "card.id:", card.id);
+          if (!hasWriteAccess) {
+            console.log("[ModuleKanbanBoard] Preventing drag - no write access");
+            e.preventDefault();
+          } else {
+            // Set the card ID in dataTransfer for the drop handler
+            e.dataTransfer.effectAllowed = "move";
+            e.dataTransfer.setData("cardId", card.id);
+            console.log("[ModuleKanbanBoard] Drag started - cardId set to:", card.id);
+          }
         }}
         className={`group ${!hasWriteAccess ? "cursor-pointer" : "cursor-grab"} active:cursor-grabbing`}
       >

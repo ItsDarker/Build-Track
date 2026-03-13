@@ -168,6 +168,10 @@ export function DynamicFormRenderer({
   existingAttachments = {},
   onDeleteAttachment,
 }: DynamicFormRendererProps) {
+  console.log(`[DynamicFormRenderer] Rendering with mode: ${mode}`);
+  console.log(`[DynamicFormRenderer] Fields count: ${fields.length}, Form values count: ${Object.keys(values).length}`);
+  console.log(`[DynamicFormRenderer] Values:`, values);
+
   const isViewMode = mode === "view";
 
   return (

@@ -53,8 +53,15 @@ class ApiClient {
     });
   }
 
-  async login(data: { email: string; password: string; rememberMe?: boolean }) {
+  async login(data: { email: string; password: string; rememberMe?: boolean; deviceFingerprint?: string; userAgent?: string }) {
     return this.request('/backend-api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async verifyDevice(data: { deviceToken: string; deviceFingerprint: string }) {
+    return this.request('/backend-api/auth/verify-device', {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -590,6 +597,12 @@ class ApiClient {
 
   async markAllUserNotificationsRead() {
     return this.request('/backend-api/notifications/read-all', { method: 'PUT' });
+  }
+
+  async deleteUserNotification(notificationId: string) {
+    return this.request(`/backend-api/notifications/${notificationId}`, {
+      method: 'DELETE',
+    });
   }
 
   async acceptProjectInvite(notificationId: string) {

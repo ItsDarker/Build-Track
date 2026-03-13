@@ -21,6 +21,9 @@ export interface SignupData {
 export interface LoginData {
   email: string;
   password: string;
+  rememberMe?: boolean;
+  deviceFingerprint?: string;
+  userAgent?: string;
 }
 
 export interface AuthTokens {
@@ -194,8 +197,8 @@ export class AuthService {
 }
 
 
-  async login(data: LoginData, ip: string): Promise<AuthTokens & { user: any }> {
-  const { email, password } = data;
+  async login(data: LoginData, ip: string): Promise<AuthTokens & { user: any; deviceToken?: string }> {
+  const { email, password, rememberMe, deviceFingerprint, userAgent } = data;
 
   // INCLUDE role so your return { role: user.role } isn't undefined
   const user = await prisma.user.findUnique({
@@ -248,6 +251,12 @@ export class AuthService {
     },
   });
 
+  // Create device token if "Remember Me" is checked
+  let deviceToken: string | undefined;
+  if (rememberMe && deviceFingerprint) {
+    deviceToken = await this.createDeviceToken(user.id, deviceFingerprint, userAgent || 'Unknown', ip);
+  }
+
   return {
     accessToken,
     refreshToken,
@@ -258,8 +267,145 @@ export class AuthService {
       emailVerified: user.emailVerified,
       role: user.role,
     },
+    deviceToken,
   };
 }
+
+  /**
+   * Create a device token for "Remember Me" functionality
+   */
+  private async createDeviceToken(userId: string, deviceFingerprint: string, userAgent: string, ipAddress: string): Promise<string> {
+    try {
+      // Generate a secure device token
+      const deviceTokenValue = randomBytes(32).toString('hex');
+
+      // Get device name from user agent
+      const deviceName = this.extractDeviceName(userAgent);
+
+      // Device tokens expire in 15 days (for Remember Me)
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 15);
+
+      // Check if device already exists
+      const existingDevice = await (prisma as any).deviceToken?.findFirst({
+        where: { userId, deviceFingerprint },
+      });
+
+      if (existingDevice) {
+        // Update existing device token
+        await (prisma as any).deviceToken?.update({
+          where: { id: existingDevice.id },
+          data: {
+            deviceToken: deviceTokenValue,
+            expiresAt,
+            lastUsedAt: new Date(),
+          },
+        });
+      } else {
+        // Create new device token
+        await (prisma as any).deviceToken?.create({
+          data: {
+            userId,
+            deviceName,
+            deviceFingerprint,
+            userAgent,
+            ipAddress,
+            deviceToken: deviceTokenValue,
+            expiresAt,
+          },
+        });
+      }
+
+      return deviceTokenValue;
+    } catch (error) {
+      // If device token creation fails, just continue without it
+      console.error('Failed to create device token:', error);
+      return '';
+    }
+  }
+
+  /**
+   * Verify device token and auto-login user
+   */
+  async verifyDeviceToken(deviceToken: string, deviceFingerprint: string): Promise<AuthTokens & { user: any }> {
+    try {
+      // Find device token
+      const device = await (prisma as any).deviceToken?.findUnique({
+        where: { deviceToken },
+        include: { user: { include: { role: true } } },
+      });
+
+      if (!device) {
+        throw new Error('Invalid device token');
+      }
+
+      // Check if token is expired
+      if (device.expiresAt < new Date()) {
+        throw new Error('Device token expired');
+      }
+
+      // Verify fingerprint matches
+      if (device.deviceFingerprint !== deviceFingerprint) {
+        throw new Error('Device fingerprint mismatch');
+      }
+
+      const user = device.user;
+
+      // Check if user is blocked
+      if (user.isBlocked) {
+        throw new Error('Your account has been blocked');
+      }
+
+      // Generate new tokens
+      const accessToken = generateAccessToken({ userId: user.id, email: user.email });
+      const refreshToken = generateRefreshToken({ userId: user.id, email: user.email });
+
+      const refreshTokenExpiresAt = new Date();
+      refreshTokenExpiresAt.setDate(refreshTokenExpiresAt.getDate() + 7);
+
+      await prisma.refreshToken.create({
+        data: {
+          userId: user.id,
+          token: refreshToken,
+          expiresAt: refreshTokenExpiresAt,
+        },
+      });
+
+      // Update last used timestamp
+      await (prisma as any).deviceToken?.update({
+        where: { id: device.id },
+        data: { lastUsedAt: new Date() },
+      });
+
+      return {
+        accessToken,
+        refreshToken,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          emailVerified: user.emailVerified,
+          role: user.role,
+        },
+      };
+    } catch (error: any) {
+      throw new Error(`Device token verification failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Extract device name from user agent
+   */
+  private extractDeviceName(userAgent: string): string {
+    // Simple extraction logic - can be enhanced
+    if (userAgent.includes('Windows')) return 'Windows';
+    if (userAgent.includes('Mac')) return 'Mac';
+    if (userAgent.includes('Linux')) return 'Linux';
+    if (userAgent.includes('iPhone')) return 'iPhone';
+    if (userAgent.includes('iPad')) return 'iPad';
+    if (userAgent.includes('Android')) return 'Android';
+    return 'Unknown Device';
+  }
 
 
   /**

@@ -113,6 +113,10 @@ export default function ProfilePage() {
       if (normalizedPhone) {
         profileForm.setFieldsValue({ phone: formatPhoneNumber(normalizedPhone) });
       }
+      // Refresh the page to update the dashboard with new profile data
+      setTimeout(() => {
+        router.refresh();
+      }, 500);
     }
     setSaving(false);
   };

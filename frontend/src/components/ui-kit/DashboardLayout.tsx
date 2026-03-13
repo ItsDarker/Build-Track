@@ -18,6 +18,7 @@ import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   BellOutlined,
+  CloseOutlined,
 } from "@ant-design/icons";
 import {
   ChevronDown,
@@ -38,6 +39,7 @@ import { Logo } from "./Logo";
 import { navigation, type SidebarItem } from "@/config/buildtrack.config";
 import { canAccessModule } from "@/config/rbac";
 import { cn } from "@/lib/utils";
+import { HelpNestChat } from "@/components/support/HelpNestChat";
 
 /** Map sidebar child paths to module slugs for RBAC filtering */
 const SIDEBAR_PATH_TO_MODULE: Record<string, string> = {
@@ -55,6 +57,7 @@ interface User {
   id: string;
   email: string;
   name?: string;
+  avatarUrl?: string | null;
   role: {
     name: string;
     displayName: string;
@@ -186,6 +189,21 @@ export function DashboardLayout({ user, children }: DashboardLayoutProps) {
     }
   };
 
+  const handleDeleteNotification = async (e: React.MouseEvent, notifId: string) => {
+    e.stopPropagation();
+    const result = await apiClient.deleteUserNotification(notifId);
+    if (result.data) {
+      setNotifications(prev => prev.filter(n => n.id !== notifId));
+      const notif = notifications.find(n => n.id === notifId);
+      if (notif && !notif.read) {
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+      message.success('Notification cleared');
+    } else {
+      message.error(result.error || 'Failed to delete notification');
+    }
+  };
+
   const handleAcceptInvite = async (notifId: string) => {
     const inviteType = activeInvite?.type;
     const apiCall = inviteType === 'TEAM_INVITE'
@@ -253,22 +271,53 @@ export function DashboardLayout({ user, children }: DashboardLayoutProps) {
               cursor: 'pointer',
               background: notif.read ? 'transparent' : '#f0f7ff',
               transition: 'background 0.2s',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'flex-start',
+              gap: '8px',
             }}
           >
-            <div style={{ marginBottom: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontWeight: notif.read ? 'normal' : '600' }}>
-                {notif.title}
-              </span>
-              {notif.type === 'PROJECT_INVITE' && (
-                <Tag color="orange" style={{ marginLeft: 8 }}>Pending invite</Tag>
-              )}
-              {notif.type === 'TEAM_INVITE' && (
-                <Tag color="blue" style={{ marginLeft: 8 }}>Team invite</Tag>
-              )}
+            <div style={{ flex: 1 }}>
+              <div style={{ marginBottom: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontWeight: notif.read ? 'normal' : '600' }}>
+                  {notif.title}
+                </span>
+                {notif.type === 'PROJECT_INVITE' && (
+                  <Tag color="orange" style={{ marginLeft: 8 }}>Pending invite</Tag>
+                )}
+                {notif.type === 'TEAM_INVITE' && (
+                  <Tag color="blue" style={{ marginLeft: 8 }}>Team invite</Tag>
+                )}
+              </div>
+              <div style={{ fontSize: 12, color: '#999' }}>
+                {notif.message.length > 60 ? notif.message.substring(0, 60) + '…' : notif.message}
+              </div>
             </div>
-            <div style={{ fontSize: 12, color: '#999' }}>
-              {notif.message.length > 60 ? notif.message.substring(0, 60) + '…' : notif.message}
-            </div>
+            <button
+              onClick={(e) => handleDeleteNotification(e, notif.id)}
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: '4px',
+                cursor: 'pointer',
+                color: '#999',
+                fontSize: 14,
+                minWidth: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+              title="Clear notification"
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.color = '#f5222d';
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.color = '#999';
+              }}
+            >
+              <CloseOutlined style={{ fontSize: 14 }} />
+            </button>
           </div>
         ))
       )}
@@ -414,6 +463,9 @@ export function DashboardLayout({ user, children }: DashboardLayoutProps) {
               </Badge>
             </Dropdown>
 
+            {/* Help & Support Chat Widget */}
+            <HelpNestChat user={user} />
+
             {navigation.topNav.map((item) => {
               if (item === "PROFILE") {
                 return (
@@ -434,8 +486,16 @@ export function DashboardLayout({ user, children }: DashboardLayoutProps) {
                           {user.role?.displayName || 'No Role'}
                         </p>
                       </div>
-                      <div className="w-9 h-9 bg-orange-500 rounded-full flex items-center justify-center text-white font-semibold text-sm">
-                        {initials}
+                      <div className="w-9 h-9 bg-orange-500 rounded-full flex items-center justify-center text-white font-semibold text-sm overflow-hidden">
+                        {user.avatarUrl ? (
+                          <img
+                            src={user.avatarUrl}
+                            alt={displayName}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          initials
+                        )}
                       </div>
                     </a>
                   </Dropdown>
@@ -455,12 +515,52 @@ export function DashboardLayout({ user, children }: DashboardLayoutProps) {
                 );
               }
 
+              // Handle navigation for Support, Reports, and Contacts
+              if (item === "Support") {
+                return (
+                  <button
+                    key={item}
+                    className="flex items-center gap-1.5 text-gray-500 hover:text-slate-900 transition-colors text-sm"
+                    onClick={() => router.push("/app/support")}
+                  >
+                    {topNavIcons[item]}
+                    <span className="hidden lg:inline">{item}</span>
+                  </button>
+                );
+              }
+
+              if (item === "Reports") {
+                return (
+                  <button
+                    key={item}
+                    className="flex items-center gap-1.5 text-gray-500 hover:text-slate-900 transition-colors text-sm"
+                    onClick={() => router.push("/app/reports")}
+                  >
+                    {topNavIcons[item]}
+                    <span className="hidden lg:inline">{item}</span>
+                  </button>
+                );
+              }
+
+              if (item === "Contacts") {
+                return (
+                  <button
+                    key={item}
+                    className="flex items-center gap-1.5 text-gray-500 hover:text-slate-900 transition-colors text-sm"
+                    onClick={() => router.push("/app/contacts")}
+                  >
+                    {topNavIcons[item]}
+                    <span className="hidden lg:inline">{item}</span>
+                  </button>
+                );
+              }
+
               return (
                 <button
                   key={item}
                   className="flex items-center gap-1.5 text-gray-500 hover:text-slate-900 transition-colors text-sm"
                   onClick={() => {
-                    // TODO: Wire up Reports, Contacts, Support pages
+                    // Search handled separately
                     console.log(`Navigate to ${item}`);
                   }}
                 >

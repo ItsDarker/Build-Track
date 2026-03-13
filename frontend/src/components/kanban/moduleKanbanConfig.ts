@@ -87,7 +87,7 @@ export const MODULE_KANBAN_CONFIGS: Record<string, ModuleKanbanConfig> = {
       { title: "Rejected", key: "Rejected", color: COLORS.red },
     ],
     cardTitleFieldKey: "Approval Type",
-    cardMetaFieldKeys: ["Approval ID", "Requested By"],
+    cardMetaFieldKeys: ["Approval ID", "Approver (internal user)"],
   },
 
   "job-confirmation": {
@@ -99,8 +99,8 @@ export const MODULE_KANBAN_CONFIGS: Record<string, ModuleKanbanConfig> = {
       { title: "Delivered", key: "Delivered", color: COLORS.green },
       { title: "Closed", key: "Closed", color: COLORS.gray },
     ],
-    cardTitleFieldKey: "Job Name",
-    cardMetaFieldKeys: ["Job ID", "Customer Name"],
+    cardTitleFieldKey: "Order ID",
+    cardMetaFieldKeys: ["Accepted Quote ID", "Customer Reference"],
   },
 
   "work-orders": {
@@ -125,8 +125,8 @@ export const MODULE_KANBAN_CONFIGS: Record<string, ModuleKanbanConfig> = {
       { title: "Resolved", key: "Resolved", color: COLORS.green },
       { title: "Closed", key: "Closed", color: COLORS.gray },
     ],
-    cardTitleFieldKey: "Issue Title",
-    cardMetaFieldKeys: ["Support Ticket ID", "Severity"],
+    cardTitleFieldKey: "Issue Description",
+    cardMetaFieldKeys: ["Support Ticket ID", "Priority"],
   },
 
   "bom-materials-planning": {
@@ -161,8 +161,8 @@ export const MODULE_KANBAN_CONFIGS: Record<string, ModuleKanbanConfig> = {
       { title: "Done", key: "Done", color: COLORS.green },
       { title: "Delayed", key: "Delayed", color: COLORS.amber },
     ],
-    cardTitleFieldKey: "Product Name",
-    cardMetaFieldKeys: ["Schedule Entry ID", "Scheduled Date"],
+    cardTitleFieldKey: "Schedule Entry ID",
+    cardMetaFieldKeys: ["Work Center / Station", "Planned Start"],
   },
 
   "manufacturing": {
@@ -207,8 +207,8 @@ export const MODULE_KANBAN_CONFIGS: Record<string, ModuleKanbanConfig> = {
       { title: "Installed", key: "Installed", color: COLORS.green },
       { title: "Failed Attempt", key: "Failed Attempt", color: COLORS.red },
     ],
-    cardTitleFieldKey: "Customer Name",
-    cardMetaFieldKeys: ["Delivery Job ID", "Delivery Date"],
+    cardTitleFieldKey: "Delivery Job ID",
+    cardMetaFieldKeys: ["Assigned Driver/Installer", "Scheduled Date/Time Window"],
   },
 
   "billing-invoicing": {

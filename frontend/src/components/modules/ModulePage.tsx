@@ -326,17 +326,23 @@ export function ModulePage({ module }: ModulePageProps) {
       try {
         // Check if user has read access before fetching
         if (!hasReadAccess) {
+          console.log(`[${module.slug}] User has no read access`);
           if (!cancelled) setRecords([]);
           return;
         }
 
+        console.log(`[${module.slug}] Fetching records from API...`);
         setLoading(true);
         const res = await fetch(`/backend-api/modules/${module.slug}/records`, {
           credentials: "include"
         });
 
+        console.log(`[${module.slug}] API response status:`, res.status);
+
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
+
+        console.log(`[${module.slug}] Fetched ${(data.records ?? []).length} records from API`);
 
         const mapped = (data.records ?? []).map((r: any) => ({
           _id: r.id,
@@ -347,9 +353,10 @@ export function ModulePage({ module }: ModulePageProps) {
           "Updated by": r.updatedById ?? "",
         }));
 
+        console.log(`[${module.slug}] Setting records state with ${mapped.length} mapped records`);
         if (!cancelled) setRecords(mapped);
       } catch (e) {
-        console.error("Failed to load module records:", e);
+        console.error(`[${module.slug}] Failed to load module records:`, e);
         if (!cancelled) setRecords([]);
       } finally {
         if (!cancelled) setLoading(false);
@@ -460,11 +467,27 @@ export function ModulePage({ module }: ModulePageProps) {
     return opts;
   }, [module.fields, projects, clients, assignableUsers, lookups]);
 
-  // Key fields for table columns (first 5 non-section, non-audit fields)
+  // Key fields for table columns (first 5 non-section, non-audit fields + status field if not already included)
   const tableFields = useMemo(() => {
-    return module.fields
+    const filtered = module.fields
       .filter((f) => !isSectionLabel(f) && !isAuditField(f))
       .slice(0, 5);
+
+    // Get the status field key from kanban config if available
+    const kanbanConfig = MODULE_KANBAN_CONFIGS[module.slug];
+    const statusFieldKey = kanbanConfig?.statusFieldKey;
+
+    // Add status field if it exists and is not already in the first 5
+    let finalFields = [...filtered];
+    if (statusFieldKey && !filtered.some(f => f.includes(statusFieldKey.split("(")[0].trim()))) {
+      const statusField = module.fields.find(f => f.includes(statusFieldKey.split("(")[0].trim()));
+      if (statusField) {
+        finalFields.push(statusField);
+      }
+    }
+
+    console.log(`[${module.slug}] Table fields (first 5 + status):`, finalFields);
+    return finalFields;
   }, [module]);
 
   const columns = useMemo(() => {
@@ -482,10 +505,14 @@ export function ModulePage({ module }: ModulePageProps) {
         dataIndex: field,
         key: field,
         ellipsis: true,
-        render: (text: any) => {
-          if (!text) return "-";
+        render: (text: any, record: Record<string, any>) => {
+          if (!text) {
+            console.log(`[${module.slug}] Table render - field "${field}" has no value for record ${record._id}`);
+            return "-";
+          }
           const lower = field.toLowerCase();
           if (lower.includes("status")) {
+            console.log(`[${module.slug}] Rendering status field "${field}" with value: "${text}"`);
             const color =
               text.toLowerCase().includes("complete") ||
                 text.toLowerCase().includes("approved") ||
@@ -553,10 +580,17 @@ export function ModulePage({ module }: ModulePageProps) {
   }, [tableFields, hasWriteAccess]);
 
   const fetchAttachments = async (recordId: string) => {
+    if (!recordId) {
+      console.warn(`[${module.slug}] fetchAttachments called with invalid recordId:`, recordId);
+      return;
+    }
+
     try {
+      console.log(`[${module.slug}] Fetching attachments for record:`, recordId);
       const res = await fetch(`/backend-api/attachments/record/${recordId}`, {
         credentials: "include"
       });
+
       if (res.ok) {
         const data = await res.json();
         // Group attachments by field
@@ -576,6 +610,9 @@ export function ModulePage({ module }: ModulePageProps) {
           }));
         }
         setRecordAttachments(grouped);
+        console.log(`[${module.slug}] Attachments loaded:`, grouped);
+      } else {
+        console.warn(`[${module.slug}] Failed to fetch attachments: HTTP ${res.status}`);
       }
     } catch (e) {
       console.error("Failed to fetch attachments:", e);
@@ -632,15 +669,32 @@ export function ModulePage({ module }: ModulePageProps) {
   };
 
   const openModal = async (mode: FormMode, record?: Record<string, string>) => {
+    console.log(`[${module.slug}] openModal called with mode: ${mode}, record type:`, typeof record);
+
     setModalMode(mode);
     setRecordAttachments({});
-    if (record) {
-      setActiveRecordId(record._id);
-      setFormValues({ ...record });
-      await fetchAttachments(record._id);
+
+    if (record && typeof record === "object" && "_id" in record) {
+      const recordId = record._id as string;
+      console.log(`[${module.slug}] ${mode} mode - loading record ${recordId}`);
+      setActiveRecordId(recordId);
+
+      // Ensure we're using the flattened record structure
+      const recordToLoad = { ...record };
+      delete recordToLoad._id; // Remove _id from form values
+
+      console.log(`[${module.slug}] Form values to load - field count: ${Object.keys(recordToLoad).length}`, recordToLoad);
+      setFormValues(recordToLoad);
+
+      // Fetch attachments only if record ID is valid
+      if (recordId && recordId.length > 0) {
+        await fetchAttachments(recordId);
+      }
     } else {
+      console.log(`[${module.slug}] Create mode - initializing form`);
       setActiveRecordId(null);
       const initialValues: Record<string, string> = {};
+
       // Auto-populate in create mode
       if (mode === "create") {
         // Auto-populate ID fields with index offset to ensure uniqueness
@@ -658,8 +712,10 @@ export function ModulePage({ module }: ModulePageProps) {
           }
         });
       }
+      console.log(`[${module.slug}] Initial form values:`, initialValues);
       setFormValues(initialValues);
     }
+
     setFormFiles({});
     setFieldErrors({});
     setRequiredFields(detectRequiredFields(module.fields));
@@ -753,6 +809,18 @@ export function ModulePage({ module }: ModulePageProps) {
   const saveRecord = async (values?: Record<string, string>): Promise<boolean> => {
     const valuesToSave = values || formValues;
 
+    console.log(`[${module.slug}] saveRecord called with:`, valuesToSave);
+
+    // Check if we have any values to save
+    if (!valuesToSave || Object.keys(valuesToSave).length === 0) {
+      console.warn(`[${module.slug}] No form values to save!`);
+      modal.error({
+        title: "No Data",
+        content: "Please fill in at least one field before saving.",
+      });
+      return false;
+    }
+
     // Validate form before submission
     if (!validateForm()) {
       modal.error({
@@ -769,6 +837,8 @@ export function ModulePage({ module }: ModulePageProps) {
         ? `/backend-api/modules/${module.slug}/records/${activeRecordId}`
         : `/backend-api/modules/${module.slug}/records`;
 
+      console.log(`[${module.slug}] Saving ${isEdit ? 'edit' : 'create'} record:`, valuesToSave);
+
       const res = await fetch(url, {
         method: isEdit ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
@@ -776,14 +846,33 @@ export function ModulePage({ module }: ModulePageProps) {
         body: JSON.stringify({ data: valuesToSave }),
       });
 
+      console.log(`[${module.slug}] Response status:`, res.status);
+
       if (!res.ok) {
-        const errorData = await res.json();
+        let errorData;
+        try {
+          errorData = await res.json();
+        } catch {
+          errorData = { error: `HTTP ${res.status}` };
+        }
+        console.error("Save error response:", errorData);
         handleValidationError(errorData);
         throw new Error(errorData.error || `HTTP ${res.status}`);
       }
 
-      const savedData = await res.json();
+      let savedData;
+      try {
+        savedData = await res.json();
+      } catch (parseError) {
+        console.error(`[${module.slug}] Failed to parse response JSON:`, parseError);
+        throw new Error("Invalid response from server");
+      }
+
       const savedRecordId = savedData.record?.id || activeRecordId;
+
+      console.log(`[${module.slug}] Record saved with ID:`, savedRecordId);
+      console.log(`[${module.slug}] Saved record data:`, savedData.record);
+      console.log(`[${module.slug}] Complete response:`, savedData);
 
       // Handle file uploads separately
       if (savedRecordId) {
@@ -803,11 +892,16 @@ export function ModulePage({ module }: ModulePageProps) {
 
       // Refresh records list without page reload
       try {
+        console.log(`[${module.slug}] Refreshing records list from API...`);
         const listRes = await fetch(`/backend-api/modules/${module.slug}/records`, {
           credentials: "include"
         });
+        console.log(`[${module.slug}] Records list response status:`, listRes.status);
+
         if (listRes.ok) {
           const data = await listRes.json();
+          console.log(`[${module.slug}] Fetched ${(data.records ?? []).length} records`);
+
           const mapped = (data.records ?? []).map((r: any) => ({
             _id: r.id,
             ...(r.data ?? {}),
@@ -816,10 +910,13 @@ export function ModulePage({ module }: ModulePageProps) {
             "Created by": r.createdById ?? "",
             "Updated by": r.updatedById ?? "",
           }));
+          console.log(`[${module.slug}] Setting records state with ${mapped.length} records`);
           setRecords(mapped);
+        } else {
+          console.error(`[${module.slug}] Failed to fetch records: HTTP ${listRes.status}`);
         }
       } catch (e) {
-        console.error("Failed to refresh records list:", e);
+        console.error(`[${module.slug}] Error refreshing records list:`, e);
       }
 
       return true; // Indicate success
@@ -833,6 +930,10 @@ export function ModulePage({ module }: ModulePageProps) {
   };
 
   const handleCreate = async () => {
+    console.log(`[${module.slug}] Create button clicked. Form values:`, formValues);
+    console.log(`[${module.slug}] Form values count: ${Object.keys(formValues).length}`);
+    console.log(`[${module.slug}] Required fields: ${requiredFields.size}`);
+
     const success = await saveRecord();
     if (success) {
       setFormValues({});
@@ -842,6 +943,9 @@ export function ModulePage({ module }: ModulePageProps) {
 
   const handleEdit = async () => {
     if (!activeRecordId) return;
+
+    console.log(`[${module.slug}] Edit button clicked for record ${activeRecordId}. Form values:`, formValues);
+    console.log(`[${module.slug}] Form values count: ${Object.keys(formValues).length}`);
 
     const success = await saveRecord();
     if (success) {
@@ -951,12 +1055,36 @@ export function ModulePage({ module }: ModulePageProps) {
 
   const handleKanbanStatusChange = async (recordId: string, newStatus: string): Promise<boolean> => {
     const config = MODULE_KANBAN_CONFIGS[module.slug];
-    if (!config) return false;
+    if (!config) {
+      console.error(`[${module.slug}] No kanban config found`);
+      return false;
+    }
+
+    console.log(`[${module.slug}] Changing status for record ${recordId} to: ${newStatus}`);
 
     try {
       // Find the current record to merge with updated status
       const currentRecord = records.find((r) => r._id === recordId);
       if (!currentRecord) throw new Error("Record not found");
+
+      console.log(`[${module.slug}] Current record found:`, currentRecord);
+      console.log(`[${module.slug}] Status field key: ${config.statusFieldKey}`);
+      console.log(`[${module.slug}] Available fields in module:`, module.fields);
+
+      // Find the full field name from module config that matches the kanban status field key
+      // (because config fields include parentheses like "Design Status (Draft, Sent for Review, ...)")
+      const statusKeySearch = config.statusFieldKey.split("(")[0].trim();
+      console.log(`[${module.slug}] Searching for status field with key: "${statusKeySearch}"`);
+
+      const fullStatusFieldName = module.fields.find((f) =>
+        f.includes(statusKeySearch)
+      );
+      console.log(`[${module.slug}] Full status field name found: ${fullStatusFieldName}`);
+
+      if (!fullStatusFieldName) {
+        console.error(`[${module.slug}] Status field not found! Searched for: "${statusKeySearch}". Available fields:`, module.fields);
+        return false;
+      }
 
       // Prepare the updated data object (exclude audit fields)
       const dataToUpdate = { ...currentRecord };
@@ -966,8 +1094,11 @@ export function ModulePage({ module }: ModulePageProps) {
       delete dataToUpdate["Update at"];
       delete dataToUpdate["Updated by"];
 
-      // Update the status field
-      dataToUpdate[config.statusFieldKey] = newStatus;
+      // Update the status field using the full field name
+      dataToUpdate[fullStatusFieldName] = newStatus;
+      console.log(`[${module.slug}] Updated data to send:`, dataToUpdate);
+      console.log(`[${module.slug}] Setting field "${fullStatusFieldName}" to value: "${newStatus}"`);
+      console.log(`[${module.slug}] Verification - dataToUpdate[fullStatusFieldName]:`, dataToUpdate[fullStatusFieldName]);
 
       const res = await fetch(`/backend-api/modules/${module.slug}/records/${recordId}`, {
         method: "PUT",
@@ -976,12 +1107,18 @@ export function ModulePage({ module }: ModulePageProps) {
         body: JSON.stringify({ data: dataToUpdate }),
       });
 
+      console.log(`[${module.slug}] Kanban status update response status:`, res.status);
+
       if (!res.ok) {
         const errorData = await res.json();
+        console.error(`[${module.slug}] Kanban update error:`, errorData);
         throw new Error(errorData.error || `HTTP ${res.status}`);
       }
 
-      // Update local state
+      const responseData = await res.json();
+      console.log(`[${module.slug}] Kanban status update successful:`, responseData);
+
+      // Update local state immediately for kanban view
       setRecords((prev) =>
         prev.map((r) =>
           r._id === recordId
@@ -990,13 +1127,54 @@ export function ModulePage({ module }: ModulePageProps) {
         )
       );
 
+      console.log(`[${module.slug}] Records state updated - refreshing from API...`);
+
+      // Refetch records from API to ensure table view is in sync
+      try {
+        console.log(`[${module.slug}] Fetching fresh records from API...`);
+        const listRes = await fetch(`/backend-api/modules/${module.slug}/records`, {
+          credentials: "include"
+        });
+        if (listRes.ok) {
+          const data = await listRes.json();
+          console.log(`[${module.slug}] API returned ${(data.records ?? []).length} records`);
+
+          const mapped = (data.records ?? []).map((r: any) => {
+            const record = {
+              _id: r.id,
+              ...(r.data ?? {}),
+              "Created at": r.createdAt ? String(r.createdAt).slice(0, 16) : "",
+              "Update at": r.updatedAt ? String(r.updatedAt).slice(0, 16) : "",
+              "Created by": r.createdById ?? "",
+              "Updated by": r.updatedById ?? "",
+            };
+
+            // Log the updated record to verify status field
+            if (record._id === recordId) {
+              console.log(`[${module.slug}] Updated record data:`, record);
+              console.log(`[${module.slug}] Status field "${config.statusFieldKey}":`, record[config.statusFieldKey]);
+            }
+
+            return record;
+          });
+
+          console.log(`[${module.slug}] Setting records state with ${mapped.length} records`);
+          setRecords(mapped);
+          console.log(`[${module.slug}] Records state updated - table view should refresh now`);
+        } else {
+          console.warn(`[${module.slug}] Failed to fetch records: HTTP ${listRes.status}`);
+        }
+      } catch (refreshError) {
+        console.warn(`[${module.slug}] Failed to refresh records after status change:`, refreshError);
+      }
+
       modal.success({
         title: "Status Updated",
         content: `Record status changed to ${newStatus}`,
       });
       return true;
     } catch (e) {
-      console.error("Status update failed:", e);
+      console.error(`[${module.slug}] Status update failed:`, e);
       modal.error({ title: "Update failed", content: String(e) });
       return false;
     }
@@ -1109,8 +1287,8 @@ export function ModulePage({ module }: ModulePageProps) {
         <ModuleKanbanBoard
           moduleSlug={module.slug}
           records={records}
-          onCardClick={(r: Record<string, any>) => openModal("view", r._id)}
-          onCardEdit={(r: Record<string, any>) => openModal("edit", r._id)}
+          onCardClick={(r: Record<string, any>) => openModal("view", r)}
+          onCardEdit={(r: Record<string, any>) => openModal("edit", r)}
           onCardDelete={(recordId: string) => handleDelete(recordId)}
           onStatusChange={handleKanbanStatusChange}
           isLoading={loading}

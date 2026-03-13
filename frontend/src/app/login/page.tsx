@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -11,12 +11,49 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { apiClient } from "@/lib/api/client";
 import { Logo } from "@/components/ui-kit/Logo";
+import { generateDeviceFingerprint, storeDeviceToken, getStoredDeviceToken } from "@/lib/deviceFingerprint";
 
 export default function LoginPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rememberMe, setRememberMe] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
+  // Check for stored device token on page load (auto-login)
+  useEffect(() => {
+    const checkStoredDevice = async () => {
+      try {
+        const deviceFingerprint = generateDeviceFingerprint();
+        const storedToken = getStoredDeviceToken(deviceFingerprint);
+
+        if (storedToken) {
+          // Attempt auto-login with stored device token
+          const result = await apiClient.verifyDevice({
+            deviceToken: storedToken,
+            deviceFingerprint,
+          });
+
+          if (!result.error) {
+            const user = (result.data as any)?.user;
+            if (user?.role === "ADMIN") {
+              router.push("/admin");
+            } else {
+              router.push("/app");
+            }
+            router.refresh();
+            return;
+          }
+        }
+      } catch (err) {
+        console.error('Auto-login check failed:', err);
+      } finally {
+        setIsCheckingAuth(false);
+      }
+    };
+
+    checkStoredDevice();
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -27,7 +64,17 @@ export default function LoginPage() {
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
 
-    const result = await apiClient.login({ email, password, rememberMe });
+    // Generate device fingerprint and collect device info
+    const deviceFingerprint = generateDeviceFingerprint();
+    const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown';
+
+    const result = await apiClient.login({
+      email,
+      password,
+      rememberMe,
+      deviceFingerprint,
+      userAgent,
+    });
 
     if (result.error) {
       if (result.error.includes("verify your email")) {
@@ -41,6 +88,14 @@ export default function LoginPage() {
       }
       setIsLoading(false);
     } else {
+      // Store device token if Remember Me is checked
+      if (rememberMe) {
+        const deviceToken = (result.data as any)?.deviceToken;
+        if (deviceToken) {
+          storeDeviceToken(deviceFingerprint, deviceToken);
+        }
+      }
+
       // Check user role and redirect accordingly
       const user = (result.data as any)?.user;
       if (user?.role === "ADMIN") {
@@ -111,6 +166,14 @@ export default function LoginPage() {
 
       {/* Right Side - Login Form */}
       <div className="flex-1 flex items-center justify-start relative z-10 p-6 lg:p-12">
+        {isCheckingAuth ? (
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8 lg:ml-10 flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mb-4"></div>
+              <p className="text-gray-600">Checking for stored login...</p>
+            </div>
+          </div>
+        ) : (
         <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8 lg:ml-10">
           {/* Mobile Logo */}
           <div className="lg:hidden text-center mb-6">
@@ -253,6 +316,7 @@ export default function LoginPage() {
             Admin users will be redirected to the admin dashboard automatically.
           </p>
         </div>
+        )}
       </div>
     </div>
   );

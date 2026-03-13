@@ -374,7 +374,9 @@ const ColumnComponent: React.FC<ColumnProps> = ({
   const columnStyle = { backgroundColor: color };
 
   const handleDragStart = (e: DragEvent<HTMLDivElement>, card: Card) => {
+    console.log("[Kanban] Drag started - readOnly:", readOnly, "card:", card.id);
     if (readOnly) {
+      console.log("[Kanban] Drag prevented - readOnly is true");
       e.preventDefault();
       return;
     }
@@ -394,8 +396,13 @@ const ColumnComponent: React.FC<ColumnProps> = ({
   };
 
   const handleDragEnd = async (e: DragEvent<HTMLDivElement>) => {
-    if (readOnly) return;
+    console.log("[Kanban] Drag ended - column:", column);
+    if (readOnly) {
+      console.log("[Kanban] Drag ended - readOnly prevented");
+      return;
+    }
     const cardId = e.dataTransfer.getData("cardId");
+    console.log("[Kanban] Card dropped - cardId:", cardId);
     setActive(false);
     clearHighlights();
 
@@ -403,13 +410,20 @@ const ColumnComponent: React.FC<ColumnProps> = ({
     const { element } = getNearestIndicator(e, indicators);
     const before = element.dataset.before || "-1";
 
+    console.log("[Kanban] Before:", before, "CardId:", cardId, "Same position:", before === cardId);
+
     if (before !== cardId) {
       let copy = [...cards];
       const cardToMove = copy.find((c) => c.id === cardId);
-      if (!cardToMove) return;
+      if (!cardToMove) {
+        console.log("[Kanban] Card not found!");
+        return;
+      }
 
       const currentStatus = cardToMove.status;
       const isSameColumn = currentStatus === column;
+
+      console.log("[Kanban] Card status change - from:", currentStatus, "to:", column, "isSameColumn:", isSameColumn);
 
       if (!isSameColumn && limit !== undefined) {
         const columnCardCount = copy.filter((c) => c.status === column && c.id !== cardId).length;
@@ -427,7 +441,10 @@ const ColumnComponent: React.FC<ColumnProps> = ({
         copy.push(updatedCard);
       } else {
         const insertAtIndex = copy.findIndex((el) => el.id === before);
-        if (insertAtIndex === -1) return;
+        if (insertAtIndex === -1) {
+          console.log("[Kanban] Insert index not found");
+          return;
+        }
         copy.splice(insertAtIndex, 0, updatedCard);
       }
 
@@ -436,16 +453,24 @@ const ColumnComponent: React.FC<ColumnProps> = ({
 
       setCards(copy);
       if (!isSameColumn) {
+        console.log("[Kanban] Calling onCardMove with cardId:", cardId, "newStatus:", column);
         const result = onCardMove?.(cardId, column);
 
         // If onCardMove returns a Promise, wait for it and handle failure
         if (result instanceof Promise) {
+          console.log("[Kanban] onCardMove returned a Promise");
           const success = await result;
+          console.log("[Kanban] onCardMove result:", success);
           if (!success) {
             // Rollback to original state if backend update failed
+            console.log("[Kanban] Rolling back due to failure");
             setCards(originalCards);
           }
+        } else {
+          console.log("[Kanban] onCardMove did not return a Promise");
         }
+      } else {
+        console.log("[Kanban] Same column - no status change");
       }
     }
   };

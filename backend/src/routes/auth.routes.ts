@@ -79,6 +79,7 @@ router.post('/login', rateLimiter('login'), async (req, res) => {
     res.json({
       message: 'Login successful',
       user: result.user,
+      deviceToken: result.deviceToken,
     });
   } catch (error: any) {
     console.error('Login error:', error);
@@ -138,6 +139,44 @@ router.post('/refresh', async (req, res) => {
   } catch (error: any) {
     console.error('Refresh error:', error);
     res.status(401).json({ error: error.message || 'Token refresh failed' });
+  }
+});
+
+// Verify device token (for "Remember Me" functionality)
+router.post('/verify-device', async (req, res) => {
+  try {
+    const { deviceToken, deviceFingerprint } = req.body;
+
+    if (!deviceToken || !deviceFingerprint) {
+      return res.status(400).json({ error: 'Device token and fingerprint required' });
+    }
+
+    const result = await authService.verifyDeviceToken(deviceToken, deviceFingerprint);
+
+    // Set cookies
+    res.cookie('accessToken', result.accessToken, {
+      httpOnly: true,
+      secure: config.cookie.secure,
+      sameSite: config.cookie.sameSite,
+      maxAge: 15 * 60 * 1000, // 15 minutes
+      domain: config.cookie.domain === 'localhost' ? undefined : config.cookie.domain,
+    });
+
+    res.cookie('refreshToken', result.refreshToken, {
+      httpOnly: true,
+      secure: config.cookie.secure,
+      sameSite: config.cookie.sameSite,
+      maxAge: 15 * 24 * 60 * 60 * 1000, // 15 days (Remember Me duration)
+      domain: config.cookie.domain === 'localhost' ? undefined : config.cookie.domain,
+    });
+
+    res.json({
+      message: 'Device verified successfully',
+      user: result.user,
+    });
+  } catch (error: any) {
+    console.error('Device verification error:', error);
+    res.status(401).json({ error: error.message || 'Device verification failed' });
   }
 });
 

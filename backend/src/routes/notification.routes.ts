@@ -226,4 +226,34 @@ router.post('/:id/decline-invite', async (req, res) => {
     }
 });
 
+/**
+ * DELETE /api/notifications/:id
+ * Delete a notification
+ */
+router.delete('/:id', async (req, res) => {
+    try {
+        const notificationId = req.params.id;
+        const userId = (req as any).user?.userId;
+
+        // Verify notification belongs to user
+        const notification = await prisma.notification.findUnique({
+            where: { id: notificationId }
+        });
+
+        if (!notification || notification.userId !== userId) {
+            return res.status(404).json({ error: 'Notification not found' });
+        }
+
+        // Delete the notification
+        await prisma.notification.delete({
+            where: { id: notificationId }
+        });
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting notification:', error);
+        res.status(500).json({ error: 'Failed to delete notification' });
+    }
+});
+
 export default router;

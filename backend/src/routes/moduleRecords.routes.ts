@@ -89,6 +89,8 @@ router.post(
       const body: any = req.body ?? {};
       const data = body.data ?? body;
 
+      console.log(`[${slug}] Creating record with data:`, data);
+
       const record = await prisma.moduleRecord.create({
         data: {
           moduleSlug: slug,
@@ -98,10 +100,12 @@ router.post(
         },
       });
 
+      console.log(`[${slug}] Record created successfully with ID:`, record.id);
       res.status(201).json({ record });
     } catch (err) {
-      console.error("Create module record error:", err);
-      res.status(500).json({ error: "Failed to create record" });
+      console.error(`[Create] Error for module ${req.params.slug}:`, err);
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: `Failed to create record: ${errorMsg}` });
     }
   }
 );
@@ -119,6 +123,8 @@ router.put(
       const body: any = req.body ?? {};
       const data = body.data ?? body;
 
+      console.log(`[${slug}] Updating record ${id} with data:`, JSON.stringify(data, null, 2));
+
       const record = await prisma.moduleRecord.update({
         where: { id },
         data: {
@@ -127,6 +133,9 @@ router.put(
           updatedById: (req as any).user?.userId ?? (req as any).user?.id ?? null,
         },
       });
+
+      console.log(`[${slug}] Record ${id} updated successfully`);
+      console.log(`[${slug}] Record after update:`, JSON.stringify(record, null, 2));
 
       // Auto-chain: when a module record is marked complete, create next task
       const CHAIN: Record<string, { nextTitle: string; nextSlug: string }> = {
@@ -176,10 +185,11 @@ router.put(
       }
 
       res.json({ record });
-      
+
     } catch (err) {
-      console.error("Update module record error:", err);
-      res.status(500).json({ error: "Failed to update record" });
+      console.error(`[Update] Error for module ${req.params.slug}:`, err);
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: `Failed to update record: ${errorMsg}` });
     }
   }
 );
