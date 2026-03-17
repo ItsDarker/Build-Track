@@ -32,9 +32,9 @@ export default function MessagingPage() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-800">
+    <div className="flex h-full w-full bg-gray-50 dark:bg-gray-800 overflow-hidden">
       {/* Conversation List Sidebar */}
-      <div className="w-80 hidden lg:flex flex-col">
+      <div className="w-80 hidden lg:flex flex-col border-r border-gray-200 dark:border-gray-700">
         <ConversationList
           onSelectConversation={setSelectedConversationId}
           onOpenCreateGroup={() => setIsCreatingGroup(true)}
@@ -43,7 +43,7 @@ export default function MessagingPage() {
       </div>
 
       {/* Chat Window */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col h-full min-h-0">
         {selectedConversationId ? (
           <ChatWindow
             conversationId={selectedConversationId}
