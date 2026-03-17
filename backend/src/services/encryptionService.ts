@@ -138,18 +138,28 @@ export class EncryptionService {
     conversationKey: string,
     userDerivedKey: string
   ): string {
-    const keyBuffer = Buffer.from(userDerivedKey, this.ENCODING);
-    const plainKey = Buffer.from(conversationKey, this.ENCODING);
-    const iv = crypto.randomBytes(this.IV_LENGTH);
+    try {
+      const keyBuffer = Buffer.from(userDerivedKey, this.ENCODING);
+      const plainKey = Buffer.from(conversationKey, this.ENCODING);
+      const iv = crypto.randomBytes(this.IV_LENGTH);
 
-    const cipher = crypto.createCipheriv(this.ALGORITHM, keyBuffer, iv);
-    let encryptedKey = cipher.update(plainKey).toString(this.ENCODING);
-    encryptedKey += cipher.final(this.ENCODING);
+      const cipher = crypto.createCipheriv(this.ALGORITHM, keyBuffer, iv);
+      let encryptedKey = cipher.update(plainKey).toString(this.ENCODING);
+      encryptedKey += cipher.final(this.ENCODING);
 
-    const authTag = cipher.getAuthTag().toString(this.ENCODING);
+      const authTag = cipher.getAuthTag().toString(this.ENCODING);
 
-    // Return combined: iv + authTag + encryptedKey
-    return `${iv.toString(this.ENCODING)}:${authTag}:${encryptedKey}`;
+      const ivHex = iv.toString(this.ENCODING);
+      const result = `${ivHex}:${authTag}:${encryptedKey}`;
+
+      console.log(`Key wrapping: IV(${ivHex.length}) AuthTag(${authTag.length}) EncKey(${encryptedKey.length}) Result(${result.length})`);
+
+      // Return combined: iv + authTag + encryptedKey
+      return result;
+    } catch (error) {
+      console.error('Failed to encrypt key for user:', (error as Error).message);
+      throw error;
+    }
   }
 
   /**
@@ -162,7 +172,21 @@ export class EncryptionService {
     encryptedKeyWithMetadata: string,
     userDerivedKey: string
   ): string {
-    const [ivHex, authTagHex, encryptedKey] = encryptedKeyWithMetadata.split(':');
+    const parts = encryptedKeyWithMetadata.split(':');
+
+    if (parts.length !== 3) {
+      console.error(`Invalid encrypted key format: expected 3 parts, got ${parts.length}`);
+      console.error(`Encrypted key (first 50 chars): ${encryptedKeyWithMetadata.substring(0, 50)}...`);
+      throw new Error(`Invalid encrypted key format: expected 3 parts (iv:authTag:encryptedKey), got ${parts.length}`);
+    }
+
+    const [ivHex, authTagHex, encryptedKey] = parts;
+
+    if (!encryptedKey) {
+      throw new Error('Encrypted key part is empty or missing');
+    }
+
+    console.log(`Decrypting key: IV(${ivHex.length}) AuthTag(${authTagHex.length}) EncKey(${encryptedKey.length})`);
 
     const keyBuffer = Buffer.from(userDerivedKey, this.ENCODING);
     const ivBuffer = Buffer.from(ivHex, this.ENCODING);
@@ -173,6 +197,8 @@ export class EncryptionService {
 
     let decryptedKey = decipher.update(encryptedKey, this.ENCODING, this.ENCODING);
     decryptedKey += decipher.final(this.ENCODING);
+
+    console.log(`Successfully decrypted key (length: ${decryptedKey.length})`);
 
     return decryptedKey;
   }

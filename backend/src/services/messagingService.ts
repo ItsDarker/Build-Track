@@ -149,18 +149,27 @@ export class MessagingService {
 
     // Get user's encrypted key and decrypt it
     const memberRecord = conversation.members.find((m) => m.userId === currentUserId);
-    const userDerivedKey = this.getUserDerivedKey(currentUserId);
-
     let decryptedSharedKey: string | null = null;
-    try {
-      if (memberRecord?.encryptedKey) {
+
+    if (!memberRecord) {
+      console.warn(`User ${currentUserId} not found in conversation members`);
+    } else if (!memberRecord.encryptedKey) {
+      console.warn(`User ${currentUserId} has no encrypted key in conversation ${conversationId}`);
+    } else {
+      try {
+        const userDerivedKey = this.getUserDerivedKey(currentUserId);
         decryptedSharedKey = encryptionService.decryptKeyForUser(
           memberRecord.encryptedKey,
           userDerivedKey
         );
+        console.log(`Successfully decrypted shared key for user ${currentUserId}`);
+      } catch (error) {
+        const errMsg = (error as Error).message;
+        console.error(
+          `Failed to decrypt shared key for user ${currentUserId} in conversation ${conversationId}: ${errMsg}`
+        );
+        console.error(`Encrypted key format: ${memberRecord.encryptedKey?.substring(0, 50)}...`);
       }
-    } catch (error) {
-      console.error('Failed to decrypt shared key for user', currentUserId, error);
     }
 
     return {

@@ -64,14 +64,29 @@ export function useMessaging(conversationId: string, pollIntervalMs: number = 30
       // Import shared key for decryption
       if (conv.decryptedSharedKeyForCurrentUser) {
         try {
+          console.log(
+            `[useMessaging] Importing shared key (length: ${conv.decryptedSharedKeyForCurrentUser.length})`
+          );
           const key = await ClientEncryption.importKeyFromHex(
             conv.decryptedSharedKeyForCurrentUser
           );
+          console.log('[useMessaging] Successfully imported shared key');
           setSharedKey(key);
         } catch (err) {
-          console.error('Failed to import shared key:', err);
+          console.error(
+            `[useMessaging] Failed to import shared key: ${(err as Error).message}`
+          );
+          console.error(
+            `[useMessaging] Shared key details: ${conv.decryptedSharedKeyForCurrentUser?.substring(
+              0,
+              50
+            )}...`
+          );
           setError('Failed to setup decryption. Please refresh.');
         }
+      } else {
+        console.warn('[useMessaging] No decryptedSharedKeyForCurrentUser returned from backend');
+        setError('No decryption key available. Cannot decrypt messages.');
       }
     } catch (err) {
       console.error('Error loading conversation:', err);
@@ -87,6 +102,9 @@ export function useMessaging(conversationId: string, pollIntervalMs: number = 30
   const decryptMessage = useCallback(
     async (encryptedMsg: Message): Promise<DecryptedMessage> => {
       if (!sharedKey) {
+        console.warn(
+          `[decryptMessage] No shared key available for message ${encryptedMsg.id}`
+        );
         return {
           ...encryptedMsg,
           decryptedContent: '',
@@ -109,7 +127,14 @@ export function useMessaging(conversationId: string, pollIntervalMs: number = 30
           decryptionFailed: false,
         };
       } catch (err) {
-        console.error(`Failed to decrypt message ${encryptedMsg.id}:`, err);
+        console.error(
+          `[decryptMessage] Failed to decrypt message ${encryptedMsg.id}: ${(err as Error).message}`
+        );
+        console.debug('[decryptMessage] Message encryption parameters:', {
+          encryptedContent: encryptedMsg.encryptedContent?.substring(0, 30),
+          iv: encryptedMsg.encryptionIv?.substring(0, 30),
+          authTag: encryptedMsg.authTag?.substring(0, 30),
+        });
         return {
           ...encryptedMsg,
           decryptedContent: '',
