@@ -32,7 +32,8 @@ const RESOURCES = [
   'users',
   'settings',
   'scheduling',
-  'delivery'
+  'delivery',
+  'messaging'
 ] as const;
 
 // Helper to expand permissions
@@ -53,6 +54,7 @@ const ROLE_PERMISSIONS: Record<string, { resource: string, action: string }[]> =
     ...p('settings', ['read', 'update']),
     ...p('scheduling', ['read', 'create', 'update']),
     ...p('delivery', ['read', 'create', 'update']),
+    ...p('messaging', ['read', 'create', 'update']),
   ],
   ORG_ADMIN: [
     ...p('crm', ['read', 'create', 'update', 'delete']),
@@ -67,6 +69,7 @@ const ROLE_PERMISSIONS: Record<string, { resource: string, action: string }[]> =
     ...p('settings', ['read', 'update']),
     ...p('scheduling', ['read', 'create', 'update']),
     ...p('delivery', ['read', 'create', 'update']),
+    ...p('messaging', ['read', 'create', 'update']),
   ],
   PROJECT_MANAGER: [
     ...p('crm', ['read', 'create', 'update', 'delete']),
@@ -79,13 +82,18 @@ const ROLE_PERMISSIONS: Record<string, { resource: string, action: string }[]> =
     ...p('production', ['read', 'create', 'update', 'delete']),
     ...p('inventory', ['read', 'create', 'update', 'delete']),
     ...p('delivery', ['read', 'create', 'update', 'delete']),
+    ...p('messaging', ['read', 'create', 'update']),
   ],
+  // Group management permission (in addition to regular messaging)
+  // This is checked separately in conversation creation endpoints
+  // PROJECT_MANAGER and above can create and manage groups
   SALES_MANAGER: [
     ...p('crm', ['read', 'create', 'update']),
     ...p('quoting', ['read', 'create', 'update']),
     ...p('work_orders', ['read', 'create', 'update']),  // job-confirmation
     ...p('project', ['read']),          // approval-workflow
     ...p('finance', ['read']),           // billing-invoicing read access
+    ...p('messaging', ['read', 'create']),
   ],
   PROJECT_COORDINATOR: [
     ...p('project', ['read', 'create', 'update']), // Requirements & design R/W
@@ -93,18 +101,21 @@ const ROLE_PERMISSIONS: Record<string, { resource: string, action: string }[]> =
     ...p('work_orders', ['read', 'create', 'update']),
     ...p('inventory', ['read']),         // procurement read
     ...p('scheduling', ['read']),        // production-scheduling read
+    ...p('messaging', ['read', 'create']),
   ],
   PROCUREMENT_MANAGER: [
     ...p('inventory', ['read', 'create', 'update']),
     ...p('project', ['read']),
     ...p('work_orders', ['read']),       // work-orders read
     ...p('production', ['read']),        // packaging read
+    ...p('messaging', ['read', 'create']),
   ],
   PRODUCTION_MANAGER: [
     ...p('work_orders', ['read', 'create', 'update']), // work-orders R/W
     ...p('production', ['read', 'create', 'update']),
     ...p('scheduling', ['read', 'create', 'update']),
     ...p('inventory', ['read']),         // BOM/procurement read
+    ...p('messaging', ['read', 'create']),
   ],
   PLANNER: [
     ...p('crm', ['read']),
@@ -114,32 +125,38 @@ const ROLE_PERMISSIONS: Record<string, { resource: string, action: string }[]> =
     ...p('production', ['read']),
     ...p('inventory', ['read', 'create', 'update']),
     ...p('work_orders', ['read']),
+    ...p('messaging', ['read', 'create']),
   ],
   QC_MANAGER: [
     ...p('work_orders', ['read', 'create', 'update']),
     ...p('qc', ['read', 'create', 'update', 'approve']),
+    ...p('messaging', ['read', 'create']),
   ],
   LOGISTICS_MANAGER: [
     ...p('delivery', ['read', 'create', 'update']),
     ...p('work_orders', ['read']),
     ...p('project', ['read']),
     ...p('scheduling', ['read']),        // production-scheduling read
+    ...p('messaging', ['read', 'create']),
   ],
   FINANCE_MANAGER: [
     ...p('quoting', ['read', 'create', 'update']),     // quoting-contracts
     ...p('work_orders', ['read', 'create', 'update']), // job-confirmation
     ...p('finance', ['read', 'create', 'update', 'approve']),
     ...p('project', ['read']),
+    ...p('messaging', ['read', 'create']),
   ],
   CLIENT: [
     ...p('project', ['read']),
     ...p('work_orders', ['read']), // Status only
     ...p('delivery', ['read']),
     ...p('finance', ['read']), // Invoices only
+    ...p('messaging', ['read', 'create']),
   ],
   VENDOR: [
     // Limited scope, usually just their POs
     ...p('inventory', ['read', 'update']),
+    ...p('messaging', ['read', 'create']),
   ],
 };
 
@@ -218,6 +235,7 @@ async function main() {
 
   // Demo Users for all roles
   const demoUsers = [
+    { email: 'finofranklin@gmail.com', name: 'Fino Franklin', role: 'PROJECT_MANAGER' },
     { email: 'pm@buildtrack.com', name: 'Project Manager', role: 'PROJECT_MANAGER' },
     { email: 'qc@buildtrack.com', name: 'QC User', role: 'QC_MANAGER' },
     { email: 'finance@buildtrack.com', name: 'Finance User', role: 'FINANCE_MANAGER' },

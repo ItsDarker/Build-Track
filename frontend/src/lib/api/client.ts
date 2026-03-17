@@ -677,6 +677,166 @@ class ApiClient {
   getAttachmentDownloadUrl(attachmentId: string) {
     return `/backend-api/attachments/download/${attachmentId}`;
   }
+
+  // Messaging - Conversations
+  async getConversations() {
+    return this.request('/backend-api/conversations', { method: 'GET' });
+  }
+
+  async createConversation(data: {
+    name?: string;
+    description?: string;
+    isGroup: boolean;
+    memberIds: string[];
+  }) {
+    return this.request('/backend-api/conversations', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getConversation(id: string) {
+    return this.request(`/backend-api/conversations/${id}`, { method: 'GET' });
+  }
+
+  async updateConversation(id: string, data: { name?: string; description?: string }) {
+    return this.request(`/backend-api/conversations/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteConversation(id: string) {
+    return this.request(`/backend-api/conversations/${id}`, { method: 'DELETE' });
+  }
+
+  async getConversationMembers(conversationId: string) {
+    return this.request(`/backend-api/conversations/${conversationId}/members`, {
+      method: 'GET',
+    });
+  }
+
+  async addConversationMembers(conversationId: string, data: { userIds: string[] }) {
+    return this.request(`/backend-api/conversations/${conversationId}/members`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async removeConversationMember(conversationId: string, userId: string) {
+    return this.request(`/backend-api/conversations/${conversationId}/members/${userId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async leaveConversation(conversationId: string) {
+    return this.request(`/backend-api/conversations/${conversationId}/leave`, {
+      method: 'POST',
+    });
+  }
+
+  // Messaging - Messages
+  async getMessages(
+    conversationId: string,
+    params?: { limit?: number; offset?: number }
+  ) {
+    const searchParams = new URLSearchParams();
+    if (params?.limit) searchParams.set('limit', params.limit.toString());
+    if (params?.offset) searchParams.set('offset', params.offset.toString());
+    return this.request(
+      `/backend-api/messages/conversation/${conversationId}?${searchParams.toString()}`,
+      { method: 'GET' }
+    );
+  }
+
+  async sendMessage(data: {
+    conversationId: string;
+    encryptedContent: string;
+    encryptionIv: string;
+    authTag: string;
+    messageType?: string;
+  }) {
+    return this.request('/backend-api/messages', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async editMessage(
+    messageId: string,
+    data: {
+      encryptedContent: string;
+      encryptionIv: string;
+      authTag: string;
+    }
+  ) {
+    return this.request(`/backend-api/messages/${messageId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteMessage(messageId: string) {
+    return this.request(`/backend-api/messages/${messageId}`, { method: 'DELETE' });
+  }
+
+  async markMessagesAsRead(conversationId: string) {
+    return this.request(
+      `/backend-api/messages/conversation/${conversationId}/mark-read`,
+      { method: 'PUT' }
+    );
+  }
+
+  // Messaging - Attachments
+  async uploadMessageAttachment(
+    file: File,
+    messageId: string,
+    conversationId: string,
+    encryptedFileData: {
+      encryptedContent: string;
+      iv: string;
+      authTag: string;
+    }
+  ) {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('messageId', messageId);
+    formData.append('conversationId', conversationId);
+    formData.append('encryptionKey', encryptedFileData.authTag); // Use auth tag as ref
+    try {
+      const response = await fetch(`${this.baseUrl}/backend-api/message-attachments/upload`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      const data = await response.json();
+      if (!response.ok) return { error: data.error || 'Upload failed' };
+      return { data };
+    } catch (error) {
+      return { error: 'Upload failed' };
+    }
+  }
+
+  async downloadMessageAttachment(attachmentId: string, encryptionKey: string) {
+    const searchParams = new URLSearchParams();
+    searchParams.set('encryptionKey', encryptionKey);
+    return this.request(
+      `/backend-api/message-attachments/${attachmentId}/download?${searchParams.toString()}`,
+      { method: 'GET' }
+    );
+  }
+
+  async getMessageAttachmentPreview(attachmentId: string) {
+    return this.request(`/backend-api/message-attachments/${attachmentId}/preview`, {
+      method: 'GET',
+    });
+  }
+
+  async deleteMessageAttachment(attachmentId: string) {
+    return this.request(`/backend-api/message-attachments/${attachmentId}`, {
+      method: 'DELETE',
+    });
+  }
 }
 
 export const apiClient = new ApiClient(API_URL);

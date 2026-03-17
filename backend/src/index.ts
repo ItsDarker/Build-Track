@@ -17,6 +17,9 @@ import lookupRoutes from './routes/lookup.routes';
 import attachmentRoutes from './routes/attachment.routes';
 import notificationRoutes from './routes/notification.routes';
 import projectInvitationRoutes from './routes/project-invitations.routes';
+import conversationRoutes from './routes/conversations.routes';
+import messageRoutes from './routes/messages.routes';
+import messageAttachmentRoutes from './routes/messageAttachments.routes';
 
 
 const app = express();
@@ -73,6 +76,9 @@ app.use('/api/modules', moduleRecordsRoutes);
 app.use('/api/lookups', lookupRoutes);
 app.use('/api/attachments', attachmentRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/conversations', conversationRoutes);
+app.use('/api/messages', messageRoutes);
+app.use('/api/message-attachments', messageAttachmentRoutes);
 
 
 // Error handler

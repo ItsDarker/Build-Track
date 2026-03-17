@@ -19,6 +19,7 @@ import {
   MenuUnfoldOutlined,
   BellOutlined,
   CloseOutlined,
+  MessageOutlined,
 } from "@ant-design/icons";
 import {
   ChevronDown,
@@ -401,8 +402,21 @@ export function DashboardLayout({ user, children }: DashboardLayoutProps) {
           ))}
         </nav>
 
-        {/* All Modules link */}
+        {/* Messaging and All Modules section */}
         <div className="px-2 mt-4 border-t border-slate-700 pt-4">
+          <Link
+            href="/app/messaging"
+            className={cn(
+              "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
+              pathname.startsWith("/app/messaging")
+                ? "bg-blue-500/20 text-blue-300"
+                : "text-gray-400 hover:text-white hover:bg-slate-700/50"
+            )}
+          >
+            <MessageOutlined style={{ fontSize: 16 }} />
+            {!collapsed && <span>Messaging</span>}
+          </Link>
+
           <Link
             href="/app/modules"
             className={cn(

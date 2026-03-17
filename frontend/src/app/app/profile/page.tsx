@@ -9,7 +9,7 @@ import {
   Form,
   Select,
   Upload,
-  message,
+  App as AntApp,
   Spin,
   Tabs,
   Typography,
@@ -56,8 +56,9 @@ interface UserProfile {
   createdAt?: string;
 }
 
-export default function ProfilePage() {
+function ProfileContent() {
   const router = useRouter();
+  const { message } = AntApp.useApp();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -395,5 +396,13 @@ export default function ProfilePage() {
       <Divider />
       <Tabs items={tabItems} />
     </>
+  );
+}
+
+export default function ProfilePage() {
+  return (
+    <AntApp>
+      <ProfileContent />
+    </AntApp>
   );
 }

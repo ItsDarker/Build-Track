@@ -1,0 +1,143 @@
+'use client';
+
+import React, { useEffect, useRef, useState } from 'react';
+import { Empty, Spin, Skeleton, message as antMessage } from 'antd';
+import { useMessaging } from '@/hooks/useMessaging';
+import ConversationHeader, { ConversationMembersDrawer } from './ConversationHeader';
+import MessageBubble from './MessageBubble';
+import MessageComposer from './MessageComposer';
+
+interface ChatWindowProps {
+  conversationId: string;
+  currentUserId?: string;
+}
+
+const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, currentUserId }) => {
+  const {
+    conversation,
+    messages,
+    isLoading,
+    error,
+    isSending,
+    editingMessageId,
+    sendMessage,
+    editMessage,
+    deleteMessage,
+    setEditingMessageId,
+    deleteConversation,
+  } = useMessaging(conversationId);
+
+  const [showMembers, setShowMembers] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom on new messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages.length]);
+
+  const handleSendMessage = async (text: string, files: File[]) => {
+    try {
+      await sendMessage(text);
+      // TODO: Handle file uploads in Phase 2.5
+      if (files.length > 0) {
+        antMessage.info('File attachments coming soon!');
+      }
+    } catch (err) {
+      console.error('Error sending message:', err);
+    }
+  };
+
+  const handleDeleteConversation = async () => {
+    try {
+      await deleteConversation?.();
+      antMessage.success('Conversation deleted');
+      // Parent component should handle navigation
+    } catch (err) {
+      console.error('Error deleting conversation:', err);
+      antMessage.error('Failed to delete conversation');
+    }
+  };
+
+  if (isLoading && !conversation) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <Spin />
+      </div>
+    );
+  }
+
+  if (!conversation && error) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center">
+        <Empty description={error} />
+      </div>
+    );
+  }
+
+  if (!conversation) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <Empty description="No conversation selected" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 flex flex-col h-full bg-white dark:bg-gray-900">
+      {/* Header */}
+      <ConversationHeader
+        conversation={conversation}
+        onShowMembers={() => setShowMembers(true)}
+        onDelete={handleDeleteConversation}
+      />
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-2">
+        {isLoading && messages.length === 0 ? (
+          <div className="space-y-2">
+            {[...Array(5)].map((_, i) => (
+              <Skeleton key={i} paragraph={{ rows: 1 }} />
+            ))}
+          </div>
+        ) : messages.length === 0 ? (
+          <Empty description="No messages yet. Start the conversation!" />
+        ) : (
+          messages.map((msg) => (
+            <MessageBubble
+              key={msg.id}
+              message={msg}
+              isCurrentUser={msg.senderId === currentUserId}
+              isEditing={editingMessageId === msg.id}
+              currentUserId={currentUserId}
+              onEdit={(text) => editMessage(msg.id, text)}
+              onDelete={() => deleteMessage(msg.id)}
+              onEditModeChange={(editing) => {
+                if (editing) {
+                  setEditingMessageId(msg.id);
+                } else {
+                  setEditingMessageId(null);
+                }
+              }}
+            />
+          ))
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Composer */}
+      <MessageComposer
+        onSend={handleSendMessage}
+        disabled={!conversation || isSending}
+      />
+
+      {/* Members drawer */}
+      <ConversationMembersDrawer
+        open={showMembers}
+        conversation={conversation}
+        onClose={() => setShowMembers(false)}
+      />
+    </div>
+  );
+};
+
+export default ChatWindow;
