@@ -76,11 +76,11 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         )}
 
         {isEditing ? (
-          <div className={`px-3 py-2 ${bubbleClasses}`}>
+          <div className={`px-3 py-2 ${bubbleClasses} max-w-xs sm:max-w-md md:max-w-lg`}>
             <textarea
               value={editText}
               onChange={(e) => setEditText(e.target.value)}
-              className="w-full bg-transparent border-0 resize-none focus:outline-none text-sm"
+              className="w-full bg-transparent border-0 resize-none focus:outline-none text-sm break-words"
               rows={3}
               maxLength={4000}
             />
@@ -101,7 +101,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           </div>
         ) : (
           <>
-            <div className={`px-3 py-2 ${bubbleClasses}`}>
+            <div className={`px-3 py-2 ${bubbleClasses} max-w-xs sm:max-w-md md:max-w-lg overflow-hidden`}>
               {message.decryptionFailed ? (
                 <p className="text-sm italic opacity-75">
                   [Failed to decrypt message: {message.decryptionError}]

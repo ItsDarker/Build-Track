@@ -447,13 +447,21 @@ export function useMessaging(conversationId: string, pollIntervalMs: number = 30
 
   /**
    * Initialize conversation and setup polling
+   * Clear state when conversation changes
    */
   useEffect(() => {
+    // Reset state when conversation changes
+    setMessages([]);
+    setSharedKey(null);
+    messageIdsRef.current.clear();
+    setCurrentPage(0);
+    setError(null);
+
     const init = async () => {
       await loadConversation();
     };
     init();
-  }, [conversationId, loadConversation]);
+  }, [conversationId]);
 
   /**
    * Load initial messages when shared key is ready

@@ -196,6 +196,11 @@ export class ClientEncryption {
     cryptoKey: CryptoKey
   ): Promise<string> {
     try {
+      // Validate inputs
+      if (!encryptedContent || !iv || !authTag) {
+        throw new Error('Missing encryption parameters (content, iv, or tag)');
+      }
+
       // Convert hex inputs to bytes
       const ivBytes = this.hexToBytes(iv);
       const contentBytes = this.hexToBytes(encryptedContent);
@@ -217,7 +222,12 @@ export class ClientEncryption {
       const decoder = new TextDecoder();
       return decoder.decode(decrypted);
     } catch (error) {
-      throw new Error(`Message decryption failed: ${(error as Error).message}`);
+      const errMsg = (error as Error).message;
+      // Don't expose detailed error info to prevent leaking encryption details
+      if (errMsg.includes('decryption failed') || errMsg.includes('authentication')) {
+        throw new Error('Failed to decrypt message - key mismatch or corrupted data');
+      }
+      throw new Error(`Message decryption failed: ${errMsg}`);
     }
   }
 

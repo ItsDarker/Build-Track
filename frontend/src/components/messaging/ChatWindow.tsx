@@ -84,16 +84,18 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, currentUserId }
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-white dark:bg-gray-900">
-      {/* Header */}
-      <ConversationHeader
-        conversation={conversation}
-        onShowMembers={() => setShowMembers(true)}
-        onDelete={handleDeleteConversation}
-      />
+    <div className="flex-1 flex flex-col h-full bg-white dark:bg-gray-900 overflow-hidden">
+      {/* Header - fixed height */}
+      <div className="flex-shrink-0">
+        <ConversationHeader
+          conversation={conversation}
+          onShowMembers={() => setShowMembers(true)}
+          onDelete={handleDeleteConversation}
+        />
+      </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-2">
+      {/* Messages - scrollable middle section */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-2 flex flex-col">
         {isLoading && messages.length === 0 ? (
           <div className="space-y-2">
             {[...Array(5)].map((_, i) => (
@@ -101,35 +103,42 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, currentUserId }
             ))}
           </div>
         ) : messages.length === 0 ? (
-          <Empty description="No messages yet. Start the conversation!" />
+          <div className="flex-1 flex items-center justify-center">
+            <Empty description="No messages yet. Start the conversation!" />
+          </div>
         ) : (
-          messages.map((msg) => (
-            <MessageBubble
-              key={msg.id}
-              message={msg}
-              isCurrentUser={msg.senderId === currentUserId}
-              isEditing={editingMessageId === msg.id}
-              currentUserId={currentUserId}
-              onEdit={(text) => editMessage(msg.id, text)}
-              onDelete={() => deleteMessage(msg.id)}
-              onEditModeChange={(editing) => {
-                if (editing) {
-                  setEditingMessageId(msg.id);
-                } else {
-                  setEditingMessageId(null);
-                }
-              }}
-            />
-          ))
+          <>
+            {messages.map((msg) => (
+              <div key={msg.id} className="break-words">
+                <MessageBubble
+                  message={msg}
+                  isCurrentUser={msg.senderId === currentUserId}
+                  isEditing={editingMessageId === msg.id}
+                  currentUserId={currentUserId}
+                  onEdit={(text) => editMessage(msg.id, text)}
+                  onDelete={() => deleteMessage(msg.id)}
+                  onEditModeChange={(editing) => {
+                    if (editing) {
+                      setEditingMessageId(msg.id);
+                    } else {
+                      setEditingMessageId(null);
+                    }
+                  }}
+                />
+              </div>
+            ))}
+            <div ref={messagesEndRef} />
+          </>
         )}
-        <div ref={messagesEndRef} />
       </div>
 
-      {/* Composer */}
-      <MessageComposer
-        onSend={handleSendMessage}
-        disabled={!conversation || isSending}
-      />
+      {/* Composer - fixed height */}
+      <div className="flex-shrink-0">
+        <MessageComposer
+          onSend={handleSendMessage}
+          disabled={!conversation || isSending}
+        />
+      </div>
 
       {/* Members drawer */}
       <ConversationMembersDrawer
