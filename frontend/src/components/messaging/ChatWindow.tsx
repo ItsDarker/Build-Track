@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Empty, Spin, Skeleton, message as antMessage } from 'antd';
+import { Empty, Spin, Skeleton, App } from 'antd';
 import { useMessaging } from '@/hooks/useMessaging';
 import ConversationHeader, { ConversationMembersDrawer } from './ConversationHeader';
 import MessageBubble from './MessageBubble';
@@ -13,6 +13,7 @@ interface ChatWindowProps {
 }
 
 const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, currentUserId }) => {
+  const { message } = App.useApp();
   const {
     conversation,
     messages,
@@ -25,7 +26,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, currentUserId }
     deleteMessage,
     setEditingMessageId,
     deleteConversation,
-  } = useMessaging(conversationId);
+  } = useMessaging(conversationId, 3000, message);
 
   const [showMembers, setShowMembers] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -40,7 +41,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, currentUserId }
       await sendMessage(text);
       // TODO: Handle file uploads in Phase 2.5
       if (files.length > 0) {
-        antMessage.info('File attachments coming soon!');
+        message.info('File attachments coming soon!');
       }
     } catch (err) {
       console.error('Error sending message:', err);
@@ -50,11 +51,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, currentUserId }
   const handleDeleteConversation = async () => {
     try {
       await deleteConversation?.();
-      antMessage.success('Conversation deleted');
+      message.success('Conversation deleted');
       // Parent component should handle navigation
     } catch (err) {
       console.error('Error deleting conversation:', err);
-      antMessage.error('Failed to delete conversation');
+      message.error('Failed to delete conversation');
     }
   };
 

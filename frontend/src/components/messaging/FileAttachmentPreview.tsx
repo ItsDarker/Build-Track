@@ -1,11 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Button, Popconfirm, Modal, Spin } from 'antd';
+import { Button, Popconfirm, Modal, Spin, App } from 'antd';
 import { DeleteOutlined, DownloadOutlined, FileOutlined, FilePdfOutlined, FileImageOutlined } from '@ant-design/icons';
 import { MessageAttachment } from '@/types/messaging';
 import { apiClient } from '@/lib/api/client';
-import { message as antMessage } from 'antd';
 
 interface FileAttachmentPreviewProps {
   attachment: MessageAttachment;
@@ -22,6 +21,7 @@ const FileAttachmentPreview: React.FC<FileAttachmentPreviewProps> = ({
   onDelete,
   encryptionKey,
 }) => {
+  const { message } = App.useApp();
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -46,7 +46,7 @@ const FileAttachmentPreview: React.FC<FileAttachmentPreviewProps> = ({
 
   const handleDownload = async () => {
     if (!encryptionKey) {
-      antMessage.error('Encryption key not available');
+      message.error('Encryption key not available');
       return;
     }
 
@@ -58,7 +58,7 @@ const FileAttachmentPreview: React.FC<FileAttachmentPreviewProps> = ({
       );
 
       if (response.error) {
-        antMessage.error('Failed to download file');
+        message.error('Failed to download file');
         return;
       }
 
@@ -69,10 +69,10 @@ const FileAttachmentPreview: React.FC<FileAttachmentPreviewProps> = ({
       link.click();
       URL.revokeObjectURL(link.href);
 
-      antMessage.success('File downloaded');
+      message.success('File downloaded');
     } catch (err) {
       console.error('Error downloading file:', err);
-      antMessage.error('Failed to download file');
+      message.error('Failed to download file');
     } finally {
       setIsDownloading(false);
     }
@@ -106,10 +106,10 @@ const FileAttachmentPreview: React.FC<FileAttachmentPreviewProps> = ({
     try {
       await apiClient.deleteMessageAttachment(attachment.id);
       onDelete?.();
-      antMessage.success('Attachment deleted');
+      message.success('Attachment deleted');
     } catch (err) {
       console.error('Error deleting attachment:', err);
-      antMessage.error('Failed to delete attachment');
+      message.error('Failed to delete attachment');
     } finally {
       setIsDeleting(false);
     }

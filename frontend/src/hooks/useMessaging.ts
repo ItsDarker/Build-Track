@@ -10,13 +10,14 @@ import {
   Message,
   SendMessagePayload,
 } from '@/types/messaging';
-import { message as antMessage } from 'antd';
+import { message as defaultMessage } from 'antd';
 
 /**
  * useMessaging Hook
  * Manages conversation state, message polling, encryption/decryption
  */
-export function useMessaging(conversationId: string, pollIntervalMs: number = 3000) {
+export function useMessaging(conversationId: string, pollIntervalMs: number = 3000, messageApi?: typeof defaultMessage) {
+  const antMessage = messageApi || defaultMessage;
   // State
   const [conversation, setConversation] = useState<ConversationWithMembers | null>(null);
   const [messages, setMessages] = useState<DecryptedMessage[]>([]);

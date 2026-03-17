@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { List, Input, Button, Empty, Spin, Badge, Tooltip, Popconfirm, message as antMessage } from 'antd';
+import { List, Input, Button, Empty, Spin, Badge, Tooltip, Popconfirm, App } from 'antd';
 import { PlusOutlined, DeleteOutlined, TeamOutlined } from '@ant-design/icons';
 import { Conversation, ConversationListItem } from '@/types/messaging';
 import { apiClient } from '@/lib/api/client';
@@ -18,6 +18,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
   onOpenCreateGroup,
   selectedId,
 }) => {
+  const { message } = App.useApp();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [filteredConversations, setFilteredConversations] = useState<Conversation[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -77,14 +78,14 @@ const ConversationList: React.FC<ConversationListProps> = ({
     try {
       const response = await apiClient.deleteConversation(id);
       if (response.error) {
-        antMessage.error('Failed to delete conversation');
+        message.error('Failed to delete conversation');
         return;
       }
       setConversations((prev) => prev.filter((c) => c.id !== id));
-      antMessage.success('Conversation deleted');
+      message.success('Conversation deleted');
     } catch (err) {
       console.error('Error deleting conversation:', err);
-      antMessage.error('Failed to delete conversation');
+      message.error('Failed to delete conversation');
     }
   };
 

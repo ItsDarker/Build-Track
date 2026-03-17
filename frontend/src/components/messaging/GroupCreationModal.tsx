@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Modal, Form, Input, Select, Button, Spin, message as antMessage, Alert } from 'antd';
+import { Modal, Form, Input, Select, Button, Spin, Alert, App } from 'antd';
 import { apiClient } from '@/lib/api/client';
 import { AssignableUser } from '@/types/messaging';
 
@@ -18,6 +18,7 @@ const GroupCreationModal: React.FC<GroupCreationModalProps> = ({
   onSuccess,
   isAllowedToCreate = true,
 }) => {
+  const { message } = App.useApp();
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<AssignableUser[]>([]);
@@ -41,7 +42,7 @@ const GroupCreationModal: React.FC<GroupCreationModalProps> = ({
       }
     } catch (err) {
       console.error('Error loading users:', err);
-      antMessage.error('Failed to load users');
+      message.error('Failed to load users');
     } finally {
       setLoadingUsers(false);
     }
@@ -62,18 +63,18 @@ const GroupCreationModal: React.FC<GroupCreationModalProps> = ({
       });
 
       if (response.error) {
-        antMessage.error(response.error);
+        message.error(response.error);
         return;
       }
 
       const data = response.data as { conversation: { id: string } };
-      antMessage.success('Group created successfully!');
+      message.success('Group created successfully!');
       form.resetFields();
       onSuccess(data.conversation.id);
       onClose();
     } catch (err) {
       console.error('Error creating group:', err);
-      antMessage.error('Failed to create group');
+      message.error('Failed to create group');
     } finally {
       setLoading(false);
     }

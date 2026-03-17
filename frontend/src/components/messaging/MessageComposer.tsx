@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useState } from 'react';
-import { Button, Space, Input, Tooltip, message as antMessage, Progress } from 'antd';
+import { Button, Space, Input, Tooltip, Progress, App } from 'antd';
 import { SendOutlined, PaperClipOutlined, SmileOutlined } from '@ant-design/icons';
 
 interface MessageComposerProps {
@@ -10,6 +10,7 @@ interface MessageComposerProps {
 }
 
 const MessageComposer: React.FC<MessageComposerProps> = ({ onSend, disabled = false }) => {
+  const { message } = App.useApp();
   const [content, setContent] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
@@ -22,12 +23,12 @@ const MessageComposer: React.FC<MessageComposerProps> = ({ onSend, disabled = fa
 
   const handleSend = async () => {
     if (!content.trim() && files.length === 0) {
-      antMessage.warning('Enter a message or select a file');
+      message.warning('Enter a message or select a file');
       return;
     }
 
     if (isOverLimit) {
-      antMessage.error('Message exceeds 4000 character limit');
+      message.error('Message exceeds 4000 character limit');
       return;
     }
 
@@ -51,7 +52,7 @@ const MessageComposer: React.FC<MessageComposerProps> = ({ onSend, disabled = fa
 
     // Validate file count
     if (files.length + selectedFiles.length > 5) {
-      antMessage.error('Maximum 5 files per message');
+      message.error('Maximum 5 files per message');
       return;
     }
 
@@ -61,7 +62,7 @@ const MessageComposer: React.FC<MessageComposerProps> = ({ onSend, disabled = fa
     const maxSize = 50 * 1024 * 1024; // 50MB
 
     if (totalSize > maxSize) {
-      antMessage.error('Total file size cannot exceed 50MB');
+      message.error('Total file size cannot exceed 50MB');
       return;
     }
 
