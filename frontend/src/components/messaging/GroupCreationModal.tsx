@@ -35,7 +35,9 @@ const GroupCreationModal: React.FC<GroupCreationModalProps> = ({
       setLoadingUsers(true);
       const response = await apiClient.getAssignableUsers?.();
       if (response?.data) {
-        setUsers(response.data as AssignableUser[]);
+        const userData = response.data as any;
+        const usersList = userData.users || userData || [];
+        setUsers(Array.isArray(usersList) ? usersList : []);
       }
     } catch (err) {
       console.error('Error loading users:', err);
@@ -84,7 +86,7 @@ const GroupCreationModal: React.FC<GroupCreationModalProps> = ({
       onCancel={onClose}
       width={500}
       footer={null}
-      destroyOnClose
+      destroyOnHidden
     >
       {!isAllowedToCreate ? (
         <Alert
