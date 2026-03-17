@@ -114,6 +114,13 @@ export function useMessaging(conversationId: string, pollIntervalMs: number = 30
       }
 
       try {
+        console.debug(`[decryptMessage] Decrypting message ${encryptedMsg.id}`, {
+          contentLen: encryptedMsg.encryptedContent?.length,
+          ivLen: encryptedMsg.encryptionIv?.length,
+          tagLen: encryptedMsg.authTag?.length,
+          keyType: sharedKey?.type,
+        });
+
         const plaintext = await ClientEncryption.decryptMessage(
           encryptedMsg.encryptedContent,
           encryptedMsg.encryptionIv,
@@ -121,25 +128,32 @@ export function useMessaging(conversationId: string, pollIntervalMs: number = 30
           sharedKey
         );
 
+        console.debug(`[decryptMessage] Successfully decrypted message ${encryptedMsg.id}`);
+
         return {
           ...encryptedMsg,
           decryptedContent: plaintext,
           decryptionFailed: false,
         };
       } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
         console.error(
-          `[decryptMessage] Failed to decrypt message ${encryptedMsg.id}: ${(err as Error).message}`
+          `[decryptMessage] Failed to decrypt message ${encryptedMsg.id}: ${errorMsg}`
         );
         console.debug('[decryptMessage] Message encryption parameters:', {
-          encryptedContent: encryptedMsg.encryptedContent?.substring(0, 30),
-          iv: encryptedMsg.encryptionIv?.substring(0, 30),
-          authTag: encryptedMsg.authTag?.substring(0, 30),
+          encryptedContent: encryptedMsg.encryptedContent?.substring(0, 50),
+          iv: encryptedMsg.encryptionIv?.substring(0, 50),
+          authTag: encryptedMsg.authTag?.substring(0, 50),
+        });
+        console.debug('[decryptMessage] Error details:', {
+          errorType: err?.constructor?.name,
+          errorObj: err,
         });
         return {
           ...encryptedMsg,
           decryptedContent: '',
           decryptionFailed: true,
-          decryptionError: (err as Error).message,
+          decryptionError: errorMsg,
         };
       }
     },

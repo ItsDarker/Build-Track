@@ -106,14 +106,44 @@ export class ClientEncryption {
    * @returns CryptoKey ready for AES-GCM operations
    */
   static async importKeyFromHex(hexKey: string): Promise<CryptoKey> {
-    const keyData = this.hexToArrayBuffer(hexKey);
-    return crypto.subtle.importKey(
-      'raw',
-      keyData,
-      { name: ALGORITHM },
-      false, // not extractable (security best practice)
-      ['encrypt', 'decrypt']
-    );
+    try {
+      if (!hexKey || typeof hexKey !== 'string') {
+        throw new Error(`Invalid hexKey: expected string, got ${typeof hexKey}`);
+      }
+
+      if (hexKey.length !== 64) {
+        throw new Error(`Invalid hexKey length: expected 64 chars (256 bits), got ${hexKey.length}`);
+      }
+
+      console.debug('[ClientEncryption.importKeyFromHex] Importing key, length:', hexKey.length);
+
+      const keyData = this.hexToArrayBuffer(hexKey);
+
+      console.debug('[ClientEncryption.importKeyFromHex] Converted to ArrayBuffer, size:', keyData.byteLength);
+
+      const cryptoKey = await crypto.subtle.importKey(
+        'raw',
+        keyData,
+        { name: ALGORITHM },
+        false, // not extractable (security best practice)
+        ['encrypt', 'decrypt']
+      );
+
+      console.debug('[ClientEncryption.importKeyFromHex] Successfully imported key', {
+        type: cryptoKey.type,
+        algorithm: (cryptoKey.algorithm as any)?.name,
+        usages: cryptoKey.usages,
+      });
+
+      return cryptoKey;
+    } catch (error) {
+      console.error('[ClientEncryption.importKeyFromHex] Failed to import key:', {
+        error: error instanceof Error ? error.message : String(error),
+        hexKeyLength: hexKey?.length,
+        errorType: error?.constructor?.name,
+      });
+      throw error;
+    }
   }
 
   /**
@@ -201,15 +231,29 @@ export class ClientEncryption {
         throw new Error('Missing encryption parameters (content, iv, or tag)');
       }
 
+      console.debug('[ClientEncryption.decryptMessage] Input validation passed', {
+        contentLen: encryptedContent.length,
+        ivLen: iv.length,
+        tagLen: authTag.length,
+      });
+
       // Convert hex inputs to bytes
       const ivBytes = this.hexToBytes(iv);
       const contentBytes = this.hexToBytes(encryptedContent);
       const tagBytes = this.hexToBytes(authTag);
 
+      console.debug('[ClientEncryption.decryptMessage] Converted to bytes', {
+        ivBytes: ivBytes.length,
+        contentBytes: contentBytes.length,
+        tagBytes: tagBytes.length,
+      });
+
       // Reconstruct full ciphertext with tag appended
       const fullCiphertext = new Uint8Array(contentBytes.length + tagBytes.length);
       fullCiphertext.set(contentBytes);
       fullCiphertext.set(tagBytes, contentBytes.length);
+
+      console.debug('[ClientEncryption.decryptMessage] Full ciphertext length:', fullCiphertext.length);
 
       // Decrypt with AES-256-GCM
       const decrypted = await crypto.subtle.decrypt(
@@ -218,13 +262,32 @@ export class ClientEncryption {
         fullCiphertext as any
       );
 
+      console.debug('[ClientEncryption.decryptMessage] Decryption successful');
+
       // Decode to UTF-8 string
       const decoder = new TextDecoder();
       return decoder.decode(decrypted);
     } catch (error) {
-      const errMsg = (error as Error).message;
+      // Better error message extraction
+      let errMsg = 'Unknown error';
+      if (error instanceof Error) {
+        errMsg = error.message;
+      } else if (error instanceof DOMException) {
+        errMsg = `${error.name}: ${error.message}`;
+      } else if (typeof error === 'string') {
+        errMsg = error;
+      } else {
+        errMsg = String(error);
+      }
+
+      console.error('[ClientEncryption.decryptMessage] Detailed error:', {
+        type: error?.constructor?.name,
+        message: errMsg,
+        errorObj: error,
+      });
+
       // Don't expose detailed error info to prevent leaking encryption details
-      if (errMsg.includes('decryption failed') || errMsg.includes('authentication')) {
+      if (errMsg.includes('decryption failed') || errMsg.includes('authentication') || errMsg.includes('OperationError')) {
         throw new Error('Failed to decrypt message - key mismatch or corrupted data');
       }
       throw new Error(`Message decryption failed: ${errMsg}`);
