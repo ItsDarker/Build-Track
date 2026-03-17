@@ -50,3 +50,15 @@ tmpclaude-*
 backend/dist/
 
 buildtrac-app-718b0caebb02.json
+
+# Temporary reports and logs
+DATA_LOSS_INVESTIGATION.md
+MANUAL_WORKFLOW_TEST_REPORT.md
+MODULE_RECORDS_SEEDED.md
+PHASE1_COMPLETION_REPORT.md
+PROFILE_AVATAR_VERIFICATION.md
+SEEDING_LESSONS_LEARNED.md
+TESTING_INSTRUCTIONS.md
+WORKFLOW_ANALYSIS.md
+backend/backend_startup.log
+backend/prisma/migrations/20260313_add_missing_user_columns/
