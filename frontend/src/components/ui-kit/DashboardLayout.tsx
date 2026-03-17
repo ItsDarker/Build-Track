@@ -586,10 +586,23 @@ export function DashboardLayout({ user, children }: DashboardLayoutProps) {
           </Space>
         </Header>
 
-        <Content style={{ margin: "24px 16px 0", overflow: "initial" }}>
-          <div className="p-6 bg-white rounded-lg min-h-[360px]">
-            {children}
-          </div>
+        <Content
+          style={{
+            margin: pathname === "/app/messaging" ? "0" : "24px 16px 0",
+            overflow: pathname === "/app/messaging" ? "hidden" : "initial",
+            padding: pathname === "/app/messaging" ? "0" : undefined,
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          {pathname === "/app/messaging" ? (
+            children
+          ) : (
+            <div className="p-6 bg-white rounded-lg min-h-[360px]">
+              {children}
+            </div>
+          )}
         </Content>
 
         <Footer style={{ textAlign: "center", color: "#999", fontSize: 12 }}>
