@@ -77,10 +77,10 @@ export default function GroupInfoModalV2({ open, onClose, conversation, currentU
                     <div className="w-full px-8">
                         <Form layout="vertical">
                             <Form.Item label="Group Icon URL">
-                                <Input value={editIconUrl} onChange={e => setEditIconUrl(e.target.value)} placeholder="https://..." />
+                                <Input value={editIconUrl} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditIconUrl(e.target.value)} placeholder="https://..." />
                             </Form.Item>
                             <Form.Item label="Group Name">
-                                <Input value={editName} onChange={e => setEditName(e.target.value)} />
+                                <Input value={editName} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditName(e.target.value)} />
                             </Form.Item>
                             <div className="flex gap-2 justify-end">
                                 <Button icon={<CloseOutlined />} onClick={() => setIsEditing(false)}>Cancel</Button>
@@ -134,7 +134,7 @@ export default function GroupInfoModalV2({ open, onClose, conversation, currentU
                                     <Select
                                         size="small"
                                         value={member.role || 'MEMBER'}
-                                        onChange={(val) => handleRoleChange(member.userId, val)}
+                                        onChange={(val: string) => handleRoleChange(member.userId, val)}
                                         options={[
                                             { label: 'Admin', value: 'ADMIN' },
                                             { label: 'Member', value: 'MEMBER' },
