@@ -699,10 +699,17 @@ class ApiClient {
     return this.request(`/backend-api/conversations/${id}`, { method: 'GET' });
   }
 
-  async updateConversation(id: string, data: { name?: string; description?: string }) {
+  async updateConversation(id: string, data: { name?: string; description?: string; iconUrl?: string }) {
     return this.request(`/backend-api/conversations/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
+    });
+  }
+
+  async updateConversationMemberRole(conversationId: string, userId: string, role: string) {
+    return this.request(`/backend-api/conversations/${conversationId}/members/${userId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ role }),
     });
   }
 
@@ -733,6 +740,32 @@ class ApiClient {
     return this.request(`/backend-api/conversations/${conversationId}/leave`, {
       method: 'POST',
     });
+  }
+
+  // Messaging - Attachments
+  async uploadMessageAttachment(conversationId: string, messageId: string, encryptionKey: string, file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('conversationId', conversationId);
+    formData.append('messageId', messageId);
+    formData.append('encryptionKey', encryptionKey);
+
+    try {
+      const response = await fetch(`${this.baseUrl}/backend-api/message-attachments/upload`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      const data = await response.json();
+      if (!response.ok) return { error: data.error || 'Upload failed' };
+      return { data };
+    } catch (error) {
+      return { error: 'Upload failed' };
+    }
+  }
+
+  getMessageAttachmentDownloadUrl(attachmentId: string, encryptionKey: string) {
+    return `${this.baseUrl}/backend-api/message-attachments/${attachmentId}/download?encryptionKey=${encodeURIComponent(encryptionKey)}`;
   }
 
   // Messaging - Messages
@@ -787,36 +820,6 @@ class ApiClient {
     );
   }
 
-  // Messaging - Attachments
-  async uploadMessageAttachment(
-    file: File,
-    messageId: string,
-    conversationId: string,
-    encryptedFileData: {
-      encryptedContent: string;
-      iv: string;
-      authTag: string;
-    }
-  ) {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('messageId', messageId);
-    formData.append('conversationId', conversationId);
-    formData.append('encryptionKey', encryptedFileData.authTag); // Use auth tag as ref
-    try {
-      const response = await fetch(`${this.baseUrl}/backend-api/message-attachments/upload`, {
-        method: 'POST',
-        credentials: 'include',
-        body: formData,
-      });
-      const data = await response.json();
-      if (!response.ok) return { error: data.error || 'Upload failed' };
-      return { data };
-    } catch (error) {
-      return { error: 'Upload failed' };
-    }
-  }
-
   async downloadMessageAttachment(attachmentId: string, encryptionKey: string) {
     const searchParams = new URLSearchParams();
     searchParams.set('encryptionKey', encryptionKey);
@@ -836,6 +839,42 @@ class ApiClient {
     return this.request(`/backend-api/message-attachments/${attachmentId}`, {
       method: 'DELETE',
     });
+  }
+
+  // Generic HTTP methods for custom endpoints
+  async get<T = any>(endpoint: string) {
+    return this.request<T>(endpoint, {
+      method: 'GET',
+    });
+  }
+
+  async post<T = any>(endpoint: string, data?: any) {
+    return this.request<T>(endpoint, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async put<T = any>(endpoint: string, data?: any) {
+    return this.request<T>(endpoint, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async delete<T = any>(endpoint: string) {
+    return this.request<T>(endpoint, {
+      method: 'DELETE',
+    });
+  }
+
+  // Messaging V2 endpoints
+  async getUsers() {
+    return this.get('/backend-api/users');
+  }
+
+  async getConversationsV2() {
+    return this.get('/backend-api/conversations');
   }
 }
 

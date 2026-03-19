@@ -452,4 +452,88 @@ router.post('/:id/leave', async (req: RBACRequest, res: Response) => {
   }
 });
 
+/**
+ * PUT /conversations/:id
+ * Update group details (name, icon) — creator or admin only
+ */
+router.put('/:id', async (req: RBACRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const { id } = req.params;
+    const { name, iconUrl } = req.body;
+
+    const conversation = await prisma.conversation.findUnique({ where: { id } });
+    if (!conversation) return res.status(404).json({ error: 'Conversation not found' });
+
+    // Ensure it's a group
+    if (!conversation.isGroup) {
+      return res.status(400).json({ error: 'Cannot update details of a 1:1 conversation' });
+    }
+
+    // Role check
+    const member = await prisma.conversationMember.findUnique({
+      where: { conversationId_userId: { conversationId: id, userId } }
+    });
+    const isGlobalAdmin = (req as any).enrichedUser.isAdmin;
+    const isGroupOwner = conversation.createdById === userId;
+    const isGroupAdmin = member?.role === 'ADMIN';
+
+    if (!isGlobalAdmin && !isGroupOwner && !isGroupAdmin) {
+      return res.status(403).json({ error: 'Only group admins can update group details' });
+    }
+
+    const updated = await messagingService.updateConversation(id, { name, iconUrl });
+    res.json({ conversation: updated });
+  } catch (error) {
+    console.error('Error updating conversation:', error);
+    res.status(500).json({ error: 'Failed to update conversation' });
+  }
+});
+
+/**
+ * PATCH /conversations/:id/members/:userId
+ * Update member role — creator or admin only
+ */
+router.patch('/:id/members/:userId', async (req: RBACRequest, res: Response) => {
+  try {
+    const currentUserId = req.user?.userId;
+    if (!currentUserId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const { id, userId } = req.params;
+    const { role } = req.body;
+
+    const conversation = await prisma.conversation.findUnique({ where: { id } });
+    if (!conversation) return res.status(404).json({ error: 'Conversation not found' });
+
+    // Role check
+    const currentMember = await prisma.conversationMember.findUnique({
+      where: { conversationId_userId: { conversationId: id, userId: currentUserId } }
+    });
+    const isGlobalAdmin = (req as any).enrichedUser.isAdmin;
+    const isGroupOwner = conversation.createdById === currentUserId;
+    const isGroupAdmin = currentMember?.role === 'ADMIN';
+
+    if (!isGlobalAdmin && !isGroupOwner && !isGroupAdmin) {
+      return res.status(403).json({ error: 'Only group admins can update roles' });
+    }
+
+    // Prevent changing the creator's role
+    if (userId === conversation.createdById && role !== 'ADMIN') {
+      return res.status(400).json({ error: 'Cannot downgrade the group creator' });
+    }
+
+    const updated = await messagingService.updateConversationMemberRole(id, userId, role);
+    res.json({ member: updated });
+  } catch (error) {
+    console.error('Error updating member role:', error);
+    res.status(500).json({ error: 'Failed to update member role' });
+  }
+});
+
 export default router;

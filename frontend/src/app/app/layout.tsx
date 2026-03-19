@@ -7,6 +7,10 @@ import { DashboardLayout } from "@/components/ui-kit/DashboardLayout";
 import { UserProvider } from "@/lib/context/UserContext";
 import { apiClient } from "@/lib/api/client";
 
+import { initializeSocket, disconnectSocket } from "@/lib/socket/client";
+import { useWebRTC } from "@/hooks/useWebRTC";
+import CallOverlayV2 from "@/components/messagingv2/CallOverlayV2";
+
 interface User {
     id: string;
     email: string;
@@ -24,13 +28,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
 
+    // Call state from our hook
+    const webrtc = useWebRTC();
+
     useEffect(() => {
         async function checkAuth() {
             const result = await apiClient.getCurrentUser();
 
             if (result.error || !result.data) {
-                // If getting user fails, we redirect to login, but only once we are sure
-                // We might want to handle this better, but for now this matches existing logic
                 router.push("/login");
                 return;
             }
@@ -42,11 +47,24 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 return;
             }
 
+            // Initialize Socket.io
+            const socket = initializeSocket('session', userData.id);
+            socket.on('connect', () => {
+                socket.emit('auth:identify', { userId: userData.id });
+            });
+            if (socket.connected) {
+                socket.emit('auth:identify', { userId: userData.id });
+            }
+
             setUser(userData);
             setLoading(false);
         }
 
         checkAuth();
+
+        return () => {
+            disconnectSocket();
+        };
     }, [router]);
 
     if (loading) {
@@ -65,6 +83,21 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <UserProvider user={user}>
             <DashboardLayout user={user}>
                 {children}
+                <CallOverlayV2
+                    incomingCall={webrtc.incomingCall}
+                    callSession={webrtc.callSession}
+                    localStream={webrtc.localStream}
+                    remoteStreams={webrtc.remoteStreams}
+                    micEnabled={webrtc.micEnabled}
+                    cameraEnabled={webrtc.cameraEnabled}
+                    onAccept={webrtc.acceptCall}
+                    onReject={webrtc.rejectCall}
+                    onEnd={webrtc.endCall}
+                    onToggleMic={webrtc.toggleMic}
+                    onToggleCamera={webrtc.toggleCamera}
+                    error={webrtc.error}
+                    onClearError={webrtc.clearError}
+                />
             </DashboardLayout>
         </UserProvider>
     );

@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { encryptionService } from './encryptionService';
+import { realtimeService } from './realtimeService';
 
 const prisma = new PrismaClient();
 
@@ -212,6 +213,7 @@ export class MessagingService {
         members: {
           select: {
             userId: true,
+            lastReadAt: true,
             user: {
               select: {
                 id: true,
@@ -240,7 +242,28 @@ export class MessagingService {
       orderBy: { updatedAt: 'desc' }, // Sort by conversation update time instead
     });
 
-    return conversations;
+    const conversationsWithUnread = await Promise.all(
+      conversations.map(async (conv) => {
+        const currentUserMember = conv.members.find(m => m.userId === userId);
+        const lastReadAt = currentUserMember?.lastReadAt || new Date(0);
+
+        const unreadCount = await prisma.message.count({
+          where: {
+            conversationId: conv.id,
+            createdAt: { gt: lastReadAt },
+            senderId: { not: userId }, // Exclude messages sent by the current user
+            deletedAt: null
+          }
+        });
+
+        return {
+          ...conv,
+          unreadCount
+        };
+      })
+    );
+
+    return conversationsWithUnread;
   }
 
   /**
@@ -261,7 +284,7 @@ export class MessagingService {
       throw new Error('Access denied: user is not a member of this conversation');
     }
 
-    return prisma.message.create({
+    const newMessage = await prisma.message.create({
       data: {
         conversationId: input.conversationId,
         senderId: input.senderId,
@@ -279,8 +302,42 @@ export class MessagingService {
             avatarUrl: true,
           },
         },
+        conversation: {
+          select: {
+            name: true,
+            isGroup: true,
+          }
+        }
       },
     });
+
+    // Create global Web Notifications for all other members
+    const otherMembers = await prisma.conversationMember.findMany({
+      where: {
+        conversationId: input.conversationId,
+        userId: { not: input.senderId },
+        leftAt: null
+      }
+    });
+
+    if (otherMembers.length > 0) {
+      const senderName = newMessage.sender.displayName || newMessage.sender.name || 'Someone';
+      const convName = newMessage.conversation?.isGroup ? ` in ${newMessage.conversation.name || 'Group Chat'}` : '';
+
+      await prisma.notification.createMany({
+        data: otherMembers.map(m => ({
+          userId: m.userId,
+          type: 'NEW_MESSAGE',
+          title: `New Message from ${senderName}${convName}`,
+          message: 'You have received a new secure message',
+        }))
+      });
+    }
+
+    // Emit real-time event
+    realtimeService.emitNewMessage(input.conversationId, newMessage);
+
+    return newMessage;
   }
 
   /**
@@ -320,16 +377,7 @@ export class MessagingService {
             avatarUrl: true,
           },
         },
-        attachments: {
-          select: {
-            id: true,
-            filename: true,
-            originalName: true,
-            mimeType: true,
-            size: true,
-            uploadedAt: true,
-          },
-        },
+        attachments: true,
       },
       orderBy: { createdAt: 'desc' },
       take: limit,
@@ -359,7 +407,7 @@ export class MessagingService {
     newIv: string,
     newAuthTag: string
   ) {
-    return prisma.message.update({
+    const updated = await prisma.message.update({
       where: { id: messageId },
       data: {
         encryptedContent: newEncryptedContent,
@@ -368,34 +416,48 @@ export class MessagingService {
         isEdited: true,
         editedAt: new Date(),
       },
+      include: {
+        sender: {
+          select: { id: true, name: true, displayName: true, avatarUrl: true },
+        },
+      },
     });
+
+    // Emit real-time event
+    realtimeService.emitMessageEdited(updated.conversationId, updated.id, updated);
+
+    return updated;
   }
 
   /**
    * Delete a message (soft delete)
    */
   async deleteMessage(messageId: string) {
-    return prisma.message.update({
+    const message = await prisma.message.update({
       where: { id: messageId },
       data: { deletedAt: new Date() },
     });
+
+    // Emit real-time event
+    realtimeService.emitMessageDeleted(message.conversationId, message.id);
+
+    return message;
   }
 
   /**
    * Mark messages as read
    */
   async markMessagesAsRead(conversationId: string, userId: string) {
-    return prisma.conversationMember.update({
+    const lastReadAt = new Date();
+    await prisma.conversationMember.update({
       where: {
-        conversationId_userId: {
-          conversationId,
-          userId,
-        },
+        conversationId_userId: { conversationId, userId },
       },
-      data: {
-        lastReadAt: new Date(),
-      },
+      data: { lastReadAt },
     });
+
+    // Emit real-time event
+    realtimeService.emitReadReceipt(conversationId, userId, lastReadAt);
   }
 
   /**
@@ -498,16 +560,41 @@ export class MessagingService {
   }
 
   /**
-   * Update conversation (name, description)
+   * Update conversation (name, description, iconUrl)
    */
   async updateConversation(
     conversationId: string,
-    updates: { name?: string; description?: string }
+    updates: { name?: string; description?: string; iconUrl?: string }
   ) {
-    return prisma.conversation.update({
+    const updated = await prisma.conversation.update({
       where: { id: conversationId },
       data: updates,
     });
+
+    // Emit real-time event
+    realtimeService.emitConversationUpdated(conversationId, updated);
+
+    return updated;
+  }
+
+  /**
+   * Update a member's role
+   */
+  async updateConversationMemberRole(conversationId: string, userId: string, role: string) {
+    const updated = await prisma.conversationMember.update({
+      where: {
+        conversationId_userId: {
+          conversationId,
+          userId,
+        },
+      },
+      data: { role },
+    });
+
+    // Notify participants about member update (e.g. role change)
+    realtimeService.emitConversationUpdated(conversationId, { userId, role });
+
+    return updated;
   }
 
   /**

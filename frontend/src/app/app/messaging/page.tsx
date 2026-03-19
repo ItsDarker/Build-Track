@@ -1,74 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Empty, message as antMessage } from 'antd';
-import { useUser } from '@/lib/context/UserContext';
-import ConversationList from '@/components/messaging/ConversationList';
-import ChatWindow from '@/components/messaging/ChatWindow';
-import GroupCreationModal from '@/components/messaging/GroupCreationModal';
+import React from 'react';
+import MessagingV2Shell from '@/components/messagingv2/MessagingV2Shell';
 
 /**
  * Messaging Page
- * Main messaging interface with conversation list and chat window
+ * New messaging module with real-time features, voice/video calling, and presence indicators
+ * Uses the messagingv2 implementation with Socket.io and WebRTC
  */
 export default function MessagingPage() {
-  const user = useUser();
-  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
-  const [isCreatingGroup, setIsCreatingGroup] = useState(false);
-
-  const userRole = user?.role?.name;
-
-  // Check if user can create groups (PM, ORG_ADMIN, SUPER_ADMIN)
-  const canCreateGroup = ['PROJECT_MANAGER', 'ORG_ADMIN', 'SUPER_ADMIN'].includes(
-    userRole || ''
-  );
-
-  if (!user) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <Empty description="Please log in to access messaging" />
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex h-full w-full bg-gray-50 dark:bg-gray-800 overflow-hidden">
-      {/* Conversation List Sidebar */}
-      <div className="w-80 hidden lg:flex flex-col border-r border-gray-200 dark:border-gray-700">
-        <ConversationList
-          onSelectConversation={setSelectedConversationId}
-          onOpenCreateGroup={() => setIsCreatingGroup(true)}
-          selectedId={selectedConversationId || undefined}
-        />
-      </div>
-
-      {/* Chat Window */}
-      <div className="flex-1 flex flex-col h-full min-h-0">
-        {selectedConversationId ? (
-          <ChatWindow
-            conversationId={selectedConversationId}
-            currentUserId={user.id}
-          />
-        ) : (
-          <div className="flex-1 flex items-center justify-center">
-            <Empty
-              description="Select a conversation to start messaging"
-              style={{ marginBottom: 48 }}
-            />
-          </div>
-        )}
-      </div>
-
-      {/* Group Creation Modal */}
-      <GroupCreationModal
-        open={isCreatingGroup}
-        onClose={() => setIsCreatingGroup(false)}
-        onSuccess={(conversationId) => {
-          setSelectedConversationId(conversationId);
-          antMessage.success('Group created! Start chatting.');
-        }}
-        isAllowedToCreate={canCreateGroup}
-      />
-    </div>
-  );
+  return <MessagingV2Shell />;
 }

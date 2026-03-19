@@ -20,9 +20,27 @@ import projectInvitationRoutes from './routes/project-invitations.routes';
 import conversationRoutes from './routes/conversations.routes';
 import messageRoutes from './routes/messages.routes';
 import messageAttachmentRoutes from './routes/messageAttachments.routes';
+import callsRoutes from './routes/calls.routes';
+import presenceRoutes from './routes/presence.routes';
+import usersRoutes from './routes/users.routes';
+import http from 'http';
+import { Server as SocketIOServer } from 'socket.io';
+import { realtimeService } from './services/realtimeService';
+import { initSocketHandlers } from './socket/handlers';
 
 
 const app = express();
+const server = http.createServer(app);
+const io = new SocketIOServer(server, {
+  cors: {
+    origin: config.frontendUrl,
+    credentials: true,
+  },
+});
+
+// Initialize Socket.io service and handlers
+realtimeService.initialize(io);
+initSocketHandlers(io);
 
 
 // Middleware
@@ -79,6 +97,9 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/conversations', conversationRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/message-attachments', messageAttachmentRoutes);
+app.use('/api/calls', callsRoutes);
+app.use('/api/presence', presenceRoutes);
+app.use('/api/users', usersRoutes);
 
 
 // Error handler
@@ -107,7 +128,7 @@ process.on("SIGTERM", async () => {
 
 
 // Start server
-app.listen(config.port, () => {
+server.listen(config.port, () => {
   console.log(`🚀 Backend server running on port ${config.port}`);
   console.log(`📝 Environment: ${config.nodeEnv}`);
   console.log(`🔗 Frontend URL: ${config.frontendUrl}`);

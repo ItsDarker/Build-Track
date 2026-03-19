@@ -51,6 +51,8 @@ model User {
   conversationsCreated Conversation[]     @relation("ConversationCreatedBy")
   conversationMembers  ConversationMember[] @relation("ConversationMembers")
   sentMessages         Message[]           @relation("MessagesSent")
+  callsInitiated       CallSession[]       @relation("CallsInitiated")
+  callParticipations   CallParticipant[]   @relation("CallParticipations")
 
   @@map("users")
 }
@@ -405,6 +407,7 @@ model Conversation {
   id              String              @id @default(cuid())
   name            String?             // Group chat name (null for one-to-one)
   description     String?             // Group description (optional)
+  iconUrl         String?             @map("icon_url")
   isGroup         Boolean             @default(false)
   createdById     String              @map("created_by_id")
   createdBy       User                @relation("ConversationCreatedBy", fields: [createdById], references: [id])
@@ -418,6 +421,7 @@ model Conversation {
 
   members         ConversationMember[]
   messages        Message[]
+  callSessions    CallSession[]
 
   @@map("conversations")
   @@index([createdById])
@@ -430,6 +434,7 @@ model ConversationMember {
   id              String              @id @default(cuid())
   conversationId  String              @map("conversation_id")
   userId          String              @map("user_id")
+  role            String              @default("MEMBER")
 
   // Per-user encryption of the shared conversation key
   encryptedKey    String              @map("encrypted_key")
@@ -501,4 +506,52 @@ model MessageAttachment {
   @@map("message_attachments")
   @@index([messageId])
   @@index([gcsFileId])
+}
+
+// Real-time Calling models
+model CallSession {
+  id              String             @id @default(cuid())
+  conversationId  String?            @map("conversation_id")
+  initiatorId     String             @map("initiator_id")
+  callType        String             @default("video") @map("call_type") // video | audio
+  status          String             @default("ringing") // ringing | connecting | active | ended
+  
+  startedAt       DateTime?          @map("started_at")
+  endedAt         DateTime?          @map("ended_at")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+
+  conversation    Conversation?      @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  initiator       User               @relation("CallsInitiated", fields: [initiatorId], references: [id])
+  participants    CallParticipant[]
+
+  @@map("call_sessions")
+  @@index([conversationId])
+  @@index([initiatorId])
+  @@index([status])
+}
+
+model CallParticipant {
+  id              String             @id @default(cuid())
+  callSessionId   String             @map("call_session_id")
+  userId          String             @map("user_id")
+  
+  joinedAt        DateTime           @default(now()) @map("joined_at")
+  leftAt          DateTime?          @map("left_at")
+  
+  // Media state
+  micEnabled      Boolean            @default(true) @map("mic_enabled")
+  cameraEnabled   Boolean            @default(true) @map("camera_enabled")
+  
+  // WebRTC signaling
+  sdpOffer        String?            @map("sdp_offer")
+  sdpAnswer       String?            @map("sdp_answer")
+
+  callSession     CallSession        @relation(fields: [callSessionId], references: [id], onDelete: Cascade)
+  user            User               @relation("CallParticipations", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([callSessionId, userId])
+  @@map("call_participants")
+  @@index([callSessionId])
+  @@index([userId])
 }
