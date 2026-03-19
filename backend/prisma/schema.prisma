@@ -53,6 +53,7 @@ model User {
   sentMessages         Message[]           @relation("MessagesSent")
   callsInitiated       CallSession[]       @relation("CallsInitiated")
   callParticipations   CallParticipant[]   @relation("CallParticipations")
+  presenceSessions     PresenceSession[]   @relation("PresenceSessions")
 
   @@map("users")
 }
@@ -535,14 +536,14 @@ model CallParticipant {
   id              String             @id @default(cuid())
   callSessionId   String             @map("call_session_id")
   userId          String             @map("user_id")
-  
+
   joinedAt        DateTime           @default(now()) @map("joined_at")
   leftAt          DateTime?          @map("left_at")
-  
+
   // Media state
   micEnabled      Boolean            @default(true) @map("mic_enabled")
   cameraEnabled   Boolean            @default(true) @map("camera_enabled")
-  
+
   // WebRTC signaling
   sdpOffer        String?            @map("sdp_offer")
   sdpAnswer       String?            @map("sdp_answer")
@@ -554,4 +555,25 @@ model CallParticipant {
   @@map("call_participants")
   @@index([callSessionId])
   @@index([userId])
+}
+
+// User presence tracking for real-time status
+model PresenceSession {
+  id              String             @id @default(cuid())
+  userId          String             @unique @map("user_id")
+  status          String             @default("offline") // online | away | offline | in-call
+
+  lastSeenAt      DateTime           @default(now()) @map("last_seen_at")
+  deviceId        String?            @map("device_id")
+  userAgent       String?            @map("user_agent")
+  ipAddress       String?            @map("ip_address")
+
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+
+  user            User               @relation("PresenceSessions", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("presence_sessions")
+  @@index([userId])
+  @@index([status])
 }
