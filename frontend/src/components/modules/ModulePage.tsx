@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Table, Modal, Button as AntButton, Tag, Empty, Tooltip, App, Select as AntSelect, Segmented } from "antd";
 import {
   PlusOutlined,
@@ -21,6 +21,7 @@ import { DynamicFormRenderer, isFileField } from "./DynamicFormRenderer";
 import { ModuleKanbanBoard } from "@/components/kanban/ModuleKanbanBoard";
 import { MODULE_KANBAN_CONFIGS } from "@/components/kanban/moduleKanbanConfig";
 import { RecordActivityLog } from "./RecordActivityLog";
+import { ProjectLink } from "@/components/ui/ProjectLink";
 
 import type { FormMode } from "./DynamicFormRenderer";
 import type { ModuleConfig } from "@/config/buildtrack.config";
@@ -141,6 +142,53 @@ const AUDIT_FIELDS = ["Created at", "Created by", "Update at", "Updated by"];
 
 function isAuditField(label: string): boolean {
   return AUDIT_FIELDS.includes(label);
+}
+
+/**
+ * Attempts to find a value in the record using fuzzy key matching.
+ * Handles cases where the backend key slightly differs from the config field name.
+ */
+function getFuzzyValue(record: Record<string, any>, field: string): any {
+  // 1. Direct match
+  if (record[field] !== undefined) return record[field];
+
+  const lowerField = field.toLowerCase();
+  const keys = Object.keys(record);
+
+  // 2. Normalize and check (remove extra spaces, case-insensitive)
+  const normalizedField = lowerField.replace(/\s+/g, '');
+  for (const key of keys) {
+    if (key.toLowerCase().replace(/\s+/g, '') === normalizedField) return record[key];
+  }
+
+  // 3. Known aliases
+  const aliases: Record<string, string[]> = {
+    'address': ['delivery address', 'site address', 'project address', 'billing address'],
+    'work order id': ['linked work order id', 'reference id', 'sales order id'],
+    'ticket type': ['issue type', 'support type', 'request type'],
+    'task status': ['status', 'lead status', 'current status'],
+    'priority': ['importance', 'urgency'],
+    'inspector': ['inspected by', 'qc inspector'],
+    'owner': ['assigned to', 'manager', 'coordinator'],
+  };
+
+  for (const [canonical, variants] of Object.entries(aliases)) {
+    if (lowerField.includes(canonical)) {
+      for (const variant of variants) {
+        // Find if record has any of these variants
+        const foundKey = keys.find(k => k.toLowerCase().includes(variant));
+        if (foundKey) return record[foundKey];
+      }
+    }
+  }
+
+  // 4. Fallback: if field contains "status", try any key containing "status"
+  if (lowerField.includes("status")) {
+    const statusKey = keys.find(k => k.toLowerCase().includes("status") && !k.toLowerCase().includes("audit"));
+    if (statusKey) return record[statusKey];
+  }
+
+  return undefined;
 }
 
 /**
@@ -296,6 +344,24 @@ export function ModulePage({ module }: ModulePageProps) {
   const { role } = useUser();
   const hasReadAccess = canAccessModule(role.name, module.slug);
   const hasWriteAccess = canWriteModule(role.name, module.slug);
+
+  if (!hasReadAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[70vh] text-center px-4">
+        <ShieldCheck className="w-16 h-16 text-red-500 mb-4 opacity-20" />
+        <h2 className="text-2xl font-bold text-slate-800 mb-2">Access Denied</h2>
+        <p className="text-slate-500 max-w-md mb-6">
+          You do not have the required permissions to view the <strong>{module.name}</strong> module. 
+          Please contact your administrator if you believe this is an error.
+        </p>
+        <Button onClick={() => router.push("/app")} variant="outline">
+          Return to Dashboard
+        </Button>
+      </div>
+    );
+  }
+
+  const searchParams = useSearchParams();
   const [records, setRecords] = useState<Record<string, any>[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -306,8 +372,8 @@ export function ModulePage({ module }: ModulePageProps) {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [requiredFields, setRequiredFields] = useState<Set<string>>(new Set());
   const [assignableUsers, setAssignableUsers] = useState<{ id: string; name?: string; email: string }[]>([]);
-  const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
-  const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
+  const [projects, setProjects] = useState<{ id: string; name: string; code?: string; clientId?: string; client?: { name: string } }[]>([]);
+  const [clients, setClients] = useState<{ id: string; name: string; email?: string }[]>([]);
   const [lookups, setLookups] = useState<Record<string, { id: string; value: string; label: string; order: number }[]>>({});
   const [recordAttachments, setRecordAttachments] = useState<Record<string, { id: string; filename: string; path: string; mimeType: string }[]>>({});
   const [assignPickerOpen, setAssignPickerOpen] = useState(false);
@@ -436,31 +502,34 @@ export function ModulePage({ module }: ModulePageProps) {
     module.fields.forEach((field) => {
       const label = cleanLabel(field);
       const lower = label.toLowerCase();
-      const options = extractOptions(field);
+      const optionsFromConfig = extractOptions(field);
 
-      // Start with hardcoded/config options if they exist
-      if (options && options.length > 0) {
-        opts[label] = options.map(o => ({ value: o, label: o }));
-      }
+      // 1. Relational data (Projects, Clients, Users)
+      // Matching patterns for project, client, assignee fields
+      const isProjectField = lower.includes("project id") || lower.includes("project reference") || lower.includes("linked project") || lower.includes("project name");
+      const isClientField = (lower.includes("customer") || lower.includes("client")) && !isProjectField;
+      const isAssigneeField = (lower.includes("assigned") || lower.includes("owner") || lower.includes("prepared by")) && !isProjectField && !isClientField;
 
-      // Relational data (Projects, Clients, Users)
-      if (lower.includes("project id") || lower.includes("project reference") || lower.includes("linked project")) {
-        opts[label] = projects.map((p) => ({ value: p.id, label: p.name }));
-      } else if (lower.includes("project name")) {
-        opts[label] = projects.map((p) => ({ value: p.name, label: p.name }));
-      } else if (lower.includes("customer name") || lower.includes("client name")) {
-        opts[label] = clients.map((c) => ({ value: c.name, label: c.name }));
-      } else if (lower.includes("customer") || lower.includes("client")) {
-        opts[label] = clients.map((c) => ({ value: c.id, label: c.name }));
-      } else if (findAssigneeFields([label]).length > 0) {
+      if (isProjectField) {
+        opts[label] = projects.map((p) => ({ value: p.id, label: `${p.name} (${p.code || p.id.slice(0, 8)})` }));
+      } else if (isClientField) {
+        opts[label] = clients.map((c) => ({ value: c.id, label: `${c.name}${c.email ? ` (${c.email})` : ''}` }));
+      } else if (isAssigneeField) {
         opts[label] = assignableUsers.map((u) => ({ value: String(u.name || u.email), label: String(u.name || u.email) }));
       }
-    });
+      
+      // 2. Options from config labels (e.g. Status (A, B, C))
+      if (optionsFromConfig && optionsFromConfig.length > 0) {
+        // If we already have relational opts, we prefer config if matches exactly, 
+        // but usually config is for static enums like Status.
+        if (!opts[label]) {
+           opts[label] = optionsFromConfig.map(o => ({ value: o, label: o }));
+        }
+      }
 
-    // Merge/Overwrite with backend lookups (Admin-configured)
-    Object.keys(lookups).forEach((category) => {
-      if (lookups[category] && lookups[category].length > 0) {
-        opts[category] = lookups[category].map((l) => ({ value: l.value, label: l.label }));
+      // 3. Merge/Overwrite with backend lookups (Admin-seeded)
+      if (lookups[label] && lookups[label].length > 0) {
+        opts[label] = lookups[label].map((l) => ({ value: l.value, label: l.label }));
       }
     });
 
@@ -505,14 +574,23 @@ export function ModulePage({ module }: ModulePageProps) {
         dataIndex: field,
         key: field,
         ellipsis: true,
-        render: (text: any, record: Record<string, any>) => {
-          if (!text) {
-            console.log(`[${module.slug}] Table render - field "${field}" has no value for record ${record._id}`);
+        render: (_: any, record: Record<string, any>) => {
+          const text = getFuzzyValue(record, field);
+          if (text === undefined || text === null || text === "") {
             return "-";
           }
           const lower = field.toLowerCase();
+          
+          // Render Project Link Component for Project references
+          if (lower.includes("project id") || lower.includes("linked project") || lower.includes("project reference") || lower.includes("project name")) {
+             // If we have the _projectId safely stored, prefer that for the link
+             const projectId = record["_projectId"] || (text.startsWith("PRJ-") || text.includes("-") ? undefined : text);
+             if (projectId || (text && text.length > 5)) {
+               return <ProjectLink projectId={projectId || text} projectName={text} projectCode={record["_projectCode"]} />;
+             }
+          }
+
           if (lower.includes("status")) {
-            console.log(`[${module.slug}] Rendering status field "${field}" with value: "${text}"`);
             const color =
               text.toLowerCase().includes("complete") ||
                 text.toLowerCase().includes("approved") ||
@@ -711,6 +789,31 @@ export function ModulePage({ module }: ModulePageProps) {
             initialValues[field] = defaultStatus;
           }
         });
+
+        // Pre-populate from query params (e.g. ?projectId=...)
+        const qProjectId = searchParams.get("projectId");
+        if (qProjectId) {
+          const projectField = module.fields.find(f => {
+            const l = cleanLabel(f).toLowerCase();
+            return l.includes("project id") || l.includes("project reference") || l.includes("linked project");
+          });
+          if (projectField) {
+            initialValues[projectField] = qProjectId;
+            const p = projects.find(proj => proj.id === qProjectId);
+            if (p) {
+              initialValues["_projectId"] = p.id;
+              initialValues["_projectName"] = p.name;
+              initialValues["_projectCode"] = (p as any).code || "";
+              const nameField = module.fields.find(f => cleanLabel(f).toLowerCase().includes("project name") && !f.toLowerCase().includes("id"));
+              if (nameField) initialValues[nameField] = p.name;
+              const clientName = (p as any).client?.name;
+              if (clientName) {
+                const customerField = module.fields.find(f => f.toLowerCase().includes("customer") || f.toLowerCase().includes("client name"));
+                if (customerField) initialValues[customerField] = clientName;
+              }
+            }
+          }
+        }
       }
       console.log(`[${module.slug}] Initial form values:`, initialValues);
       setFormValues(initialValues);
@@ -723,7 +826,31 @@ export function ModulePage({ module }: ModulePageProps) {
   };
 
   const handleFormChange = (field: string, value: string) => {
-    setFormValues((prev) => ({ ...prev, [field]: value }));
+    setFormValues((prev) => {
+      const next = { ...prev, [field]: value };
+      const lowerField = field.toLowerCase();
+      
+      // Auto-populate related fields when a Project is selected
+      if (lowerField.includes("project id") || lowerField.includes("linked project") || lowerField.includes("project reference")) {
+        const selectedProject = projects.find((p: any) => p.id === value || p.name === value);
+        if (selectedProject) {
+          next["_projectId"] = selectedProject.id;
+          next["_projectName"] = selectedProject.name;
+          next["_projectCode"] = (selectedProject as any).code || '';
+          
+          const clientName = (selectedProject as any).client?.name;
+          if (clientName) {
+            next["_clientId"] = (selectedProject as any).clientId || '';
+            const customerNameField = Object.keys(next).find(k => k.toLowerCase().includes("customer") || k.toLowerCase().includes("client name"));
+            if (customerNameField) next[customerNameField] = clientName;
+          }
+          
+          const projectNameField = Object.keys(next).find(k => k.toLowerCase().includes("project name") && !k.toLowerCase().includes("id"));
+          if (projectNameField) next[projectNameField] = selectedProject.name;
+        }
+      }
+      return next;
+    });
     // Clear error for this field when user starts typing
     if (fieldErrors[field]) {
       setFieldErrors((prev) => {
@@ -1246,8 +1373,8 @@ export function ModulePage({ module }: ModulePageProps) {
                 localStorage.setItem(`bt_view_${module.slug}`, newMode);
               }}
               options={[
-                { value: "table", icon: <UnorderedListOutlined /> },
-                { value: "kanban", icon: <AppstoreOutlined /> },
+                { value: "table", label: <Tooltip title="List View"><UnorderedListOutlined /></Tooltip> },
+                { value: "kanban", label: <Tooltip title="Kanban View"><AppstoreOutlined /></Tooltip> },
               ]}
             />
           )}

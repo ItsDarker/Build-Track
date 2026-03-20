@@ -14,7 +14,8 @@ router.get('/', requirePermission('read', 'project'), async (req: any, res) => {
     try {
         const status = req.query.status as string;
         const clientId = req.query.clientId as string;
-        const projects = await projectService.listProjects({ status, clientId });
+        const user = req.user ? { id: req.user.userId, role: req.user.role?.name || '' } : undefined;
+        const projects = await projectService.listProjects({ status, clientId, user });
         res.json({ projects });
     } catch (error) {
         console.error('Error listing projects:', error);

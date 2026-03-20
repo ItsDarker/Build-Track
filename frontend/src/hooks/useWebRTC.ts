@@ -4,13 +4,31 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { CallSession, IncomingCall, UseWebRTCReturn } from '@/types/messagingv2';
 import { useSocketIO } from './useSocketIO';
 
-const ICE_SERVERS = {
-  iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' },
-  ],
+// Function to get ICE servers from environment or defaults
+const getIceServers = () => {
+  const envIceServers = process.env.NEXT_PUBLIC_ICE_SERVERS;
+  if (envIceServers) {
+    try {
+      return { iceServers: JSON.parse(envIceServers) };
+    } catch (e) {
+      console.error('[WebRTC] Failed to parse NEXT_PUBLIC_ICE_SERVERS:', e);
+    }
+  }
+
+  // Fallback production-ready STUN/TURN configuration
+  return {
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun2.l.google.com:19302' },
+      // Note: In a real production environment, you MUST provide a TURN server
+      // example: { urls: 'turn:your-turn-server.com', username: 'user', credential: 'password' }
+    ],
+    iceCandidatePoolSize: 10,
+  };
 };
+
+const ICE_CONFIG = getIceServers();
 
 /**
  * WebRTC Hook
@@ -88,7 +106,7 @@ export function useWebRTC(): UseWebRTCReturn {
   const createPeerConnection = useCallback((userId: string, stream: MediaStream) => {
     if (peerConnectionsRef.current[userId]) return peerConnectionsRef.current[userId];
 
-    const pc = new RTCPeerConnection(ICE_SERVERS);
+    const pc = new RTCPeerConnection(ICE_CONFIG);
 
     // Add local tracks to the connection
     stream.getTracks().forEach((track) => {
@@ -191,12 +209,18 @@ export function useWebRTC(): UseWebRTCReturn {
    */
   const endCall = useCallback(async () => {
     try {
+      console.log('[WebRTC] Ending call, cleaning up...');
       if (localStream) {
-        localStream.getTracks().forEach((track) => track.stop());
+        localStream.getTracks().forEach((track) => {
+          track.stop();
+          console.log(`[WebRTC] Stopped track: ${track.kind}`);
+        });
         setLocalStream(null);
       }
 
-      Object.values(peerConnectionsRef.current).forEach((pc) => pc.close());
+      Object.values(peerConnectionsRef.current).forEach((pc) => {
+        pc.close();
+      });
       peerConnectionsRef.current = {};
 
       if (callSession && isConnected) {
@@ -206,6 +230,7 @@ export function useWebRTC(): UseWebRTCReturn {
       setCallSession(null);
       setRemoteStreams({});
       setIsConnecting(false);
+      setIncomingCall(null);
     } catch (err) {
       console.error('Error ending call:', err);
     }
@@ -294,13 +319,33 @@ export function useWebRTC(): UseWebRTCReturn {
       }
     };
 
+    const handleParticipantLeft = (data: { userId: string }) => {
+      setRemoteStreams((prev) => {
+        const next = { ...prev };
+        delete next[data.userId];
+        return next;
+      });
+      if (peerConnectionsRef.current[data.userId]) {
+        peerConnectionsRef.current[data.userId].close();
+        delete peerConnectionsRef.current[data.userId];
+      }
+    };
+
+    const handleParticipantMediaChanged = (data: { userId: string, micEnabled?: boolean, cameraEnabled?: boolean }) => {
+      // We could store this in a separate state if we wanted to show mute icons
+      console.log(`[WebRTC] Participant ${data.userId} media changed:`, data);
+    };
+
     const handleCallEnded = () => {
+      console.log('[WebRTC] Call ended by server');
       endCall();
     };
 
     on('calling:incoming-call', handleIncomingCall);
     on('calling:initiated', handleCallInitiated);
     on('calling:participant-joined', handleParticipantJoined);
+    on('calling:participant-left', handleParticipantLeft);
+    on('calling:participant-media-changed', handleParticipantMediaChanged);
     on('calling:sdp-offer', handleSdpOffer);
     on('calling:sdp-answer', handleSdpAnswer);
     on('calling:ice-candidate', handleIceCandidate);
@@ -310,6 +355,8 @@ export function useWebRTC(): UseWebRTCReturn {
       off('calling:incoming-call', handleIncomingCall);
       off('calling:initiated', handleCallInitiated);
       off('calling:participant-joined', handleParticipantJoined);
+      off('calling:participant-left', handleParticipantLeft);
+      off('calling:participant-media-changed', handleParticipantMediaChanged);
       off('calling:sdp-offer', handleSdpOffer);
       off('calling:sdp-answer', handleSdpAnswer);
       off('calling:ice-candidate', handleIceCandidate);

@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Table, Tag, Button, Modal, List, Select, App, Form, Input, Space, Segmented } from "antd";
+import { useEffect, useState, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
+import { Table, Tag, Button, Modal, List, Select, App, Form, Input, Space, Segmented, Tooltip, AutoComplete } from "antd";
 import { EyeOutlined, EditOutlined, DeleteOutlined, PlusOutlined, UnorderedListOutlined, AppstoreOutlined } from "@ant-design/icons";
 import { apiClient } from "@/lib/api/client";
 import { useUser } from "@/lib/context/UserContext";
@@ -15,6 +16,7 @@ const TASK_STATUSES = ["New", "In Progress", "Completed"];
 export default function LeadsPage() {
   const { message, modal } = App.useApp();
   const { role } = useUser();
+  const searchParams = useSearchParams();
   const hasWriteAccess = canWriteModule(role.name, "crm-leads");
   const [form] = Form.useForm();
   const [records, setRecords] = useState<any[]>([]);
@@ -25,6 +27,7 @@ export default function LeadsPage() {
   const [formModalOpen, setFormModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<any>(null);
   const [clients, setClients] = useState<any[]>([]);
+  const [projects, setProjects] = useState<any[]>([]);
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [viewRecord, setViewRecord] = useState<any>(null);
   const [viewMode, setViewMode] = useState<"table" | "kanban">(() => {
@@ -57,10 +60,42 @@ export default function LeadsPage() {
     }
   };
 
+  const fetchProjects = async () => {
+    try {
+      const res = await fetch("/backend-api/projects", { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        setProjects(data.projects ?? []);
+      }
+    } catch (e) {
+      console.error("Failed to load projects:", e);
+    }
+  };
+
   useEffect(() => {
     fetchRecords();
     fetchClients();
+    fetchProjects();
   }, []);
+
+  // Handle URL parameters for auto-population
+  useEffect(() => {
+    const projectId = searchParams.get("projectId");
+    const projectName = searchParams.get("projectName");
+    const projectCode = searchParams.get("projectCode");
+
+    if (projectId || projectName || projectCode) {
+      setFormModalOpen(true);
+      setEditingRecord(null);
+      form.setFieldsValue({
+        "Project ID": projectCode || projectId,
+        "_projectId": projectId,
+        "_projectCode": projectCode,
+        "_projectName": projectName,
+        "Project Name / Reference": projectName || projectCode || projectId
+      });
+    }
+  }, [searchParams, form]);
 
   const openProjectDetails = async (projectId: string) => {
     if (!projectId) return;
@@ -323,8 +358,8 @@ export default function LeadsPage() {
               localStorage.setItem("bt_view_crm-leads", newMode);
             }}
             options={[
-              { value: "table", icon: <UnorderedListOutlined /> },
-              { value: "kanban", icon: <AppstoreOutlined /> },
+              { value: "table", label: <Tooltip title="List View"><UnorderedListOutlined /></Tooltip> },
+              { value: "kanban", label: <Tooltip title="Kanban View"><AppstoreOutlined /></Tooltip> },
             ]}
           />
           {hasWriteAccess && (
@@ -461,11 +496,12 @@ export default function LeadsPage() {
             label="Customer Name"
             rules={[{ required: true, message: "Customer name is required" }]}
           >
-            <Select
-              showSearch
-              optionFilterProp="label"
-              placeholder="Search and select a client"
-              options={clients.map(c => ({ value: c.name, label: c.name }))}
+            <AutoComplete
+              placeholder="Search or type a client name"
+              options={clients.map(c => ({ value: c.name, label: `${c.name}${c.email ? ` (${c.email})` : ''}` }))}
+              filterOption={(inputValue: string, option: any) =>
+                option?.label?.toString().toLowerCase().includes(inputValue.toLowerCase()) ?? false
+              }
             />
           </Form.Item>
           <Form.Item
@@ -487,11 +523,60 @@ export default function LeadsPage() {
             />
           </Form.Item>
           <Form.Item
+            name="_projectCode"
+            label="Project"
+          >
+            <AutoComplete
+              allowClear
+              placeholder="Search or type a project ID/Code"
+              onChange={(val: string) => {
+                if (val) {
+                  // Find if it matches a project for auto-population
+                  const opt = projects.find(p => p.code === val || p.id === val || p.name === val);
+                  form.setFieldsValue({
+                    "_projectId": opt?.id || "",
+                    "_projectCode": opt?.code || val,
+                    "_projectName": opt?.name || val,
+                    "Project ID": val,
+                    "Project Name / Reference": opt?.name || val
+                  });
+                } else {
+                  form.setFieldsValue({
+                    "_projectId": "",
+                    "_projectCode": "",
+                    "_projectName": "",
+                    "Project ID": "",
+                    "Project Name / Reference": ""
+                  });
+                }
+              }}
+              options={projects.map(p => ({ 
+                value: p.code || p.id, 
+                label: `${p.name} (${p.code || p.id.slice(0, 8)})`,
+              }))}
+              filterOption={(inputValue: string, option: any) =>
+                option?.label?.toString().toLowerCase().includes(inputValue.toLowerCase()) ?? false
+              }
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="Project ID"
+            label="Project ID"
+            hidden
+          >
+            <Input />
+          </Form.Item>
+          <Form.Item
             name="Project Name / Reference"
             label="Project Name / Reference"
           >
             <Input placeholder="Enter project reference" />
           </Form.Item>
+          {/* Hidden fields for linking */}
+          <Form.Item name="_projectId" noStyle><Input type="hidden" /></Form.Item>
+          <Form.Item name="_projectCode" noStyle><Input type="hidden" /></Form.Item>
+          <Form.Item name="_projectName" noStyle><Input type="hidden" /></Form.Item>
           <div className="flex justify-end gap-2">
             <Button onClick={() => setFormModalOpen(false)}>Cancel</Button>
             <Button type="primary" htmlType="submit">

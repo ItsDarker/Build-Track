@@ -83,20 +83,23 @@ export default function ReportsPage() {
   const fetchProjects = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/backend-api/modules/projects/records');
+      const res = await fetch('/backend-api/projects');
       const data = await res.json();
 
-      if (Array.isArray(data.records)) {
-        const projects = data.records.map((r: any) => ({
-          id: r.id,
-          name: r['Project Name'] || 'Unnamed',
-          status: r['Task Status'] || 'New',
-          budget: parseFloat(r['Budget'] || 0),
-          spent: parseFloat(r['Budget'] || 0) * (Math.random() * 0.8 + 0.2), // Simulated spent
-          startDate: r['Start Date'],
-          endDate: r['End Date'],
-          progress: Math.floor(Math.random() * 100),
-          projectManager: r['Project Manager'],
+      if (Array.isArray(data.projects)) {
+        const projects = data.projects.map((p: any) => ({
+          id: p.id,
+          name: p.name || 'Unnamed',
+          status: p.status === 'IN_PROGRESS' ? 'In Progress' : 
+                  p.status === 'COMPLETED' ? 'Completed' : 
+                  p.status === 'ON_HOLD' ? 'On Hold' : 
+                  p.status === 'CANCELLED' ? 'Cancelled' : 'New',
+          budget: parseFloat(p.budget || 0),
+          spent: parseFloat(p.totalSpent || 0),
+          startDate: p.startDate,
+          endDate: p.endDate,
+          progress: p.status === 'COMPLETED' ? 100 : (p._count?.tasks > 0 ? 50 : 10), // Heuristic progress
+          projectManager: p.manager?.name || 'Unassigned',
         }));
         setProjects(projects);
 

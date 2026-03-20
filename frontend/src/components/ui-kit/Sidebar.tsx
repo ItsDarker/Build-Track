@@ -2,10 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, CheckSquare, Users, BarChart3, Settings, X } from "lucide-react";
+import { LayoutDashboard, CheckSquare, Users, BarChart3, Settings, X, Database } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useUser } from "@/lib/context/UserContext";
+import { canAccessModule, REVERSE_ROLE_MAP } from "@/config/rbac";
+import { getAllModules } from "@/config/buildtrack.config";
 
-const navItems = [
+const staticNavItems = [
   { href: "/app", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/app/tasks", icon: CheckSquare, label: "Tasks", disabled: true },
   { href: "/app/team", icon: Users, label: "Team", disabled: true },
@@ -20,6 +23,11 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   const pathname = usePathname();
+  const { role } = useUser();
+  const allModules = getAllModules();
+
+  // Filter dynamic modules based on RBAC
+  const allowedModules = allModules.filter(mod => canAccessModule(role.name, mod.slug));
 
   return (
     <>
@@ -38,7 +46,7 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
           isOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col h-full overflow-y-auto">
           {/* Mobile Close Button */}
           {onClose && (
             <div className="lg:hidden flex justify-end p-4">
@@ -51,9 +59,12 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
             </div>
           )}
 
-          {/* Navigation */}
-          <nav className="flex-1 px-4 py-6 space-y-2">
-            {navItems.map((item) => {
+          {/* Static Navigation */}
+          <nav className="px-4 py-6 space-y-2">
+            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4 px-4">
+              General
+            </div>
+            {staticNavItems.map((item) => {
               const isActive = pathname === item.href;
               return (
                 <Link
@@ -81,6 +92,41 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
                 </Link>
               );
             })}
+          </nav>
+
+          {/* Dynamic Modules Navigation */}
+          <nav className="flex-1 px-4 pb-6 space-y-2">
+            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4 px-4">
+              Modules
+            </div>
+            {allowedModules.map((mod) => {
+              const href = `/app/modules/${mod.slug}`;
+              const isActive = pathname === href;
+              return (
+                <Link
+                  key={mod.slug}
+                  href={href}
+                  onClick={() => {
+                    if (onClose) onClose();
+                  }}
+                  className={cn(
+                    "flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-slate-700 text-white"
+                      : "text-gray-400 hover:text-white hover:bg-slate-700/50"
+                  )}
+                >
+                  <Database className="w-5 h-5" />
+                  <span className="truncate">{mod.name}</span>
+                </Link>
+              );
+            })}
+            
+            {allowedModules.length === 0 && (
+              <div className="px-4 py-2 text-xs text-gray-500 italic">
+                No modules accessible
+              </div>
+            )}
           </nav>
         </div>
       </aside>

@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
+import { SLUG_TO_RESOURCE } from '../config/moduleFields';
 
 export interface RBACRequest extends Request {
     user?: {
@@ -125,7 +126,17 @@ export const requireProjectAccess = async (
     // Let's implement a quick hybrid.
     try {
         const user = req.user;
-        const projectId = req.params.id || req.body.projectId || req.query.projectId;
+        const bodyProjectId = req.body.projectId || 
+                           req.body._projectId || 
+                           (req.body.data && (req.body.data.projectId || req.body.data._projectId || req.body.data['Linked Project ID']));
+        const queryProjectId = req.query.projectId || req.query._projectId;
+        
+        // Only use params.id as projectId if it's NOT a modules route
+        // (because in modules routes, :id is usually the record ID)
+        const isModulesRoute = req.baseUrl.includes('/api/modules') || (req.params.slug && SLUG_TO_RESOURCE[req.params.slug]); // fallback if baseUrl is partial
+        const paramsProjectId = isModulesRoute ? null : req.params.id;
+
+        let projectId = (bodyProjectId || queryProjectId || paramsProjectId) as string;
 
         if (!user || !user.userId) return res.status(401).json({ error: 'Authentication required' });
 
@@ -142,28 +153,43 @@ export const requireProjectAccess = async (
 
         const roleName = dbUser.role.name;
 
-        // Super Admin / Org Admin / Finance / PM (generic) - allow if they have global read access
+        // 1. Check if they have 'read:project' permission globally.
         const canReadProjects = dbUser.role.permissions.some(p => p.permission.resource === 'project' && p.permission.action === 'read');
-
         if (!canReadProjects) {
             return res.status(403).json({ error: 'Insufficient permissions to view projects' });
         }
 
-        // Row-Level Security:
+        // 2. Row-Level Security:
         // Admins and Finance managers can view all projects
         if (roleName === 'SUPER_ADMIN' || roleName === 'ORG_ADMIN' || roleName === 'FINANCE_MANAGER') {
             return next();
         }
 
-        // PROJECT_MANAGERS can view all projects (they may not manage all of them)
-        if (roleName === 'PROJECT_MANAGER') {
+        // 3. For list routes (no specific projectId), we let the service/router filter the results.
+        if (!projectId) {
             return next();
         }
 
-        // Clients/Subcontractors logic remains...
-        // ... (simplified for brevity, assume service handles detailed ownership if passed here)
+        // 4. For specific project access (GET /:id, POST /record, etc.):
+        const project = await prisma.project.findUnique({
+            where: { id: projectId },
+            include: { 
+                members: { where: { userId: user.userId } }
+            }
+        });
 
-        return next();
+        if (!project) return res.status(404).json({ error: 'Project not found' });
+
+        // User must be the Manager, the Assigned person, or an accepted Member
+        const isManager = project.managerId === user.userId;
+        const isAssigned = project.assignedToId === user.userId;
+        const isMember = project.members && project.members.length > 0;
+
+        if (isManager || isAssigned || isMember) {
+            return next();
+        }
+
+        return res.status(403).json({ error: 'Access denied to this project' });
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: 'Server error' });

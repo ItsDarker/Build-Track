@@ -1,7 +1,8 @@
 import { Router, Response, NextFunction } from "express";
 import { authenticate, AuthRequest } from "../middleware/auth";
-import { requirePermission, RBACRequest } from "../middleware/rbac";
+import { requirePermission, RBACRequest, requireProjectAccess } from "../middleware/rbac";
 import { prisma } from "../config/prisma";
+import { FIELD_KEYS, COMPLETION_STATUSES, SLUG_TO_RESOURCE } from "../config/moduleFields";
 
 const router = Router();
 
@@ -10,25 +11,7 @@ const router = Router();
  * This bridges the gap between URL slugs and the resource names
  * stored in the permissions table.
  */
-const SLUG_TO_RESOURCE: Record<string, string> = {
-  "crm-leads": "crm",
-  "quoting-contracts": "quoting",
-  "project-requirements": "project",
-  "design-configurator": "project",
-  "approval-workflow": "project",
-  "job-confirmation": "work_orders",
-  "work-orders": "work_orders",
-  "support-warranty": "work_orders",
-  "bom-materials-planning": "inventory",
-  "procurement": "inventory",
-  "production-scheduling": "scheduling",
-  "manufacturing": "production",
-  "quality-control": "qc",
-  "packaging": "production",
-  "delivery-installation": "delivery",
-  "billing-invoicing": "finance",
-  "closure": "finance",
-};
+// SLUG_TO_RESOURCE is now imported from ../config/moduleFields
 
 /**
  * Middleware factory: resolves module slug from params,
@@ -59,9 +42,69 @@ router.get(
   async (req: AuthRequest, res) => {
     try {
       const { slug } = req.params;
+      const user = req.user as any;
+      const userId = user?.userId;
+      const role = typeof user?.role === 'string' ? user.role : user?.role?.name;
+      
+      console.log(`[DEBUG] GET /modules/${slug}/records | User: ${userId} | Role: ${role}`);
+
+      const where: any = { moduleSlug: slug };
+
+      // Row-Level Security (RLS) for Non-Admins
+      const ADMIN_ROLES = ['SUPER_ADMIN', 'ORG_ADMIN'];
+      if (!ADMIN_ROLES.includes(role)) {
+        // Find projects where the user is a member or manager
+        const userProjects = await prisma.project.findMany({
+          where: {
+            OR: [
+              { managerId: userId },
+              { assignedToId: userId },
+              { members: { some: { userId } } }
+            ]
+          },
+          select: { id: true, code: true, name: true }
+        });
+
+        const projectIds = userProjects.map(p => p.id);
+        const projectCodes = userProjects.map(p => p.code).filter(Boolean) as string[];
+        const projectNames = userProjects.map(p => p.name).filter(Boolean) as string[];
+
+        if (role === 'SALES_MANAGER') {
+          // Sales sees records they created or assigned to them
+          where.OR = [
+            { createdById: userId },
+          ];
+        } else if (projectIds.length === 0) {
+          // No project membership → no records
+          where.id = { in: [] };
+        } else {
+          // Filter: records where the creator is this user, OR the record's
+          // data matches one of our project IDs or codes across multiple possible keys.
+          const allIdentifiers = [...new Set([...projectIds, ...projectCodes, ...projectNames])];
+          
+          const projectFilters = allIdentifiers.flatMap((val: string) => [
+            { data: { path: ['projectId'], equals: val } },
+            { data: { path: ['_projectId'], equals: val } },
+            { data: { path: ['_projectCode'], equals: val } },
+            { data: { path: ['Project Code'], equals: val } },
+            { data: { path: ['Linked Project ID'], equals: val } },
+            { data: { path: ['Project Name / Reference'], equals: val } },
+            { data: { path: ['Project Reference'], equals: val } },
+            { data: { path: ['Linked Project Name'], equals: val } },
+            { data: { path: ['Project Name'], equals: val } },
+            { data: { path: ['Project ID'], equals: val } }
+          ]);
+
+          where.OR = [
+            { createdById: userId },
+            ...projectFilters
+          ];
+        }
+      }
+
 
       const records = await prisma.moduleRecord.findMany({
-        where: { moduleSlug: slug },
+        where,
         orderBy: { createdAt: "desc" },
       });
 
@@ -83,6 +126,7 @@ router.post(
   "/:slug/records",
   authenticate,
   modulePermission("create"),
+  requireProjectAccess,
   async (req: AuthRequest, res) => {
     try {
       const { slug } = req.params;
@@ -117,6 +161,7 @@ router.put(
   "/:slug/records/:id",
   authenticate,
   modulePermission("update"),
+  requireProjectAccess,
   async (req: AuthRequest, res) => {
     try {
       const { slug, id } = req.params;
@@ -142,16 +187,31 @@ router.put(
         'crm-leads': { nextTitle: 'Project Requirements', nextSlug: 'project-requirements' },
         'project-requirements': { nextTitle: 'Design Configuration', nextSlug: 'design-configurator' },
         'design-configurator': { nextTitle: 'Quoting & Contracts', nextSlug: 'quoting-contracts' },
+        'quoting-contracts': { nextTitle: 'Approval Workflow', nextSlug: 'approval-workflow' },
+        'approval-workflow': { nextTitle: 'Job Confirmation', nextSlug: 'job-confirmation' },
+        'job-confirmation': { nextTitle: 'Work Orders', nextSlug: 'work-orders' },
+        'work-orders': { nextTitle: 'BOM & Materials Planning', nextSlug: 'bom-materials-planning' },
+        'bom-materials-planning': { nextTitle: 'Procurement', nextSlug: 'procurement' },
+        'procurement': { nextTitle: 'Production Scheduling', nextSlug: 'production-scheduling' },
+        'production-scheduling': { nextTitle: 'Manufacturing', nextSlug: 'manufacturing' },
+        'manufacturing': { nextTitle: 'Quality Control', nextSlug: 'quality-control' },
+        'quality-control': { nextTitle: 'Packaging', nextSlug: 'packaging' },
+        'packaging': { nextTitle: 'Delivery & Installation', nextSlug: 'delivery-installation' },
+        'delivery-installation': { nextTitle: 'Billing & Invoicing', nextSlug: 'billing-invoicing' },
+        'billing-invoicing': { nextTitle: 'Project Closure', nextSlug: 'closure' },
       };
 
-      const leadStatus = (data as any)?.['Lead Status (New, Contacted, Qualified, Closed)'];
-      const taskStatus = (data as any)?.['Task Status (New, In Progress, Completed)'];
-      const isCompleted = leadStatus === 'Closed' || taskStatus === 'Completed';
+      const recordData = data as any;
+      const leadStatus = recordData[FIELD_KEYS.LEAD_STATUS];
+      const taskStatus = recordData[FIELD_KEYS.TASK_STATUS];
+      
+      const completionValues = COMPLETION_STATUSES[slug] || ['Completed'];
+      const isCompleted = completionValues.includes(leadStatus) || completionValues.includes(taskStatus);
+      
       const chain = CHAIN[slug];
 
       if (isCompleted && chain) {
-        const recordData = data as any;
-        const projectId = recordData._projectId;
+        const projectId = recordData[FIELD_KEYS.PROJECT_ID] || recordData['Linked Project ID'] || recordData['Project Name / Reference'];
         const assigneeId = (req as any).user?.userId ?? (req as any).user?.id ?? null;
 
         if (projectId) {
@@ -166,23 +226,46 @@ router.put(
             },
           });
 
+          // Prepare data for next module record
+          const nextData: Record<string, any> = {
+            [FIELD_KEYS.PROJECT_ID]: projectId,
+            [FIELD_KEYS.PROJECT_CODE]: recordData[FIELD_KEYS.PROJECT_CODE] || '',
+            [FIELD_KEYS.PROJECT_NAME]: recordData[FIELD_KEYS.PROJECT_NAME] || '',
+            [FIELD_KEYS.TASK_ID]: nextTask.id,
+            [FIELD_KEYS.TASK_STATUS]: 'New',
+          };
+
+          // Also try to populate user-visible project fields for the next module
+          // Common patterns: "Linked Project ID", "Project Name", "Linked Project Name"
+          const projectFields = [
+            'Linked Project ID', 'Project ID', 'Project Reference', 'Project Name / Reference',
+            'Linked Project Name', 'Project Name', 'Linked Client Name', 'Customer Name'
+          ];
+          
+          projectFields.forEach(f => {
+            if (recordData[f]) {
+              nextData[f] = recordData[f];
+            } else if (f.includes('Project ID') || f.includes('Project Reference')) {
+              nextData[f] = projectId;
+            } else if (f.includes('Project Name') && recordData[FIELD_KEYS.PROJECT_NAME]) {
+              nextData[f] = recordData[FIELD_KEYS.PROJECT_NAME];
+            }
+          });
+
           // Create next module record
           await prisma.moduleRecord.create({
             data: {
               moduleSlug: chain.nextSlug,
-              data: {
-                _projectId: projectId,
-                _projectCode: recordData._projectCode || '',
-                _projectName: recordData._projectName || '',
-                _taskId: nextTask.id,
-                'Task Status (New, In Progress, Completed)': 'New',
-              },
+              data: nextData,
               createdById: assigneeId,
               updatedById: assigneeId,
             },
           });
+          
+          console.log(`[Chain] Created next record in ${chain.nextSlug} for project ${projectId}`);
         }
       }
+
 
       res.json({ record });
 
@@ -201,6 +284,7 @@ router.delete(
   "/:slug/records/:id",
   authenticate,
   modulePermission("delete"),
+  requireProjectAccess,
   async (req: AuthRequest, res) => {
     try {
       const { id } = req.params;

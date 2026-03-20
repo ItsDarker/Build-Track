@@ -23,10 +23,15 @@ import messageAttachmentRoutes from './routes/messageAttachments.routes';
 import callsRoutes from './routes/calls.routes';
 import presenceRoutes from './routes/presence.routes';
 import usersRoutes from './routes/users.routes';
+import supportRoutes from './routes/support.routes';
 import http from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import { realtimeService } from './services/realtimeService';
 import { initSocketHandlers } from './socket/handlers';
+
+
+import { createAdapter } from '@socket.io/redis-adapter';
+import { Redis } from 'ioredis';
 
 
 const app = express();
@@ -37,6 +42,14 @@ const io = new SocketIOServer(server, {
     credentials: true,
   },
 });
+
+// Setup Redis adapter for Scaling (e.g. on GCP Cloud Run)
+if (config.redisUrl) {
+  const pubClient = new Redis(config.redisUrl);
+  const subClient = pubClient.duplicate();
+  io.adapter(createAdapter(pubClient, subClient));
+  console.log('✅ Redis adapter initialized for Socket.io scaling');
+}
 
 // Initialize Socket.io service and handlers
 realtimeService.initialize(io);
@@ -100,6 +113,7 @@ app.use('/api/message-attachments', messageAttachmentRoutes);
 app.use('/api/calls', callsRoutes);
 app.use('/api/presence', presenceRoutes);
 app.use('/api/users', usersRoutes);
+app.use('/api/support', supportRoutes);
 
 
 // Error handler

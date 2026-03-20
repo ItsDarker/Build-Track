@@ -121,14 +121,24 @@ export function DashboardLayout({ user, children }: DashboardLayoutProps) {
   const [activeInvite, setActiveInvite] = useState<UserNotification | null>(null);
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
 
+/** Map top-level sidebar paths to required roles (allowlist). Empty = all roles allowed. */
+const SIDEBAR_TOP_LEVEL_ROLE_DENY: Record<string, string[]> = {
+  "/app/clients": ["CLIENT", "VENDOR"], // Clients cannot see the Customers page
+};
+
   // Filter sidebar items based on user role
+  const roleName = user?.role?.name ?? "VENDOR";
   const filteredSidebar = navigation.sidebar
+    .filter((item) => {
+      const deniedRoles = SIDEBAR_TOP_LEVEL_ROLE_DENY[item.path];
+      if (deniedRoles && deniedRoles.includes(roleName)) return false;
+      return true;
+    })
     .map((item) => {
       if (!item.children) return item;
       const filteredChildren = item.children.filter((child) => {
         const moduleSlug = SIDEBAR_PATH_TO_MODULE[child.path];
         if (!moduleSlug) return true; // No mapping = always show
-        const roleName = user?.role?.name ?? "VENDOR";
         return canAccessModule(roleName, moduleSlug);
       });
       if (filteredChildren.length === 0) return null;
@@ -586,8 +596,19 @@ export function DashboardLayout({ user, children }: DashboardLayoutProps) {
           </Space>
         </Header>
 
-        <Content style={{ margin: "24px 16px 0", overflow: "initial" }}>
-          <div className="p-6 bg-white rounded-lg min-h-[360px] flex flex-col h-[calc(100vh-200px)]">
+        <Content 
+          style={{ 
+            margin: "24px 16px 0", 
+            overflow: "initial", 
+            display: "flex", 
+            flexDirection: "column",
+            flex: "1 0 auto"
+          }}
+        >
+          <div 
+            className="p-6 bg-white rounded-lg flex flex-col flex-1"
+            style={{ minHeight: "calc(100vh - 160px)" }}
+          >
             {children}
           </div>
         </Content>

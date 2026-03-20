@@ -89,7 +89,16 @@ export default function ClientsPage() {
     const init = async () => {
       const userResult = await apiClient.getCurrentUser();
       if (userResult.error || !userResult.data) { router.push("/login"); return; }
-      setUser((userResult.data as any).user);
+      
+      const userData = (userResult.data as any).user;
+      setUser(userData);
+
+      // RBAC Guard: Clients cannot view the Customers page
+      if (userData.role === "CLIENT") {
+        message.warning("You do not have permission to access the Customers module.");
+        router.push("/app");
+        return;
+      }
       const clientsResult = await apiClient.getClients();
       if (clientsResult.data) setClients((clientsResult.data as any).clients || []);
       setLoading(false);

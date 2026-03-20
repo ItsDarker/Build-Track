@@ -9,6 +9,7 @@ import { ConfigProvider, App } from 'antd';
 import { StyleProvider } from '@ant-design/cssinjs';
 import { AntdRegistry } from '@ant-design/nextjs-registry';
 import theme from '@/theme/themeConfig';
+import { AuthErrorHandler } from '@/components/auth/AuthErrorHandler';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -30,6 +31,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <StyleProvider>
           <ConfigProvider theme={theme}>
             <App>
+              <AuthErrorHandler />
               {children}
             </App>
           </ConfigProvider>

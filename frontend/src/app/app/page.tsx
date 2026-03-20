@@ -11,6 +11,7 @@ import {
   FolderKanban,
   CalendarDays,
   TrendingUp,
+  Users,
 } from "lucide-react";
 import { useUser } from "@/lib/context/UserContext";
 import { canAccessModule, MODULE_ACCESS, REVERSE_ROLE_MAP } from "@/config/rbac";
@@ -86,7 +87,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Quick Navigation */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Link href="/app/tasks">
           <Card className="hover:shadow-md transition-shadow cursor-pointer border-orange-200 bg-orange-50/50">
             <CardContent className="pt-6 flex items-center gap-3">
@@ -116,6 +117,17 @@ export default function DashboardPage() {
               <div>
                 <p className="font-semibold text-slate-900">My Calendar</p>
                 <p className="text-sm text-gray-500">Scheduled items &amp; deadlines</p>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/app/team">
+          <Card className="hover:shadow-md transition-shadow cursor-pointer border-purple-200 bg-purple-50/50">
+            <CardContent className="pt-6 flex items-center gap-3">
+              <Users className="w-8 h-8 text-purple-500" />
+              <div>
+                <p className="font-semibold text-slate-900">Team Profile</p>
+                <p className="text-sm text-gray-500">Manage members &amp; roles</p>
               </div>
             </CardContent>
           </Card>

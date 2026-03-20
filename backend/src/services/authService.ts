@@ -168,12 +168,13 @@ export class AuthService {
   }
 
   // 5) Generate tokens
-  const accessToken = generateAccessToken({ userId: user.id, email: user.email });
-  const refreshToken = generateRefreshToken({ userId: user.id, email: user.email });
+  const expiresIn = '15d'; // Default OAuth to 15 days
+  const accessToken = generateAccessToken({ userId: user.id, email: user.email, role: user.role?.name });
+  const refreshToken = generateRefreshToken({ userId: user.id, email: user.email, role: user.role?.name }, expiresIn);
 
   // 6) Store refresh token
   const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + 7);
+  expiresAt.setDate(expiresAt.getDate() + 15);
 
   await prisma.refreshToken.create({
     data: {
@@ -237,11 +238,16 @@ export class AuthService {
     data: { email, ip, success: true, userId: user.id },
   });
 
-  const accessToken = generateAccessToken({ userId: user.id, email: user.email });
-  const refreshToken = generateRefreshToken({ userId: user.id, email: user.email });
+  const expiresInStr = rememberMe ? '15d' : '24h';
+  const accessToken = generateAccessToken({ userId: user.id, email: user.email, role: user.role?.name });
+  const refreshToken = generateRefreshToken({ userId: user.id, email: user.email, role: user.role?.name }, expiresInStr);
 
   const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + 7);
+  if (rememberMe) {
+    expiresAt.setDate(expiresAt.getDate() + 15);
+  } else {
+    expiresAt.setHours(expiresAt.getHours() + 24);
+  }
 
   await prisma.refreshToken.create({
     data: {
@@ -357,11 +363,11 @@ export class AuthService {
       }
 
       // Generate new tokens
-      const accessToken = generateAccessToken({ userId: user.id, email: user.email });
-      const refreshToken = generateRefreshToken({ userId: user.id, email: user.email });
+      const accessToken = generateAccessToken({ userId: user.id, email: user.email, role: user.role?.name });
+      const refreshToken = generateRefreshToken({ userId: user.id, email: user.email, role: user.role?.name }, '15d');
 
       const refreshTokenExpiresAt = new Date();
-      refreshTokenExpiresAt.setDate(refreshTokenExpiresAt.getDate() + 7);
+      refreshTokenExpiresAt.setDate(refreshTokenExpiresAt.getDate() + 15);
 
       await prisma.refreshToken.create({
         data: {
@@ -462,8 +468,8 @@ export class AuthService {
     throw new Error("Please verify your email before logging in");
   }
 
-  const accessToken = generateAccessToken({ userId: user.id, email: user.email });
-  const refreshToken = generateRefreshToken({ userId: user.id, email: user.email });
+  const accessToken = generateAccessToken({ userId: user.id, email: user.email, role: user.role?.name });
+  const refreshToken = generateRefreshToken({ userId: user.id, email: user.email, role: user.role?.name });
 
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + 7);
@@ -592,6 +598,7 @@ export class AuthService {
     const accessToken = generateAccessToken({
       userId: storedToken.user.id,
       email: storedToken.user.email,
+      role: (storedToken.user as any).role?.name,
     });
 
     return { accessToken };

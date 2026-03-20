@@ -6,6 +6,8 @@ export const createProjectSchema = z.object({
     code: z.string().optional(),
     description: z.string().optional(),
     status: z.enum(['PLANNING', 'IN_PROGRESS', 'ON_HOLD', 'COMPLETED', 'CANCELLED']).default('PLANNING'),
+    budget: z.number().optional().default(0),
+    totalSpent: z.number().optional().default(0),
     startDate: z.string().datetime().optional(),
     endDate: z.string().datetime().optional(),
     clientId: z.string().optional(),
@@ -18,11 +20,21 @@ export const createProjectSchema = z.object({
 export const updateProjectSchema = createProjectSchema.partial();
 
 export const projectService = {
-    async listProjects(params?: { status?: string; clientId?: string; managerId?: string }) {
+    async listProjects(params?: { status?: string; clientId?: string; managerId?: string; user?: { id: string; role: string } }) {
         const where: any = {};
         if (params?.status) where.status = params.status;
         if (params?.clientId) where.clientId = params.clientId;
         if (params?.managerId) where.managerId = params.managerId;
+
+        if (params?.user) {
+            const { role, id } = params.user;
+            if (!['SUPER_ADMIN', 'ORG_ADMIN', 'FINANCE_MANAGER'].includes(role)) {
+                where.OR = [
+                    { managerId: id },
+                    { members: { some: { userId: id } } }
+                ];
+            }
+        }
 
         return prisma.project.findMany({
             where,
@@ -101,7 +113,7 @@ export const projectService = {
 
         const project = await prisma.project.findUnique({
             where: { id },
-            select: { id: true, name: true, code: true, client: { select: { name: true } } },
+            select: { id: true, name: true, code: true, clientId: true, client: { select: { name: true } } },
         });
 
         const task = await prisma.task.create({
@@ -114,21 +126,24 @@ export const projectService = {
             },
         });
 
-        // Auto-create CRM/Lead module record linked to this project and task
+        // Auto-create Project Requirements module record linked to this project and task
         await prisma.moduleRecord.create({
             data: {
-                moduleSlug: 'crm-leads',
+                moduleSlug: 'project-requirements',
                 data: {
                     _projectId: id,
                     _projectCode: project?.code || '',
                     _projectName: project?.name || '',
+                    _clientId: project?.clientId || '',
                     _taskId: task.id,
+                    'Requirement Record ID': `REQ-${Date.now().toString().slice(-6)}`,
                     'Task Status (New, In Progress, Completed)': 'New',
-                    'Lead ID': `CL-${task.id.slice(-6).toUpperCase()}`,
-                    'Lead Status (New, Contacted, Qualified, Closed)': 'New',
-                    'Customer Name (text)': project?.client?.name || '',
-                    'Project Name / Reference': project?.name || '',
+                    'Linked Project ID': id,
+                    'Linked Project Name': project?.name || '',
+                    'Linked Client Name': project?.client?.name || '',
                 },
+                createdById: assigneeId,
+                updatedById: assigneeId,
             },
         });
 

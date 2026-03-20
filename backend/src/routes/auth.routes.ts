@@ -57,7 +57,7 @@ router.post('/login', rateLimiter('login'), async (req, res) => {
     // Determine refresh token expiration based on rememberMe
     const refreshTokenMaxAge = data.rememberMe
       ? 15 * 24 * 60 * 60 * 1000  // 15 days if "Remember Me" is checked
-      : 7 * 24 * 60 * 60 * 1000;  // 7 days default
+      : 24 * 60 * 60 * 1000;      // 24 hours default
 
     // Set cookies
     res.cookie('accessToken', result.accessToken, {
@@ -306,10 +306,27 @@ router.get("/oauth/google/callback", async (req, res) => {
     // 1) Issue tokens using your existing auth service (handles find-or-create)
     const result = await authService.loginWithOAuth(email, name);
 
-    // 2) Redirect with tokens for cross-domain handling
+    // 2) Set cookies identically to standard email login
+    res.cookie('accessToken', result.accessToken, {
+      httpOnly: true,
+      secure: config.cookie.secure,
+      sameSite: config.cookie.sameSite,
+      maxAge: 15 * 60 * 1000, // 15 minutes
+      domain: config.cookie.domain === 'localhost' ? undefined : config.cookie.domain,
+    });
+
+    res.cookie('refreshToken', result.refreshToken, {
+      httpOnly: true,
+      secure: config.cookie.secure,
+      sameSite: config.cookie.sameSite,
+      maxAge: 15 * 24 * 60 * 60 * 1000, // 15 days for OAuth
+      domain: config.cookie.domain === 'localhost' ? undefined : config.cookie.domain,
+    });
+
+    // 3) Redirect without tokens in URL
     const dest = ["SUPER_ADMIN", "ADMIN", "ORG_ADMIN"].includes(result.user?.role?.name) ? "/admin" : "/app";
     return res.redirect(
-      `${config.frontendUrl}/auth/callback?accessToken=${result.accessToken}&refreshToken=${result.refreshToken}&dest=${encodeURIComponent(dest)}`
+      `${config.frontendUrl}/auth/callback?dest=${encodeURIComponent(dest)}`
     );
   } catch (error: any) {
     console.error("Google OAuth error:", error);

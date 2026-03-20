@@ -71,4 +71,6 @@ export const config = {
     serviceAccountProjectId: process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_PROJECT_ID || '',
     uploadsFolderId: process.env.GOOGLE_DRIVE_UPLOADS_FOLDER_ID || '',
   },
+  // Redis configuration for Socket.io scaling
+  redisUrl: process.env.REDIS_URL || '',
 } as const;

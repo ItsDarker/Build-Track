@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth';
-import { requirePermission, requireTaskAccess } from '../middleware/rbac';
+import { requirePermission, requireTaskAccess, requireProjectAccess } from '../middleware/rbac';
 import { taskService, createTaskSchema, updateTaskSchema } from '../services/taskService';
 import { z } from 'zod';
 
@@ -10,7 +10,7 @@ const router = Router();
 router.use(authenticate);
 
 // Get tasks for a project
-router.get('/', async (req, res) => {
+router.get('/', requireProjectAccess, async (req, res) => {
     try {
         const projectId = req.query.projectId as string;
         if (!projectId) {
@@ -25,7 +25,7 @@ router.get('/', async (req, res) => {
 });
 
 // Create task (ADMIN and PM only)
-router.post('/', requirePermission('create', 'work_orders'), async (req, res) => {
+router.post('/', requirePermission('create', 'work_orders'), requireProjectAccess, async (req, res) => {
     try {
         const data = createTaskSchema.parse(req.body);
         const task = await taskService.createTask(data);

@@ -28,9 +28,38 @@ class ApiClient {
         },
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
+        // Intercept 401 Unauthorized and attempt token refresh
+        if (response.status === 401 && !endpoint.includes('/refresh') && !endpoint.includes('/login') && !endpoint.includes('/logout')) {
+          try {
+            const refreshResponse = await fetch(`${this.baseUrl}/backend-api/auth/refresh`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include'
+            });
+
+            if (refreshResponse.ok) {
+              // Retry original request if refresh succeeded
+              const retryResponse = await fetch(`${this.baseUrl}${endpoint}`, {
+                ...options,
+                credentials: 'include',
+                headers: {
+                  'Content-Type': 'application/json',
+                  ...options?.headers,
+                },
+              });
+              const retryData = await retryResponse.json().catch(() => ({}));
+              if (!retryResponse.ok) {
+                return { error: retryData.error || `HTTP error! status: ${retryResponse.status}` };
+              }
+              return { data: retryData };
+            }
+          } catch (refreshErr) {
+            console.error('Auto-refresh failed:', refreshErr);
+          }
+        }
         return {
           error: data.error || `HTTP error! status: ${response.status}`,
         };

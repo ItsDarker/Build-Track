@@ -155,10 +155,22 @@ router.get('/:id/invitations', async (req, res) => {
             orderBy: { createdAt: 'desc' }
         });
 
-        res.json({ invitations });
+        // Also fetch active members
+        const members = await prisma.projectMember.findMany({
+            where: { projectId },
+            select: {
+                id: true,
+                userId: true,
+                joinedAt: true,
+                user: { select: { name: true, email: true } }
+            },
+            orderBy: { joinedAt: 'desc' }
+        });
+
+        res.json({ invitations, members });
     } catch (error) {
-        console.error('Error fetching invitations:', error);
-        res.status(500).json({ error: 'Failed to fetch invitations' });
+        console.error('Error fetching invitations and members:', error);
+        res.status(500).json({ error: 'Failed to fetch project access data' });
     }
 });
 
@@ -275,6 +287,94 @@ router.post('/:id/invitations/:invId/resend', async (req, res) => {
     } catch (error) {
         console.error('Error resending invitation:', error);
         res.status(500).json({ error: 'Failed to resend invitation' });
+    }
+});
+
+/**
+ * POST /api/projects/:id/invitations/:invId/accept
+ * Invitee accepts a project invitation
+ */
+router.post('/:id/invitations/:invId/accept', async (req, res) => {
+    try {
+        const projectId = req.params.id;
+        const invitationId = req.params.invId;
+        const userId = (req as any).user?.userId;
+
+        const invitation = await prisma.projectInvitation.findUnique({
+            where: { id: invitationId }
+        });
+
+        if (!invitation) return res.status(404).json({ error: 'Invitation not found' });
+        if (invitation.inviteeId !== userId) return res.status(403).json({ error: 'Not authorized to accept this invitation' });
+        if (invitation.status !== 'PENDING') return res.status(400).json({ error: 'Invitation is no longer pending' });
+        if (invitation.projectId !== projectId) return res.status(400).json({ error: 'Inconsistent project ID' });
+
+        await prisma.$transaction(async (tx) => {
+            // Update status
+            await tx.projectInvitation.update({
+                where: { id: invitationId },
+                data: { status: 'ACCEPTED' }
+            });
+
+            // Create Project Member
+            await tx.projectMember.create({
+                data: {
+                    projectId,
+                    userId
+                }
+            });
+
+            // Mark notification as read
+            await tx.notification.updateMany({
+                where: { invitationId },
+                data: { read: true }
+            });
+        });
+
+        res.json({ success: true, message: 'Invitation accepted safely' });
+    } catch (error) {
+        console.error('Error accepting invitation:', error);
+        res.status(500).json({ error: 'Failed to accept invitation' });
+    }
+});
+
+/**
+ * POST /api/projects/:id/invitations/:invId/reject
+ * Invitee rejects a project invitation
+ */
+router.post('/:id/invitations/:invId/reject', async (req, res) => {
+    try {
+        const projectId = req.params.id;
+        const invitationId = req.params.invId;
+        const userId = (req as any).user?.userId;
+
+        const invitation = await prisma.projectInvitation.findUnique({
+            where: { id: invitationId }
+        });
+
+        if (!invitation) return res.status(404).json({ error: 'Invitation not found' });
+        if (invitation.inviteeId !== userId) return res.status(403).json({ error: 'Not authorized to reject this invitation' });
+        if (invitation.status !== 'PENDING') return res.status(400).json({ error: 'Invitation is no longer pending' });
+        if (invitation.projectId !== projectId) return res.status(400).json({ error: 'Inconsistent project ID' });
+
+        await prisma.$transaction(async (tx) => {
+            // Update status
+            await tx.projectInvitation.update({
+                where: { id: invitationId },
+                data: { status: 'DECLINED' }
+            });
+
+            // Mark notification as read
+            await tx.notification.updateMany({
+                where: { invitationId },
+                data: { read: true }
+            });
+        });
+
+        res.json({ success: true, message: 'Invitation declined' });
+    } catch (error) {
+        console.error('Error rejecting invitation:', error);
+        res.status(500).json({ error: 'Failed to reject invitation' });
     }
 });
 

@@ -13,7 +13,8 @@ import {
   Form,
   ConfigProvider,
   UploadFile,
-  Divider as AntDivider
+  Divider as AntDivider,
+  AutoComplete
 } from "antd";
 import type { UploadChangeParam } from "antd/es/upload";
 import {
@@ -203,7 +204,7 @@ export function DynamicFormRenderer({
             const options = extractOptions(field);
             const value = values[field] || "";
             const label = cleanLabel(field);
-            const disabled = isViewMode || isAuditField(field) || isIdField(field);
+            const disabled = isViewMode || isAuditField(field);
             const fieldError = errors[field];
             const isRequired = requiredFields.has(field);
 
@@ -214,6 +215,12 @@ export function DynamicFormRenderer({
             if (hasDynamic && hasDynamic.length > 0) {
               fieldType = "select";
               finalOptions = dynamicOptions[label];
+            }
+
+            // Treat certain fields as AutoComplete if they have dynamic options but allow manual entry
+            const isFlexRelational = hasDynamic && (isIdField(field) || label.toLowerCase().includes("project") || label.toLowerCase().includes("customer") || label.toLowerCase().includes("client"));
+            if (isFlexRelational) {
+               fieldType = "input"; // We'll handle AutoComplete in renderAntField
             }
 
             return (
@@ -517,6 +524,21 @@ function renderAntField(
       );
 
     default:
+      if (options && options.length > 0) {
+         return (
+            <AutoComplete
+              className="w-full"
+              value={value}
+              onChange={(v: string) => onChange(field, v)}
+              placeholder={`Enter or select ${label}...`}
+              disabled={disabled}
+              options={options}
+              filterOption={(inputValue: string, option: any) =>
+                option?.label?.toString().toLowerCase().includes(inputValue.toLowerCase()) ?? false
+              }
+            />
+         );
+      }
       return (
         <Input
           value={value}

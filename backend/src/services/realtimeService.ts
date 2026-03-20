@@ -98,56 +98,56 @@ export class RealtimeService {
    * Emit incoming call
    */
   emitIncomingCall(recipientUserId: string, callData: any) {
-    this.emitToUser(recipientUserId, 'call:incoming', callData);
+    this.emitToUser(recipientUserId, 'calling:incoming-call', callData);
   }
 
   /**
    * Emit call accepted
    */
   emitCallAccepted(callSessionId: string, userId: string, sdpAnswer?: string) {
-    this.emitToCall(callSessionId, 'call:accepted', { userId, sdpAnswer });
+    this.emitToCall(callSessionId, 'calling:accepted', { userId, sdpAnswer });
   }
 
   /**
    * Emit call rejected
    */
   emitCallRejected(callSessionId: string, userId: string) {
-    this.emitToCall(callSessionId, 'call:rejected', { userId });
+    this.emitToCall(callSessionId, 'calling:rejected', { userId });
   }
 
   /**
    * Emit call ended
    */
   emitCallEnded(callSessionId: string) {
-    this.emitToCall(callSessionId, 'call:ended', {});
+    this.emitToCall(callSessionId, 'calling:ended', {});
   }
 
   /**
    * Emit ICE candidate
    */
   emitIceCandidate(callSessionId: string, fromUserId: string, candidate: any) {
-    this.emitToCall(callSessionId, 'call:ice-candidate', { fromUserId, candidate });
+    this.emitToCall(callSessionId, 'calling:ice-candidate', { fromUserId, candidate });
   }
 
   /**
    * Emit participant joined call
    */
   emitParticipantJoined(callSessionId: string, userId: string, userData: any) {
-    this.emitToCall(callSessionId, 'call:participant-joined', { userId, ...userData });
+    this.emitToCall(callSessionId, 'calling:participant-joined', { userId, ...userData });
   }
 
   /**
    * Emit participant left call
    */
   emitParticipantLeft(callSessionId: string, userId: string) {
-    this.emitToCall(callSessionId, 'call:participant-left', { userId });
+    this.emitToCall(callSessionId, 'calling:participant-left', { userId });
   }
 
   /**
    * Emit participant media change
    */
   emitParticipantMediaChange(callSessionId: string, userId: string, micEnabled: boolean, cameraEnabled: boolean) {
-    this.emitToCall(callSessionId, 'call:participant-media', { userId, micEnabled, cameraEnabled });
+    this.emitToCall(callSessionId, 'calling:participant-media', { userId, micEnabled, cameraEnabled });
   }
 
   /**

@@ -74,7 +74,7 @@ export function Hero() {
       <div className="absolute inset-0 z-0">
         {!imgError ? (
           <Image
-            src="/brand/hero-bg.jpg"
+            src="/brand/hero-bg.png"
             alt="Construction site"
             fill
             className="object-cover"

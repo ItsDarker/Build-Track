@@ -11,16 +11,17 @@ export function initializeSocket(token: string, userId: string): Socket {
     return socket;
   }
 
-  const backendUrl = typeof window !== 'undefined'
-    ? window.location.origin.replace(/:\d+$/, ':4000') // Replace port with backend port
-    : 'http://localhost:4000';
+  const backendUrl = process.env.NEXT_PUBLIC_API_URL || 
+    (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:4000');
 
   socket = io(backendUrl, {
     auth: {
       token,
       userId,
     },
-    reconnection: false, // Disabled to prevent console spam
+    reconnection: true,
+    reconnectionAttempts: 10,
+    reconnectionDelay: 1000,
     autoConnect: true,
     transports: ['websocket', 'polling'],
   });

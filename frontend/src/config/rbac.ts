@@ -60,7 +60,7 @@ export const MODULE_ACCESS: Record<string, Record<string, AccessLevel>> = {
     PROJECT_MANAGER: "R/W",
     SALES_MANAGER: "R/W",
     PROJECT_COORDINATOR: "R",
-    CLIENT: "R/W",
+    CLIENT: "R", // Changed from R/W to R
   },
   "project-requirements": {
     PROJECT_MANAGER: "R/W",

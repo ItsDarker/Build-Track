@@ -4,6 +4,7 @@ import { config } from '../config/env';
 export interface JwtPayload {
   userId: string;
   email: string;
+  role?: string;
 }
 
 export function generateAccessToken(payload: JwtPayload): string {
@@ -12,9 +13,9 @@ export function generateAccessToken(payload: JwtPayload): string {
   } as jwt.SignOptions);
 }
 
-export function generateRefreshToken(payload: JwtPayload): string {
+export function generateRefreshToken(payload: JwtPayload, customExpiresIn?: string | number): string {
   return jwt.sign(payload, config.jwtRefreshSecret, {
-    expiresIn: config.jwtRefreshExpiresIn,
+    expiresIn: customExpiresIn || config.jwtRefreshExpiresIn,
   } as jwt.SignOptions);
 }
 

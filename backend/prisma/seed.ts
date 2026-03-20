@@ -130,6 +130,8 @@ const ROLE_PERMISSIONS: Record<string, { resource: string, action: string }[]> =
   QC_MANAGER: [
     ...p('work_orders', ['read', 'create', 'update']),
     ...p('qc', ['read', 'create', 'update', 'approve']),
+    ...p('project', ['read']),
+    ...p('production', ['read']),
     ...p('messaging', ['read', 'create']),
   ],
   LOGISTICS_MANAGER: [
@@ -147,10 +149,11 @@ const ROLE_PERMISSIONS: Record<string, { resource: string, action: string }[]> =
     ...p('messaging', ['read', 'create']),
   ],
   CLIENT: [
-    ...p('project', ['read']),
+    ...p('project', ['read', 'update']),
     ...p('work_orders', ['read']), // Status only
     ...p('delivery', ['read']),
-    ...p('finance', ['read']), // Invoices only
+    ...p('finance', ['read', 'update']), // Invoices + some R/W
+    ...p('crm', ['read']),
     ...p('messaging', ['read', 'create']),
   ],
   VENDOR: [

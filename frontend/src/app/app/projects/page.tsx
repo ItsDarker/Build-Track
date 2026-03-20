@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Table, Button, Card, Tag, Space, Modal, Form, Input, Select, DatePicker, App, Upload, List, AutoComplete, Tabs, Segmented } from "antd";
+import { Table, Button, Card, Tag, Space, Modal, Form, Input, Select, DatePicker, App, Upload, List, AutoComplete, Tabs, Segmented, Tooltip, Divider } from "antd";
 import { PlusOutlined, EditOutlined, DeleteOutlined, DownloadOutlined, UserAddOutlined, PlayCircleOutlined, CloseCircleOutlined, CheckCircleOutlined, UndoOutlined, FolderOpenOutlined, InboxOutlined, TeamOutlined, UnorderedListOutlined, AppstoreOutlined } from "@ant-design/icons";
 import { getAllModules } from "@/config/buildtrack.config";
 import { apiClient } from "@/lib/api/client";
@@ -9,6 +9,7 @@ import { downloadExcel } from "@/lib/downloadExcel";
 import KanbanBoardBase, { Card as KanbanCard, Column as KanbanColumn } from "@/components/kanban/KanbanBoardBase";
 import { PROJECT_KANBAN_CONFIG } from "@/components/kanban/moduleKanbanConfig";
 import dayjs from "dayjs";
+import { useRouter } from "next/navigation";
 
 /** Generate a Project ID based on project name and timestamp */
 function generateProjectId(projectName: string): string {
@@ -24,6 +25,7 @@ function generateProjectId(projectName: string): string {
 }
 
 export default function ProjectsPage() {
+    const router = useRouter();
     const { message, modal } = App.useApp();
     const [projects, setProjects] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -57,8 +59,33 @@ export default function ProjectsPage() {
     const [inviteMessage, setInviteMessage] = useState('');
     const [editModalTab, setEditModalTab] = useState('details');
     const [projectFiles, setProjectFiles] = useState<any[]>([]);
+    const [projectMembers, setProjectMembers] = useState<any[]>([]);
     const [filesLoading, setFilesLoading] = useState(false);
     const [uploadLoading, setUploadLoading] = useState(false);
+
+    // Create Client Inline Modal Logic
+    const [isCreateClientModalOpen, setIsCreateClientModalOpen] = useState(false);
+    const [clientForm] = Form.useForm();
+    const [clientCreating, setClientCreating] = useState(false);
+
+    const handleCreateClient = async (values: any) => {
+        setClientCreating(true);
+        try {
+            const result = await apiClient.createClient(values);
+            if (result.data) {
+                const newClient = (result.data as any).client;
+                setClients(prev => [...prev, newClient]);
+                form.setFieldValue('clientId', newClient.id);
+                message.success('Customer created successfully');
+                setIsCreateClientModalOpen(false);
+                clientForm.resetFields();
+            }
+        } catch (error: any) {
+            message.error(error.message || 'Failed to create customer');
+        } finally {
+            setClientCreating(false);
+        }
+    };
 
     useEffect(() => {
         fetchProjects();
@@ -185,6 +212,11 @@ export default function ProjectsPage() {
             message.success("Project started and task created");
             fetchProjects();
             startForm.resetFields();
+            setIsModalOpen(false); // Close edit modal
+            
+            // Redirect to the first module of the chain (Project Requirements)
+            // with the projectId context so it's pre-filtered
+            router.push(`/app/tasks/project-requirements?projectId=${activeProject.id}`);
         }
     };
 
@@ -305,10 +337,11 @@ export default function ProjectsPage() {
         setActiveProject(project);
 
         if (project) {
-            // Fetch invitations if editing
+            // Fetch invitations and members if editing
             const invResult = await apiClient.getProjectInvitations(project.id);
             if (invResult.data) {
                 setProjectInvitations((invResult.data as any).invitations || []);
+                setProjectMembers((invResult.data as any).members || []);
             }
             // Fetch files
             const filesResult = await apiClient.getProjectAttachments(project.id);
@@ -317,6 +350,7 @@ export default function ProjectsPage() {
             }
         } else {
             setProjectInvitations([]);
+            setProjectMembers([]);
             setProjectFiles([]);
         }
         setIsModalOpen(true);
@@ -467,12 +501,16 @@ export default function ProjectsPage() {
         {
             title: "Actions",
             key: "actions",
-            render: (_: any, record: any) => (
-                <Space>
-                    <Button icon={<EditOutlined />} onClick={() => openModal(record)} />
-                    <Button icon={<DeleteOutlined />} danger onClick={() => handleDelete(record.id)} />
-                </Space>
-            ),
+            render: (_: any, record: any) => {
+                const isClient = currentUser?.role?.name === 'CLIENT';
+                if (isClient) return null;
+                return (
+                    <Space>
+                        <Button icon={<EditOutlined />} onClick={() => openModal(record)} />
+                        <Button icon={<DeleteOutlined />} danger onClick={() => handleDelete(record.id)} />
+                    </Space>
+                );
+            },
         },
     ];
 
@@ -489,8 +527,8 @@ export default function ProjectsPage() {
                             localStorage.setItem("bt_view_projects", newMode);
                         }}
                         options={[
-                            { value: "table", icon: <UnorderedListOutlined /> },
-                            { value: "kanban", icon: <AppstoreOutlined /> },
+                            { value: "table", label: <Tooltip title="List View"><UnorderedListOutlined /></Tooltip> },
+                            { value: "kanban", label: <Tooltip title="Kanban View"><AppstoreOutlined /></Tooltip> },
                         ]}
                     />
                     <Button
@@ -514,9 +552,11 @@ export default function ProjectsPage() {
                     >
                         Download Excel
                     </Button>
-                    <Button type="primary" icon={<PlusOutlined />} onClick={() => openModal()}>
-                        New Project
-                    </Button>
+                    {currentUser?.role?.name !== 'CLIENT' && (
+                        <Button type="primary" icon={<PlusOutlined />} onClick={() => openModal()}>
+                            New Project
+                        </Button>
+                    )}
                 </Space>
             </div>
 
@@ -540,6 +580,7 @@ export default function ProjectsPage() {
                             if (project) openModal(project);
                         }}
                         isLoading={loading}
+                        readOnly={currentUser?.role?.name === 'CLIENT'}
                         emptyColumnMessage="No projects"
                     />
                 </Card>
@@ -661,6 +702,17 @@ export default function ProjectsPage() {
                                                     showSearch
                                                     optionFilterProp="label"
                                                     options={clients.map(c => ({ value: c.id, label: c.name }))}
+                                                    dropdownRender={(menu: React.ReactNode) => (
+                                                        <>
+                                                            {menu}
+                                                            <Divider style={{ margin: '8px 0' }} />
+                                                            <Space style={{ padding: '0 8px 4px' }}>
+                                                                <Button type="text" icon={<PlusOutlined />} onClick={() => setIsCreateClientModalOpen(true)}>
+                                                                    Create New Customer
+                                                                </Button>
+                                                            </Space>
+                                                        </>
+                                                    )}
                                                 />
                                             </Form.Item>
                                             <Form.Item name="managerId" label="Project Manager">
@@ -767,6 +819,8 @@ export default function ProjectsPage() {
                                                     <div>
                                                         <label className="block text-sm font-medium mb-2">Search Users</label>
                                                         <AutoComplete
+                                                            className="w-full"
+                                                            getPopupContainer={(triggerNode: HTMLElement) => triggerNode.parentNode as HTMLElement}
                                                             value={emailSearch}
                                                             options={userSuggestions}
                                                             onSearch={handleEmailSearch}
@@ -801,8 +855,48 @@ export default function ProjectsPage() {
                                             </div>
                                         </div>
 
+                                        {/* Active Team Members Section */}
+                                        <div className="mt-6">
+                                            <h3 className="font-semibold text-gray-900 mb-3">Active Team Members</h3>
+                                            {projectMembers.length === 0 ? (
+                                                <div className="text-center text-gray-500 py-6 border rounded-lg bg-gray-50">
+                                                    No active members yet
+                                                </div>
+                                            ) : (
+                                                <Table
+                                                    columns={[
+                                                        {
+                                                            title: "User",
+                                                            key: "user",
+                                                            render: (_: any, record: any) => (
+                                                                <div>
+                                                                    <div className="font-medium">{record.user?.name || record.user?.email}</div>
+                                                                    <div className="text-xs text-gray-500">{record.user?.email}</div>
+                                                                </div>
+                                                            )
+                                                        },
+                                                        {
+                                                            title: "Role",
+                                                            key: "role",
+                                                            render: () => <Tag color="blue">Member</Tag>
+                                                        },
+                                                        {
+                                                            title: "Joined",
+                                                            dataIndex: "joinedAt",
+                                                            key: "joinedAt",
+                                                            render: (date: string) => new Date(date).toLocaleDateString()
+                                                        }
+                                                    ]}
+                                                    dataSource={projectMembers}
+                                                    rowKey="id"
+                                                    pagination={false}
+                                                    size="small"
+                                                />
+                                            )}
+                                        </div>
+
                                         {/* Sent Invitations Section */}
-                                        <div>
+                                        <div className="mt-6">
                                             <h3 className="font-semibold text-gray-900 mb-3">Sent Invitations</h3>
                                             {projectInvitations.length === 0 ? (
                                                 <div className="text-center text-gray-500 py-6">
@@ -961,6 +1055,33 @@ export default function ProjectsPage() {
                     />
                 )}
             </Modal>
+        <Modal
+            title="Create New Customer"
+            open={isCreateClientModalOpen}
+            onCancel={() => setIsCreateClientModalOpen(false)}
+            footer={null}
+        >
+            <Form form={clientForm} layout="vertical" onFinish={handleCreateClient}>
+                <Form.Item name="name" label="Customer Name" rules={[{ required: true }]}>
+                    <Input />
+                </Form.Item>
+                <div className="grid grid-cols-2 gap-4">
+                    <Form.Item name="email" label="Email">
+                        <Input />
+                    </Form.Item>
+                    <Form.Item name="phone" label="Phone">
+                        <Input />
+                    </Form.Item>
+                </div>
+                <Form.Item name="address" label="Address">
+                    <Input.TextArea rows={2} />
+                </Form.Item>
+                <div className="flex justify-end gap-2 mt-4">
+                    <Button onClick={() => setIsCreateClientModalOpen(false)}>Cancel</Button>
+                    <Button type="primary" htmlType="submit" loading={clientCreating}>Create</Button>
+                </div>
+            </Form>
+        </Modal>
 
         </div>
     );
