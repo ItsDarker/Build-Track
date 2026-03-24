@@ -624,6 +624,7 @@ export class AuthService {
         emailVerified: true,
         role: { select: { name: true, displayName: true } },
         isBlocked: true,
+        plan: true,
         createdAt: true,
         // BT0005: new fields (active after prisma db push)
         firstName: true,
