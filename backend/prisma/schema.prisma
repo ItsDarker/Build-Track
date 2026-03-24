@@ -25,6 +25,7 @@ model User {
   company              String?
   jobTitle             String?             @map("job_title")
   bio                  String?
+  plan                 String              @default("PRO") @map("plan")
   isBlocked            Boolean             @default(false) @map("is_blocked")
   blockedAt            DateTime?           @map("blocked_at")
   blockedReason        String?             @map("blocked_reason")
