@@ -9,11 +9,11 @@ import { canAccessModule, REVERSE_ROLE_MAP } from "@/config/rbac";
 import { getAllModules } from "@/config/buildtrack.config";
 
 const staticNavItems = [
-  { href: "/app", icon: LayoutDashboard, label: "Dashboard" },
-  { href: "/app/tasks", icon: CheckSquare, label: "Tasks", disabled: true },
-  { href: "/app/team", icon: Users, label: "Team", disabled: true },
-  { href: "/app/reports", icon: BarChart3, label: "Reports", disabled: true },
-  { href: "/app/settings", icon: Settings, label: "Settings", disabled: true },
+  { href: "/app", icon: LayoutDashboard, label: "Dashboard", proOnly: false },
+  { href: "/app/tasks", icon: CheckSquare, label: "Tasks", disabled: true, proOnly: false },
+  { href: "/app/team", icon: Users, label: "Team", disabled: true, proOnly: true },
+  { href: "/app/reports", icon: BarChart3, label: "Reports", disabled: true, proOnly: true },
+  { href: "/app/settings", icon: Settings, label: "Settings", disabled: true, proOnly: false },
 ];
 
 interface SidebarProps {
@@ -23,11 +23,15 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   const pathname = usePathname();
-  const { role } = useUser();
+  const { role, plan } = useUser();
   const allModules = getAllModules();
 
-  // Filter dynamic modules based on RBAC
-  const allowedModules = allModules.filter(mod => canAccessModule(role.name, mod.slug));
+  // Filter static nav items based on plan
+  const isPro = !plan || plan === 'PRO';
+  const visibleNavItems = staticNavItems.filter(item => !item.proOnly || isPro);
+
+  // Filter dynamic modules based on RBAC (Pro only)
+  const allowedModules = isPro ? allModules.filter(mod => canAccessModule(role.name, mod.slug)) : [];
 
   return (
     <>
@@ -64,7 +68,7 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
             <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4 px-4">
               General
             </div>
-            {staticNavItems.map((item) => {
+            {visibleNavItems.map((item) => {
               const isActive = pathname === item.href;
               return (
                 <Link

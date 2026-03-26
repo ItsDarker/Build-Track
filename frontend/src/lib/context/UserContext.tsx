@@ -11,6 +11,7 @@ export interface AppUser {
     displayName: string; // e.g. "Super Admin"
   };
   emailVerified?: string;
+  plan?: string;
 }
 
 interface UserContextValue {

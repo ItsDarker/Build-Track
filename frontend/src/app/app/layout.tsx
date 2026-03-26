@@ -21,6 +21,7 @@ interface User {
         displayName: string;
     };
     emailVerified?: string;
+    plan?: string;
 }
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
