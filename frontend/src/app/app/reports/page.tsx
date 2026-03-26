@@ -1,3 +1,4 @@
+import ProRoute from "@/components/auth/ProRoute";
 'use client';
 
 import React, { useEffect, useState, useMemo } from 'react';
@@ -274,6 +275,7 @@ export default function ReportsPage() {
   }
 
   return (
+    <ProRoute>
     <>
       <div className="mb-6">
         <div className="flex justify-between items-start mb-4">
@@ -607,5 +609,6 @@ export default function ReportsPage() {
         ]}
       />
     </>
+    </ProRoute>
   );
 }

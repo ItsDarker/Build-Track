@@ -1,3 +1,4 @@
+import ProRoute from "@/components/auth/ProRoute";
 'use client';
 
 import React, { useEffect, useState, useMemo } from 'react';
@@ -359,7 +360,8 @@ export default function ContactsPage() {
   }
 
   return (
-    <>
+    <ProRoute>
+      <>
       <div className="mb-6">
         <Title level={2}>Contacts Directory</Title>
         <Text type="secondary">
@@ -660,5 +662,6 @@ export default function ContactsPage() {
         )}
       </Drawer>
     </>
+    </ProRoute>
   );
 }

@@ -1,4 +1,5 @@
 "use client";
+import ProRoute from "@/components/auth/ProRoute";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -462,7 +463,8 @@ export default function TeamPage() {
   ];
 
   return (
-    <>
+    <ProRoute>
+      <>
       <div className="flex justify-between items-center mb-6">
         <div>
           <Title level={3} className="mb-0">Team Profile</Title>
@@ -643,5 +645,6 @@ export default function TeamPage() {
         </Form>
       </Modal>
     </>
+    </ProRoute>
   );
 }

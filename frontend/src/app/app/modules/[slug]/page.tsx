@@ -1,4 +1,5 @@
 "use client";
+import ProRoute from "@/components/auth/ProRoute";
 
 import { useParams } from "next/navigation";
 import { ModulePage } from "@/components/modules/ModulePage";
@@ -37,5 +38,5 @@ export default function DynamicModulePage() {
     );
   }
 
-  return <ModulePage module={module} />;
+  return <ProRoute><ModulePage module={module} /></ProRoute>;
 }

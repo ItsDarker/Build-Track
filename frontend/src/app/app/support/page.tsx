@@ -1,3 +1,4 @@
+import ProRoute from "@/components/auth/ProRoute";
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -375,7 +376,8 @@ export default function SupportPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <ProRoute>
+      <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-6xl mx-auto">
         <div className="mb-8 flex justify-between items-end">
           <div>
@@ -392,5 +394,6 @@ export default function SupportPage() {
         <Tabs items={tabItems} defaultActiveKey="tickets" />
       </div>
     </div>
+    </ProRoute>
   );
 }

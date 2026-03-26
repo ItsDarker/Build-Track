@@ -1,4 +1,5 @@
 "use client";
+import ProRoute from "@/components/auth/ProRoute";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -191,7 +192,8 @@ export default function ClientsPage() {
   );
 
   return (
-    <>
+    <ProRoute>
+      <>
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
@@ -536,5 +538,6 @@ export default function ClientsPage() {
         </Form>
       </Modal>
     </>
+    </ProRoute>
   );
 }
