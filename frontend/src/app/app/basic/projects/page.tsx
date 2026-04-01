@@ -444,56 +444,56 @@ export default function BasicProjectsPage() {
 
         {/* Workflow Stepper - Horizontal */}
         <div className="mb-6">
-          <div className="flex items-center justify-between" style={{ gap: "8px" }}>
+          <div className="flex items-center" style={{ gap: "0" }}>
             {WORKFLOW_STEPS.map((step, idx) => (
-              <div key={step.key} className="flex flex-col items-center" style={{ flex: 1 }}>
+              <div key={step.key} style={{ flex: 1, display: "flex", alignItems: "center", gap: "0" }}>
                 {/* Step Circle */}
-                <div
-                  className="flex items-center justify-center rounded-full mb-2 font-bold text-white"
-                  style={{
-                    width: "48px",
-                    height: "48px",
-                    backgroundColor:
-                      idx < currentStep
-                        ? "#20c997" // Completed - teal
-                        : idx === currentStep
-                          ? "transparent"
-                          : "#d9d9d9", // Pending - light gray
-                    border: idx === currentStep ? "3px solid #1890ff" : "none",
-                    fontSize: "18px",
-                    fontWeight: "bold",
-                  }}
-                >
-                  {idx < currentStep ? (
-                    <span style={{ fontSize: "24px" }}>✓</span>
-                  ) : (
-                    <span>{idx + 1}</span>
-                  )}
+                <div className="flex flex-col items-center" style={{ minWidth: "fit-content" }}>
+                  <div
+                    className="flex items-center justify-center rounded-full font-bold text-white flex-shrink-0"
+                    style={{
+                      width: "48px",
+                      height: "48px",
+                      backgroundColor:
+                        idx < currentStep
+                          ? "#20c997" // Completed - teal
+                          : idx === currentStep
+                            ? "transparent"
+                            : "#d9d9d9", // Pending - light gray
+                      border: idx === currentStep ? "3px solid #1890ff" : "none",
+                      fontSize: "18px",
+                      fontWeight: "bold",
+                      marginBottom: "8px",
+                    }}
+                  >
+                    {idx < currentStep ? (
+                      <span style={{ fontSize: "24px" }}>✓</span>
+                    ) : (
+                      <span>{idx + 1}</span>
+                    )}
+                  </div>
+                  {/* Step Title */}
+                  <span
+                    className="text-center text-sm font-semibold text-gray-700 whitespace-nowrap"
+                    style={{ fontSize: "13px" }}
+                  >
+                    {step.title}
+                  </span>
                 </div>
-                {/* Step Title */}
-                <span
-                  className="text-center text-sm font-semibold text-gray-700"
-                  style={{ fontSize: "13px" }}
-                >
-                  {step.title}
-                </span>
-              </div>
-            ))}
-          </div>
 
-          {/* Connector Lines */}
-          <div className="flex items-center justify-between mt-2">
-            {WORKFLOW_STEPS.map((step, idx) => (
-              <div
-                key={`line-${step.key}`}
-                style={{
-                  flex: 1,
-                  height: "3px",
-                  backgroundColor: idx < currentStep ? "#20c997" : "#d9d9d9",
-                  margin: "0 2px",
-                  display: idx === WORKFLOW_STEPS.length - 1 ? "none" : "block",
-                }}
-              />
+                {/* Connector Line (between circles) */}
+                {idx < WORKFLOW_STEPS.length - 1 && (
+                  <div
+                    style={{
+                      flex: 1,
+                      height: "3px",
+                      backgroundColor: idx < currentStep ? "#20c997" : "#d9d9d9",
+                      margin: "0 -2px",
+                      marginTop: "-28px",
+                    }}
+                  />
+                )}
+              </div>
             ))}
           </div>
         </div>

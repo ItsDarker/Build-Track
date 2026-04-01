@@ -1,61 +1,54 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Calendar, Badge, Drawer, Tag, Spin } from "antd";
+import { Badge, Drawer, Tag, Spin, Button, Empty } from "antd";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { Dayjs } from "dayjs";
 import dayjs from "dayjs";
-import { Button } from "@/components/ui/button";
 import { CalendarDays, Clock } from "lucide-react";
 import { getAllModules } from "@/config/buildtrack.config";
 
-interface ScheduledItem {
+interface ScheduledEvent {
+  id: string;
   title: string;
   type: string;
   module: string;
-  time?: string;
-  recordId: string;
   moduleSlug: string;
+  recordId: string;
+  startDate: Dayjs;
+  endDate: Dayjs;
+  fullData?: any;
 }
 
-const typeBadgeColor: Record<string, "success" | "processing" | "error" | "warning" | "default"> = {
-  meeting: "processing",
-  deadline: "error",
-  review: "warning",
-  delivery: "success",
-  inspection: "processing",
-  billing: "error",
-  production: "default",
-  lead: "warning",
-  procurement: "success",
-  quote: "processing",
-  "site-visit": "processing",
-  "scheduled-start": "default",
-  "scheduled-end": "warning",
-  "target-delivery": "success",
-  "actual-start": "processing",
-  "actual-end": "success",
-  "expected-resolution": "warning",
-  "closure-date": "success",
-  "order-date": "default",
-  "quote-date": "processing",
-  "decision-date": "warning",
-  "assigned-date": "default",
+const eventTypeColors: Record<string, string> = {
+  meeting: "bg-blue-500",
+  deadline: "bg-red-500",
+  review: "bg-yellow-500",
+  delivery: "bg-green-500",
+  inspection: "bg-purple-500",
+  billing: "bg-red-600",
+  production: "bg-indigo-500",
+  lead: "bg-orange-500",
+  procurement: "bg-teal-500",
+  quote: "bg-cyan-500",
+  "site-visit": "bg-blue-600",
+  "scheduled-start": "bg-gray-500",
+  "scheduled-end": "bg-gray-600",
+  "target-delivery": "bg-green-600",
+  "actual-start": "bg-blue-400",
+  "actual-end": "bg-green-400",
+  "expected-resolution": "bg-yellow-600",
+  "closure-date": "bg-green-700",
+  "order-date": "bg-gray-400",
+  "quote-date": "bg-cyan-600",
+  "decision-date": "bg-yellow-700",
+  "assigned-date": "bg-gray-300",
+  default: "bg-gray-400",
 };
 
-// Date field keywords to detect date fields in modules
 const dateFieldKeywords = [
-  "date",
-  "due",
-  "deadline",
-  "delivery",
-  "scheduled",
-  "start",
-  "end",
-  "visit",
-  "resolution",
-  "closure",
-  "created",
-  "updated",
+  "date", "due", "deadline", "delivery", "scheduled", "start", "end",
+  "visit", "resolution", "closure", "created", "updated",
 ];
 
 function isDateField(fieldName: string): boolean {
@@ -69,7 +62,7 @@ function parseDate(value: any): dayjs.Dayjs | null {
     const parsed = dayjs(value);
     if (parsed.isValid()) return parsed;
   } catch {
-    // Ignore parsing errors
+    // Ignore
   }
   return null;
 }
@@ -95,9 +88,10 @@ function inferEventType(fieldName: string): string {
 }
 
 export default function CalendarPage() {
-  const [scheduledItems, setScheduledItems] = useState<Record<string, ScheduledItem[]>>({});
+  const [events, setEvents] = useState<ScheduledEvent[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState<Dayjs | null>(null);
+  const [currentMonth, setCurrentMonth] = useState(dayjs());
+  const [selectedEvent, setSelectedEvent] = useState<ScheduledEvent | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => {
@@ -105,9 +99,8 @@ export default function CalendarPage() {
       try {
         setLoading(true);
         const modules = getAllModules();
-        const items: Record<string, ScheduledItem[]> = {};
+        const allEvents: ScheduledEvent[] = [];
 
-        // Fetch records from each module
         for (const module of modules) {
           try {
             const res = await fetch(
@@ -116,55 +109,91 @@ export default function CalendarPage() {
             );
 
             if (!res.ok) continue;
-
             const data = await res.json();
             const records = data.records || [];
 
-            // Extract date fields from each record
             for (const record of records) {
               const recordData = record.data || {};
+              let startDate: Dayjs | null = null;
+              let endDate: Dayjs | null = null;
+              let eventFieldName = "";
 
-              // Look for date fields
-              for (const [fieldName, fieldValue] of Object.entries(recordData)) {
-                if (!isDateField(fieldName)) continue;
+              // Look for start/end date pairs or single date fields
+              const dateFields = Object.entries(recordData).filter(
+                ([key]) => isDateField(key)
+              );
 
-                const parsedDate = parseDate(fieldValue);
-                if (!parsedDate) continue;
+              // Find start date (prefer fields with "start" in name)
+              const startField = dateFields.find(
+                ([key]) =>
+                  key.toLowerCase().includes("start") ||
+                  key.toLowerCase().includes("begin")
+              );
+              if (startField) {
+                startDate = parseDate(startField[1]);
+                eventFieldName = startField[0];
+              }
 
-                const dateKey = parsedDate.format("YYYY-MM-DD");
-                if (!items[dateKey]) items[dateKey] = [];
+              // Find end date (prefer fields with "end" in name)
+              const endField = dateFields.find(
+                ([key]) =>
+                  key.toLowerCase().includes("end") ||
+                  key.toLowerCase().includes("due") ||
+                  key.toLowerCase().includes("deadline") ||
+                  key.toLowerCase().includes("delivery")
+              );
+              if (endField) {
+                endDate = parseDate(endField[1]);
+                if (!startDate) eventFieldName = endField[0];
+              }
 
-                // Generate title from record data (look for ID or name fields)
-                let title = `${fieldName}`;
+              // If only one date, use it for both start and end
+              if (!startDate && !endDate && dateFields.length > 0) {
+                const firstDate = parseDate(dateFields[0][1]);
+                if (firstDate) {
+                  startDate = firstDate;
+                  endDate = firstDate;
+                  eventFieldName = dateFields[0][0];
+                }
+              }
+
+              if (startDate && endDate) {
+                // Generate title
+                let title = eventFieldName;
                 const idField = Object.entries(recordData).find(
                   ([key]) => key.toLowerCase().includes("id") && key !== "_id"
                 );
                 const nameField = Object.entries(recordData).find(
-                  ([key]) => key.toLowerCase().includes("name") || key.toLowerCase().includes("title")
+                  ([key]) =>
+                    key.toLowerCase().includes("name") ||
+                    key.toLowerCase().includes("title")
                 );
 
                 if (idField && idField[1]) {
-                  title = `${idField[1]} - ${fieldName}`;
+                  title = `${idField[1]} - ${eventFieldName}`;
                 } else if (nameField && nameField[1]) {
-                  title = `${nameField[1]} - ${fieldName}`;
+                  title = `${nameField[1]} - ${eventFieldName}`;
                 }
 
-                items[dateKey].push({
+                allEvents.push({
+                  id: `${record.id}-${eventFieldName}`,
                   title,
-                  type: inferEventType(fieldName),
+                  type: inferEventType(eventFieldName),
                   module: module.name,
-                  recordId: record.id,
                   moduleSlug: module.slug,
+                  recordId: record.id,
+                  startDate,
+                  endDate,
+                  fullData: recordData,
                 });
               }
             }
           } catch (err) {
             console.warn(`Failed to fetch ${module.slug} records:`, err);
-            // Continue with next module
           }
         }
 
-        setScheduledItems(items);
+        setEvents(allEvents);
       } finally {
         setLoading(false);
       }
@@ -173,47 +202,85 @@ export default function CalendarPage() {
     fetchAllModuleRecords();
   }, []);
 
-  const getItems = (date: Dayjs): ScheduledItem[] => {
-    const key = date.format("YYYY-MM-DD");
-    return scheduledItems[key] || [];
+  const getDaysInMonth = (date: Dayjs) => {
+    return date.daysInMonth();
   };
 
-  const handleDateSelect = (date: Dayjs) => {
-    setSelectedDate(date);
-    const items = getItems(date);
-    if (items.length > 0) {
-      setDrawerOpen(true);
-    }
+  const getFirstDayOfMonth = (date: Dayjs) => {
+    return date.startOf("month").day();
   };
 
-  const selectedItems = selectedDate ? getItems(selectedDate) : [];
-
-  // Cell renderer for the calendar — shows badges for scheduled items
-  const cellRender = (current: Dayjs, info: { type: string }) => {
-    if (info.type !== "date") return null;
-    const items = getItems(current);
-    if (items.length === 0) return null;
-
-    return (
-      <ul className="list-none p-0 m-0">
-        {items.slice(0, 3).map((item, idx) => (
-          <li key={idx} className="mb-0.5">
-            <Badge
-              status={typeBadgeColor[item.type] || "default"}
-              text={
-                <span className="text-xs truncate block max-w-[120px]">
-                  {item.title}
-                </span>
-              }
-            />
-          </li>
-        ))}
-        {items.length > 3 && (
-          <li className="text-xs text-gray-400">+{items.length - 3} more</li>
-        )}
-      </ul>
+  const getEventsForDay = (date: Dayjs): ScheduledEvent[] => {
+    return events.filter(
+      (event) =>
+        date.isAfter(event.startDate.startOf("day"), "day") ||
+        date.isSame(event.startDate.startOf("day"), "day")
+    ).filter(
+      (event) =>
+        date.isBefore(event.endDate.startOf("day"), "day") ||
+        date.isSame(event.endDate.startOf("day"), "day")
     );
   };
+
+  const renderCalendar = () => {
+    const daysInMonth = getDaysInMonth(currentMonth);
+    const firstDay = getFirstDayOfMonth(currentMonth);
+    const days = [];
+    const weeks = [];
+
+    // Add empty cells for days before month starts
+    for (let i = 0; i < firstDay; i++) {
+      days.push(null);
+    }
+
+    // Add days of the month
+    for (let day = 1; day <= daysInMonth; day++) {
+      days.push(currentMonth.date(day));
+    }
+
+    // Group into weeks
+    for (let i = 0; i < days.length; i += 7) {
+      weeks.push(days.slice(i, i + 7));
+    }
+
+    return weeks.map((week, weekIdx) => (
+      <div key={weekIdx} className="border-b">
+        <div className="grid grid-cols-7 gap-0">
+          {week.map((date, dayIdx) => (
+            <div
+              key={dayIdx}
+              className="min-h-24 border-r p-2 bg-white hover:bg-gray-50 transition-colors"
+            >
+              {date ? (
+                <div className="h-full">
+                  <div className="text-sm font-medium text-gray-700 mb-2">
+                    {date.format("D")}
+                  </div>
+                  <div className="space-y-1">
+                    {getEventsForDay(date).map((event) => (
+                      <div
+                        key={event.id}
+                        onClick={() => {
+                          setSelectedEvent(event);
+                          setDrawerOpen(true);
+                        }}
+                        className={`${eventTypeColors[event.type] || eventTypeColors.default} text-white text-xs p-1 rounded cursor-pointer hover:opacity-80 transition-opacity truncate`}
+                        title={event.title}
+                      >
+                        {event.title}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      </div>
+    ));
+  };
+
+  const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   return (
     <div className="space-y-6">
@@ -233,65 +300,133 @@ export default function CalendarPage() {
         )}
       </div>
 
-      {/* Calendar grid using AntD Calendar */}
-      <div className="bg-white rounded-lg border p-4">
+      {/* Calendar Grid */}
+      <div className="bg-white rounded-lg border overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <Spin />
           </div>
         ) : (
-          <Calendar
-            cellRender={cellRender}
-            onSelect={handleDateSelect}
-          />
+          <>
+            {/* Calendar Navigation */}
+            <div className="flex items-center justify-between p-4 border-b">
+              <h2 className="text-lg font-semibold text-gray-900">
+                {currentMonth.format("MMMM YYYY")}
+              </h2>
+              <div className="flex gap-2">
+                <Button
+                  type="text"
+                  icon={<ChevronLeft className="w-4 h-4" />}
+                  onClick={() => setCurrentMonth(currentMonth.subtract(1, "month"))}
+                />
+                <Button
+                  type="text"
+                  onClick={() => setCurrentMonth(dayjs())}
+                >
+                  Today
+                </Button>
+                <Button
+                  type="text"
+                  icon={<ChevronRight className="w-4 h-4" />}
+                  onClick={() => setCurrentMonth(currentMonth.add(1, "month"))}
+                />
+              </div>
+            </div>
+
+            {/* Week Day Headers */}
+            <div className="grid grid-cols-7 gap-0 bg-gray-50 border-b">
+              {weekDays.map((day) => (
+                <div
+                  key={day}
+                  className="p-3 text-center font-semibold text-gray-700 border-r"
+                >
+                  {day}
+                </div>
+              ))}
+            </div>
+
+            {/* Calendar Days */}
+            {renderCalendar()}
+
+            {events.length === 0 && (
+              <div className="flex items-center justify-center py-12">
+                <Empty description="No scheduled items" />
+              </div>
+            )}
+          </>
         )}
       </div>
 
-      {/* Scheduled items drawer */}
+      {/* Event Details Drawer */}
       <Drawer
         title={
           <div className="flex items-center gap-2">
             <CalendarDays className="w-5 h-5 text-orange-500" />
-            <span>
-              Scheduled Items —{" "}
-              {selectedDate?.format("MMMM D, YYYY")}
-            </span>
+            <span>Event Details</span>
           </div>
         }
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        width={420}
+        width={450}
       >
-        {selectedItems.length === 0 ? (
-          <p className="text-gray-500 text-center py-8">
-            No items scheduled for this date.
-          </p>
-        ) : (
-          <div className="space-y-4">
-            {selectedItems.map((item, idx) => (
-              <div
-                key={idx}
-                className="p-4 border rounded-lg hover:shadow-sm transition-shadow"
-              >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="font-medium text-slate-900">{item.title}</p>
-                    <Tag className="mt-1">{item.module}</Tag>
-                  </div>
-                  <Badge
-                    status={typeBadgeColor[item.type] || "default"}
-                    text={item.type}
-                  />
+        {selectedEvent ? (
+          <div className="space-y-6">
+            {/* Title */}
+            <div>
+              <h3 className="text-lg font-semibold text-slate-900 mb-1">
+                {selectedEvent.title}
+              </h3>
+              <Tag color={eventTypeColors[selectedEvent.type]?.replace("bg-", "") || "gray"}>
+                {selectedEvent.type}
+              </Tag>
+            </div>
+
+            {/* Module */}
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-1">Module</p>
+              <p className="text-gray-900">{selectedEvent.module}</p>
+            </div>
+
+            {/* Date Range */}
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-2">Duration</p>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 text-gray-700">
+                  <Clock className="w-4 h-4" />
+                  <span>
+                    {selectedEvent.startDate.format("MMM DD, YYYY")}
+                    {!selectedEvent.startDate.isSame(selectedEvent.endDate, "day") &&
+                      ` - ${selectedEvent.endDate.format("MMM DD, YYYY")}`}
+                  </span>
                 </div>
-                {item.time && (
-                  <div className="flex items-center gap-1.5 mt-2 text-sm text-gray-500">
-                    <Clock className="w-3.5 h-3.5" />
-                    {item.time}
-                  </div>
+              </div>
+            </div>
+
+            {/* Full Event Data */}
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-3">Event Information</p>
+              <div className="bg-gray-50 rounded-lg p-4 space-y-2 max-h-96 overflow-y-auto">
+                {selectedEvent.fullData ? (
+                  Object.entries(selectedEvent.fullData).map(([key, value]: [string, any]) => (
+                    <div key={key} className="border-b border-gray-200 pb-2 last:border-0">
+                      <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                        {key}
+                      </p>
+                      <p className="text-sm text-gray-900 mt-1">
+                        {typeof value === "object"
+                          ? JSON.stringify(value)
+                          : String(value || "—")}
+                      </p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-gray-500">No additional information</p>
                 )}
               </div>
-            ))}
+            </div>
           </div>
+        ) : (
+          <Empty description="No event selected" />
         )}
       </Drawer>
     </div>
