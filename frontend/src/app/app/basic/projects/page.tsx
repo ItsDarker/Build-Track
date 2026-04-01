@@ -444,17 +444,58 @@ export default function BasicProjectsPage() {
 
         {/* Workflow Stepper - Horizontal */}
         <div className="mb-6">
-          <Steps
-            direction="horizontal"
-            current={currentStep}
-            items={WORKFLOW_STEPS.map((step) => ({
-              title: step.title,
-            }))}
-            size="small"
-            style={{
-              fontSize: "14px",
-            }}
-          />
+          <div className="flex items-center justify-between" style={{ gap: "8px" }}>
+            {WORKFLOW_STEPS.map((step, idx) => (
+              <div key={step.key} className="flex flex-col items-center" style={{ flex: 1 }}>
+                {/* Step Circle */}
+                <div
+                  className="flex items-center justify-center rounded-full mb-2 font-bold text-white"
+                  style={{
+                    width: "48px",
+                    height: "48px",
+                    backgroundColor:
+                      idx < currentStep
+                        ? "#20c997" // Completed - teal
+                        : idx === currentStep
+                          ? "transparent"
+                          : "#d9d9d9", // Pending - light gray
+                    border: idx === currentStep ? "3px solid #1890ff" : "none",
+                    fontSize: "18px",
+                    fontWeight: "bold",
+                  }}
+                >
+                  {idx < currentStep ? (
+                    <span style={{ fontSize: "24px" }}>✓</span>
+                  ) : (
+                    <span>{idx + 1}</span>
+                  )}
+                </div>
+                {/* Step Title */}
+                <span
+                  className="text-center text-sm font-semibold text-gray-700"
+                  style={{ fontSize: "13px" }}
+                >
+                  {step.title}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Connector Lines */}
+          <div className="flex items-center justify-between mt-2">
+            {WORKFLOW_STEPS.map((step, idx) => (
+              <div
+                key={`line-${step.key}`}
+                style={{
+                  flex: 1,
+                  height: "3px",
+                  backgroundColor: idx < currentStep ? "#20c997" : "#d9d9d9",
+                  margin: "0 2px",
+                  display: idx === WORKFLOW_STEPS.length - 1 ? "none" : "block",
+                }}
+              />
+            ))}
+          </div>
         </div>
 
         {/* Status Badge + Due Date + Action Button */}
@@ -670,47 +711,46 @@ export default function BasicProjectsPage() {
                       {/* Send New Invitation Section */}
                       <div className="border rounded-lg p-4 bg-gray-50">
                         <h3 className="font-semibold text-gray-900 mb-3">Send New Invitation</h3>
-                        <Form form={inviteForm} layout="vertical">
-                          <div className="space-y-3">
-                            <Form.Item label="Search Users">
-                              <AutoComplete
-                                className="w-full"
-                                value={emailSearch}
-                                options={userSuggestions}
-                                onSearch={handleEmailSearch}
-                                onChange={(value: string) => {
-                                  setEmailSearch(value);
-                                  const selected = userSuggestions.find((s) => s.value === value);
-                                  setSelectedInviteeId(selected ? value : null);
-                                }}
-                                placeholder="Start typing email or name..."
-                                notFoundContent={
-                                  emailSearch.length < 2
-                                    ? "Type at least 2 characters"
-                                    : "No users found"
-                                }
-                              />
-                            </Form.Item>
-                            <Form.Item label="Optional Message">
-                              <Input.TextArea
-                                rows={2}
-                                placeholder="Add a personal message..."
-                                value={inviteMessage}
-                                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setInviteMessage(e.target.value)}
-                              />
-                            </Form.Item>
+                        <div className="space-y-3">
+                          <div>
+                            <AutoComplete
+                              className="w-full"
+                              value={emailSearch}
+                              options={userSuggestions}
+                              onSearch={handleEmailSearch}
+                              onChange={(value: string) => {
+                                setEmailSearch(value);
+                                const selected = userSuggestions.find((s) => s.value === value);
+                                setSelectedInviteeId(selected ? value : null);
+                              }}
+                              placeholder="Start typing email or name..."
+                              notFoundContent={
+                                emailSearch.length < 2
+                                  ? "Type at least 2 characters"
+                                  : "No users found"
+                              }
+                            />
                           </div>
-                          <Button
-                            type="primary"
-                            loading={inviteLoading}
-                            disabled={!selectedInviteeId}
-                            onClick={handleSendInvite}
-                            icon={<SendOutlined />}
-                            block
-                          >
-                            Send Invitation
-                          </Button>
-                        </Form>
+                          <div>
+                            <label className="block text-sm font-medium mb-2">Optional Message</label>
+                            <Input.TextArea
+                              rows={2}
+                              placeholder="Add a personal message..."
+                              value={inviteMessage}
+                              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setInviteMessage(e.target.value)}
+                            />
+                          </div>
+                        </div>
+                        <Button
+                          type="primary"
+                          loading={inviteLoading}
+                          disabled={!selectedInviteeId}
+                          onClick={handleSendInvite}
+                          icon={<SendOutlined />}
+                          block
+                        >
+                          Send Invitation
+                        </Button>
                       </div>
 
                       <Divider />
