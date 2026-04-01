@@ -128,12 +128,14 @@ export default function BasicProjectsPage() {
       const payload = {
         name: values.name,
         clientId: values.clientId,
-        projectManagerId: values.projectManagerId || currentUser?.id,
+        assignedToId: values.projectManagerId || currentUser?.id,
+        managerId: values.projectManagerId || currentUser?.id,
         description: values.description,
         status: values.status || "PLANNING",
+        budget: values.budget || 0,
         startDate: values.startDate ? values.startDate.toISOString() : undefined,
         endDate: values.endDate ? values.endDate.toISOString() : undefined,
-        ...(editingProject ? {} : { projectCode: generateProjectId(values.name) }),
+        ...(editingProject ? {} : { code: generateProjectId(values.name) }),
       };
 
       const result = editingProject

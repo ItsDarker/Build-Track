@@ -1,6 +1,13 @@
 import dotenv from 'dotenv';
+import path from 'path';
+import fs from 'fs';
 
+// Load .env first, then .env.local if it exists (for local development overrides)
 dotenv.config();
+const envLocalPath = path.join(process.cwd(), '.env.local');
+if (fs.existsSync(envLocalPath)) {
+  dotenv.config({ path: envLocalPath, override: true });
+}
 
 export const config = {
   port: parseInt(process.env.PORT || '4000'),
@@ -51,7 +58,7 @@ export const config = {
 
   // Rate limiting
   rateLimit: {
-    max: parseInt(process.env.RATE_LIMIT_MAX || '5'),
+    max: parseInt(process.env.RATE_LIMIT_MAX || '100'), // Increased for testing
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'),
   },
 

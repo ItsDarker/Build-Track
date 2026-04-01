@@ -50,7 +50,20 @@ router.get(
 
       const where: any = { moduleSlug: slug };
 
-      // Row-Level Security (RLS) for Non-Admins
+      // Fetch all records for this module
+      const allRecords = await prisma.moduleRecord.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+      });
+
+      // Parse data field from string to object (for SQLite compatibility)
+      const parsedRecords = allRecords.map(record => ({
+        ...record,
+        data: typeof record.data === 'string' ? JSON.parse(record.data) : record.data
+      }));
+
+      // Row-Level Security (RLS) filtering - applied in-memory for SQLite compatibility
+      let records = parsedRecords;
       const ADMIN_ROLES = ['SUPER_ADMIN', 'ORG_ADMIN'];
       if (!ADMIN_ROLES.includes(role)) {
         // Find projects where the user is a member or manager
@@ -65,53 +78,54 @@ router.get(
           select: { id: true, code: true, name: true }
         });
 
-        const projectIds = userProjects.map(p => p.id);
-        const projectCodes = userProjects.map(p => p.code).filter(Boolean) as string[];
-        const projectNames = userProjects.map(p => p.name).filter(Boolean) as string[];
+        const projectIds = new Set(userProjects.map(p => p.id));
+        const projectCodes = new Set(userProjects.map(p => p.code).filter(Boolean));
+        const projectNames = new Set(userProjects.map(p => p.name).filter(Boolean));
 
         if (role === 'SALES_MANAGER') {
-          // Sales sees records they created or assigned to them
-          where.OR = [
-            { createdById: userId },
-          ];
-        } else if (projectIds.length === 0) {
-          // No project membership → no records
-          where.id = { in: [] };
+          // Sales sees records they created
+          records = records.filter(r => r.createdById === userId);
+        } else if (projectIds.size === 0) {
+          // No project membership → no records (except what they created)
+          records = records.filter(r => r.createdById === userId);
         } else {
           // Filter: records where the creator is this user, OR the record's
-          // data matches one of our project IDs or codes across multiple possible keys.
-          const allIdentifiers = [...new Set([...projectIds, ...projectCodes, ...projectNames])];
-          
-          const projectFilters = allIdentifiers.flatMap((val: string) => [
-            { data: { path: ['projectId'], equals: val } },
-            { data: { path: ['_projectId'], equals: val } },
-            { data: { path: ['_projectCode'], equals: val } },
-            { data: { path: ['Project Code'], equals: val } },
-            { data: { path: ['Linked Project ID'], equals: val } },
-            { data: { path: ['Project Name / Reference'], equals: val } },
-            { data: { path: ['Project Reference'], equals: val } },
-            { data: { path: ['Linked Project Name'], equals: val } },
-            { data: { path: ['Project Name'], equals: val } },
-            { data: { path: ['Project ID'], equals: val } }
-          ]);
+          // data matches one of our project IDs or codes
+          records = records.filter(record => {
+            // User created it
+            if (record.createdById === userId) return true;
 
-          where.OR = [
-            { createdById: userId },
-            ...projectFilters
-          ];
+            // Check if record data references one of user's projects
+            const recordData = record.data as any;
+            if (!recordData) return false;
+
+            // Check multiple possible field names for project references
+            const projectFields = [
+              'projectId', '_projectId', 'Project ID', 'Linked Project ID',
+              'projectCode', '_projectCode', 'Project Code', 'Linked Project Code',
+              'Project Name / Reference', 'Project Reference', 'Project Name', 'Linked Project Name'
+            ];
+
+            for (const field of projectFields) {
+              const value = recordData[field];
+              if (value) {
+                if (projectIds.has(value) || projectCodes.has(value) || projectNames.has(value)) {
+                  return true;
+                }
+              }
+            }
+
+            return false;
+          });
         }
       }
 
-
-      const records = await prisma.moduleRecord.findMany({
-        where,
-        orderBy: { createdAt: "desc" },
-      });
-
-      res.json({ records });
+      res.json({ records: parsedRecords });
     } catch (err) {
-      console.error("List module records error:", err);
-      res.status(500).json({ error: "Failed to list records" });
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      console.error("List module records error:", errorMsg);
+      console.error("Full error:", err);
+      res.status(500).json({ error: `Failed to list records: ${errorMsg}` });
     }
   }
 );
@@ -256,7 +270,7 @@ router.put(
           await prisma.moduleRecord.create({
             data: {
               moduleSlug: chain.nextSlug,
-              data: nextData,
+              data: JSON.stringify(nextData),
               createdById: assigneeId,
               updatedById: assigneeId,
             },

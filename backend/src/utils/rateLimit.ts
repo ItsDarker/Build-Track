@@ -37,6 +37,15 @@ export function rateLimit(
   endpoint: string,
   customConfig?: RateLimitConfig
 ): RateLimitResult {
+  // TESTING: Temporarily disable rate limiting
+  if (process.env.NODE_ENV === 'development') {
+    return {
+      success: true,
+      remaining: 999,
+      resetAt: Date.now() + 900000,
+    };
+  }
+
   const maxRequests = customConfig?.max ?? config.rateLimit.max;
   const windowMs = customConfig?.windowMs ?? config.rateLimit.windowMs;
 

@@ -130,7 +130,7 @@ export const projectService = {
         await prisma.moduleRecord.create({
             data: {
                 moduleSlug: 'project-requirements',
-                data: {
+                data: JSON.stringify({
                     _projectId: id,
                     _projectCode: project?.code || '',
                     _projectName: project?.name || '',
@@ -141,7 +141,7 @@ export const projectService = {
                     'Linked Project ID': id,
                     'Linked Project Name': project?.name || '',
                     'Linked Client Name': project?.client?.name || '',
-                },
+                }),
                 createdById: assigneeId,
                 updatedById: assigneeId,
             },

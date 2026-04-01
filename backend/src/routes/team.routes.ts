@@ -456,7 +456,7 @@ router.get('/search-users', async (req, res) => {
         // Search users by email prefix
         const users = await prisma.user.findMany({
             where: {
-                email: { startsWith: emailPrefix, mode: 'insensitive' },
+                email: { startsWith: emailPrefix },
                 isBlocked: false,
                 id: { notIn: excludedIds }
             },

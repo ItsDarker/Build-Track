@@ -39,31 +39,26 @@ router.get('/search', async (req: AuthRequest, res: Response) => {
               {
                 email: {
                   contains: searchLower,
-                  mode: 'insensitive',
                 },
               },
               {
                 name: {
                   contains: searchLower,
-                  mode: 'insensitive',
                 },
               },
               {
                 displayName: {
                   contains: searchLower,
-                  mode: 'insensitive',
                 },
               },
               {
                 firstName: {
                   contains: searchLower,
-                  mode: 'insensitive',
                 },
               },
               {
                 lastName: {
                   contains: searchLower,
-                  mode: 'insensitive',
                 },
               },
             ],

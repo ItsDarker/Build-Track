@@ -1,434 +1,382 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Badge, Drawer, Tag, Spin, Button, Empty } from "antd";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Calendar, Badge, Modal, Spin, Empty, Tag, Card, Space, Button } from "antd";
 import type { Dayjs } from "dayjs";
 import dayjs from "dayjs";
-import { CalendarDays, Clock } from "lucide-react";
-import { getAllModules } from "@/config/buildtrack.config";
+import { ArrowLeftOutlined, ArrowRightOutlined } from "@ant-design/icons";
 
-interface ScheduledEvent {
+interface CalendarEvent {
   id: string;
   title: string;
-  type: string;
   module: string;
-  moduleSlug: string;
-  recordId: string;
   startDate: Dayjs;
   endDate: Dayjs;
   fullData?: any;
 }
 
-const eventTypeColors: Record<string, string> = {
-  meeting: "bg-blue-500",
-  deadline: "bg-red-500",
-  review: "bg-yellow-500",
-  delivery: "bg-green-500",
-  inspection: "bg-purple-500",
-  billing: "bg-red-600",
-  production: "bg-indigo-500",
-  lead: "bg-orange-500",
-  procurement: "bg-teal-500",
-  quote: "bg-cyan-500",
-  "site-visit": "bg-blue-600",
-  "scheduled-start": "bg-gray-500",
-  "scheduled-end": "bg-gray-600",
-  "target-delivery": "bg-green-600",
-  "actual-start": "bg-blue-400",
-  "actual-end": "bg-green-400",
-  "expected-resolution": "bg-yellow-600",
-  "closure-date": "bg-green-700",
-  "order-date": "bg-gray-400",
-  "quote-date": "bg-cyan-600",
-  "decision-date": "bg-yellow-700",
-  "assigned-date": "bg-gray-300",
-  default: "bg-gray-400",
+const MODULE_COLORS: Record<string, string> = {
+  "project-requirements": "blue",
+  "work-orders": "purple",
+  "delivery-installation": "green",
+  "quality-control": "magenta",
+  "production-scheduling": "orange",
+  "bom-materials-planning": "cyan",
+  default: "gray",
 };
 
-const dateFieldKeywords = [
-  "date", "due", "deadline", "delivery", "scheduled", "start", "end",
-  "visit", "resolution", "closure", "created", "updated",
-];
-
-function isDateField(fieldName: string): boolean {
-  const lower = fieldName.toLowerCase();
-  return dateFieldKeywords.some((keyword) => lower.includes(keyword));
-}
-
-function parseDate(value: any): dayjs.Dayjs | null {
-  if (!value) return null;
-  try {
-    const parsed = dayjs(value);
-    if (parsed.isValid()) return parsed;
-  } catch {
-    // Ignore
-  }
-  return null;
-}
-
-function inferEventType(fieldName: string): string {
-  const lower = fieldName.toLowerCase();
-  if (lower.includes("deadline") || lower.includes("due")) return "deadline";
-  if (lower.includes("delivery")) return "delivery";
-  if (lower.includes("inspection") || lower.includes("quality")) return "inspection";
-  if (lower.includes("production") || lower.includes("manufacturing")) return "production";
-  if (lower.includes("review") || lower.includes("approval")) return "review";
-  if (lower.includes("billing") || lower.includes("invoice")) return "billing";
-  if (lower.includes("procurement")) return "procurement";
-  if (lower.includes("quote")) return "quote";
-  if (lower.includes("visit")) return "site-visit";
-  if (lower.includes("scheduled")) return "scheduled-start";
-  if (lower.includes("start")) return "scheduled-start";
-  if (lower.includes("end")) return "scheduled-end";
-  if (lower.includes("resolution")) return "expected-resolution";
-  if (lower.includes("closure")) return "closure-date";
-  if (lower.includes("order")) return "order-date";
-  return "default";
-}
-
 export default function CalendarPage() {
-  const [events, setEvents] = useState<ScheduledEvent[]>([]);
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
-  const [currentMonth, setCurrentMonth] = useState(dayjs());
-  const [selectedEvent, setSelectedEvent] = useState<ScheduledEvent | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [currentDate, setCurrentDate] = useState<Dayjs>(dayjs());
 
+  // Fetch events
   useEffect(() => {
-    const fetchAllModuleRecords = async () => {
+    const fetchEvents = async () => {
+      setLoading(true);
       try {
-        setLoading(true);
-        const modules = getAllModules();
-        const allEvents: ScheduledEvent[] = [];
+        const modules = [
+          "project-requirements",
+          "work-orders",
+          "delivery-installation",
+          "quality-control",
+          "production-scheduling",
+          "bom-materials-planning",
+        ];
 
-        for (const module of modules) {
+        const allEvents: CalendarEvent[] = [];
+
+        for (const moduleName of modules) {
           try {
-            const res = await fetch(
-              `/backend-api/modules/${module.slug}/records`,
-              { credentials: "include" }
-            );
+            const res = await fetch(`/backend-api/modules/${moduleName}/records`, {
+              credentials: "include",
+            });
 
             if (!res.ok) continue;
+
             const data = await res.json();
-            const records = data.records || [];
+            const records = Array.isArray(data.records) ? data.records : [];
 
             for (const record of records) {
               const recordData = record.data || {};
-              let startDate: Dayjs | null = null;
-              let endDate: Dayjs | null = null;
-              let eventFieldName = "";
 
-              // Look for start/end date pairs or single date fields
-              const dateFields = Object.entries(recordData).filter(
-                ([key]) => isDateField(key)
-              );
+              console.log(`Processing record: ${moduleName}`, recordData);
 
-              // Find start date (prefer fields with "start" in name)
-              const startField = dateFields.find(
-                ([key]) =>
-                  key.toLowerCase().includes("start") ||
-                  key.toLowerCase().includes("begin")
-              );
-              if (startField) {
-                startDate = parseDate(startField[1]);
-                eventFieldName = startField[0];
-              }
+              // Find date fields
+              const dateEntries = Object.entries(recordData).filter(([key]) => {
+                const lower = key.toLowerCase();
+                return (
+                  lower.includes("date") ||
+                  lower.includes("start") ||
+                  lower.includes("end") ||
+                  lower.includes("scheduled") ||
+                  lower.includes("delivery")
+                );
+              });
 
-              // Find end date (prefer fields with "end" in name)
-              const endField = dateFields.find(
-                ([key]) =>
-                  key.toLowerCase().includes("end") ||
-                  key.toLowerCase().includes("due") ||
-                  key.toLowerCase().includes("deadline") ||
-                  key.toLowerCase().includes("delivery")
-              );
-              if (endField) {
-                endDate = parseDate(endField[1]);
-                if (!startDate) eventFieldName = endField[0];
-              }
+              console.log(`Found ${dateEntries.length} date fields:`, dateEntries.map(([k]) => k));
+              if (dateEntries.length === 0) continue;
 
-              // If only one date, use it for both start and end
-              if (!startDate && !endDate && dateFields.length > 0) {
-                const firstDate = parseDate(dateFields[0][1]);
-                if (firstDate) {
-                  startDate = firstDate;
-                  endDate = firstDate;
-                  eventFieldName = dateFields[0][0];
+              // Get start and end dates
+              let startDate = null;
+              let endDate = null;
+
+              for (const [key, value] of dateEntries) {
+                const lower = key.toLowerCase();
+                if ((lower.includes("start") || lower.includes("scheduled") || lower.includes("begin")) && !startDate) {
+                  startDate = dayjs(value as any);
+                }
+                if ((lower.includes("end") || lower.includes("delivery") || lower.includes("due") || lower.includes("expected")) && !endDate) {
+                  endDate = dayjs(value as any);
                 }
               }
 
-              if (startDate && endDate) {
-                // Generate title
-                let title = eventFieldName;
-                const idField = Object.entries(recordData).find(
-                  ([key]) => key.toLowerCase().includes("id") && key !== "_id"
-                );
-                const nameField = Object.entries(recordData).find(
-                  ([key]) =>
-                    key.toLowerCase().includes("name") ||
-                    key.toLowerCase().includes("title")
-                );
+              // If only one date, use for both
+              if (!startDate && !endDate) {
+                startDate = endDate = dayjs(dateEntries[0]?.[1] as any);
+              } else if (startDate && !endDate) {
+                endDate = startDate;
+              } else if (endDate && !startDate) {
+                startDate = endDate;
+              }
 
-                if (idField && idField[1]) {
-                  title = `${idField[1]} - ${eventFieldName}`;
-                } else if (nameField && nameField[1]) {
-                  title = `${nameField[1]} - ${eventFieldName}`;
-                }
+              console.log(`startDate: ${startDate?.format()}, endDate: ${endDate?.format()}`);
+
+              if (startDate && startDate.isValid() && endDate && endDate.isValid()) {
+                const title =
+                  (recordData["Project Name"] ||
+                    recordData["Task Description"] ||
+                    recordData["Delivery ID"] ||
+                    recordData["Requirement Record ID"] ||
+                    moduleName) +
+                  (recordData["Work Order ID"] ? ` - ${recordData["Work Order ID"]}` : "");
+
+                console.log(`✓ Adding event: ${title}`);
 
                 allEvents.push({
-                  id: `${record.id}-${eventFieldName}`,
-                  title,
-                  type: inferEventType(eventFieldName),
-                  module: module.name,
-                  moduleSlug: module.slug,
-                  recordId: record.id,
+                  id: record.id,
+                  title: title.trim(),
+                  module: moduleName,
                   startDate,
                   endDate,
                   fullData: recordData,
                 });
+              } else {
+                console.log(`✗ Skipping record - invalid dates`);
               }
             }
           } catch (err) {
-            console.warn(`Failed to fetch ${module.slug} records:`, err);
+            console.log(`Module ${moduleName} skipped:`, err);
           }
         }
 
+        console.log(`✓ Total events found: ${allEvents.length}`);
         setEvents(allEvents);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchAllModuleRecords();
+    fetchEvents();
   }, []);
 
-  const getDaysInMonth = (date: Dayjs) => {
-    return date.daysInMonth();
-  };
-
-  const getFirstDayOfMonth = (date: Dayjs) => {
-    return date.startOf("month").day();
-  };
-
-  const getEventsForDay = (date: Dayjs): ScheduledEvent[] => {
+  // Get events for a specific date
+  const getEventsForDate = (date: Dayjs): CalendarEvent[] => {
     return events.filter(
       (event) =>
-        date.isAfter(event.startDate.startOf("day"), "day") ||
-        date.isSame(event.startDate.startOf("day"), "day")
-    ).filter(
-      (event) =>
-        date.isBefore(event.endDate.startOf("day"), "day") ||
-        date.isSame(event.endDate.startOf("day"), "day")
+        (date.isSame(event.startDate, "day") ||
+          date.isAfter(event.startDate, "day")) &&
+        (date.isSame(event.endDate, "day") ||
+          date.isBefore(event.endDate, "day"))
     );
   };
 
-  const renderCalendar = () => {
-    const daysInMonth = getDaysInMonth(currentMonth);
-    const firstDay = getFirstDayOfMonth(currentMonth);
-    const days = [];
-    const weeks = [];
-
-    // Add empty cells for days before month starts
-    for (let i = 0; i < firstDay; i++) {
-      days.push(null);
-    }
-
-    // Add days of the month
-    for (let day = 1; day <= daysInMonth; day++) {
-      days.push(currentMonth.date(day));
-    }
-
-    // Group into weeks
-    for (let i = 0; i < days.length; i += 7) {
-      weeks.push(days.slice(i, i + 7));
-    }
-
-    return weeks.map((week, weekIdx) => (
-      <div key={weekIdx} className="border-b">
-        <div className="grid grid-cols-7 gap-0">
-          {week.map((date, dayIdx) => (
-            <div
-              key={dayIdx}
-              className="min-h-24 border-r p-2 bg-white hover:bg-gray-50 transition-colors"
-            >
-              {date ? (
-                <div className="h-full">
-                  <div className="text-sm font-medium text-gray-700 mb-2">
-                    {date.format("D")}
-                  </div>
-                  <div className="space-y-1">
-                    {getEventsForDay(date).map((event) => (
-                      <div
-                        key={event.id}
-                        onClick={() => {
-                          setSelectedEvent(event);
-                          setDrawerOpen(true);
-                        }}
-                        className={`${eventTypeColors[event.type] || eventTypeColors.default} text-white text-xs p-1 rounded cursor-pointer hover:opacity-80 transition-opacity truncate`}
-                        title={event.title}
-                      >
-                        {event.title}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          ))}
-        </div>
-      </div>
-    ));
-  };
-
-  const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">My Calendar</h1>
-          <p className="text-gray-500 mt-1">
-            View scheduled items across all modules.
-          </p>
-        </div>
-        {loading && (
-          <div className="flex items-center gap-2 text-gray-500">
-            <Spin size="small" />
-            <span className="text-sm">Loading calendar data...</span>
+  // Render cell with events
+  const dateCellRender = (date: Dayjs) => {
+    const dayEvents = getEventsForDate(date);
+    return (
+      <div className="space-y-1">
+        {dayEvents.slice(0, 3).map((event) => (
+          <div
+            key={event.id}
+            onClick={() => {
+              setSelectedEvent(event);
+              setModalOpen(true);
+            }}
+            className="cursor-pointer"
+          >
+            <Badge
+              color={MODULE_COLORS[event.module] || MODULE_COLORS.default}
+              text={
+                <span className="text-xs truncate text-gray-700 hover:text-gray-900">
+                  {event.title.substring(0, 20)}...
+                </span>
+              }
+            />
           </div>
+        ))}
+        {dayEvents.length > 3 && (
+          <div className="text-xs text-gray-500 px-2">+{dayEvents.length - 3} more</div>
         )}
       </div>
+    );
+  };
 
-      {/* Calendar Grid */}
-      <div className="bg-white rounded-lg border overflow-hidden">
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <Spin />
-          </div>
-        ) : (
-          <>
-            {/* Calendar Navigation */}
-            <div className="flex items-center justify-between p-4 border-b">
-              <h2 className="text-lg font-semibold text-gray-900">
-                {currentMonth.format("MMMM YYYY")}
-              </h2>
-              <div className="flex gap-2">
+  return (
+    <div className="w-full h-full bg-white p-6">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-gray-900">Calendar</h1>
+        <p className="text-gray-600 mt-2">View all your project events and deadlines</p>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center h-96">
+          <Spin size="large" tip="Loading events..." />
+        </div>
+      ) : events.length === 0 ? (
+        <Card className="mb-6">
+          <Empty description="No events found" />
+        </Card>
+      ) : null}
+
+      <Card className="shadow-sm border border-gray-200">
+        <Calendar
+          fullscreen
+          value={currentDate}
+          onChange={setCurrentDate}
+          dateCellRender={dateCellRender}
+          headerRender={({ value, onChange }: any) => {
+            const start = 0;
+            const end = 12;
+            const monthOptions = [];
+
+            const getYear = value.year();
+            const currentYear = new Date().getFullYear();
+            const start_year = currentYear - 10;
+            const end_year = start_year + 20;
+
+            const yearOptions = [];
+            for (let i = start_year; i < end_year; i++) {
+              yearOptions.push({
+                label: i.toString(),
+                value: i,
+              });
+            }
+
+            for (let i = start; i < end; i++) {
+              monthOptions.push({
+                label: dayjs().month(i).format("MMM"),
+                value: i,
+              });
+            }
+
+            const month = value.month();
+
+            return (
+              <div className="p-4 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <Button
+                    type="text"
+                    icon={<ArrowLeftOutlined />}
+                    onClick={() => {
+                      onChange(value.subtract(1, "month"));
+                    }}
+                  />
+                  <div className="flex gap-2">
+                    <select
+                      value={month}
+                      onChange={(e) => {
+                        const newMonth = parseInt(e.target.value);
+                        onChange(value.clone().month(newMonth));
+                      }}
+                      className="px-3 py-1 border border-gray-300 rounded hover:border-gray-400 focus:outline-none"
+                    >
+                      {monthOptions.map((op) => (
+                        <option key={op.value} value={op.value}>
+                          {op.label}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      value={getYear}
+                      onChange={(e) => {
+                        const newYear = parseInt(e.target.value);
+                        onChange(value.clone().year(newYear));
+                      }}
+                      className="px-3 py-1 border border-gray-300 rounded hover:border-gray-400 focus:outline-none"
+                    >
+                      {yearOptions.map((op) => (
+                        <option key={op.value} value={op.value}>
+                          {op.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <Button
+                    type="text"
+                    icon={<ArrowRightOutlined />}
+                    onClick={() => {
+                      onChange(value.add(1, "month"));
+                    }}
+                  />
+                </div>
                 <Button
-                  type="text"
-                  icon={<ChevronLeft className="w-4 h-4" />}
-                  onClick={() => setCurrentMonth(currentMonth.subtract(1, "month"))}
-                />
-                <Button
-                  type="text"
-                  onClick={() => setCurrentMonth(dayjs())}
+                  type="primary"
+                  onClick={() => {
+                    onChange(dayjs());
+                  }}
                 >
                   Today
                 </Button>
-                <Button
-                  type="text"
-                  icon={<ChevronRight className="w-4 h-4" />}
-                  onClick={() => setCurrentMonth(currentMonth.add(1, "month"))}
-                />
               </div>
-            </div>
+            );
+          }}
+          style={{
+            minHeight: "600px",
+          }}
+        />
+      </Card>
 
-            {/* Week Day Headers */}
-            <div className="grid grid-cols-7 gap-0 bg-gray-50 border-b">
-              {weekDays.map((day) => (
-                <div
-                  key={day}
-                  className="p-3 text-center font-semibold text-gray-700 border-r"
-                >
-                  {day}
-                </div>
-              ))}
-            </div>
-
-            {/* Calendar Days */}
-            {renderCalendar()}
-
-            {events.length === 0 && (
-              <div className="flex items-center justify-center py-12">
-                <Empty description="No scheduled items" />
-              </div>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* Event Details Drawer */}
-      <Drawer
+      {/* Event Details Modal */}
+      <Modal
         title={
           <div className="flex items-center gap-2">
-            <CalendarDays className="w-5 h-5 text-orange-500" />
-            <span>Event Details</span>
+            <span className="text-lg font-bold">Event Details</span>
           </div>
         }
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        width={450}
+        open={modalOpen}
+        onCancel={() => setModalOpen(false)}
+        footer={null}
+        width={600}
       >
         {selectedEvent ? (
           <div className="space-y-6">
-            {/* Title */}
+            {/* Event Title */}
             <div>
-              <h3 className="text-lg font-semibold text-slate-900 mb-1">
+              <h3 className="text-xl font-bold text-gray-900 mb-3">
                 {selectedEvent.title}
               </h3>
-              <Tag color={eventTypeColors[selectedEvent.type]?.replace("bg-", "") || "gray"}>
-                {selectedEvent.type}
+              <Tag color={MODULE_COLORS[selectedEvent.module] || MODULE_COLORS.default}>
+                {selectedEvent.module}
               </Tag>
             </div>
 
-            {/* Module */}
-            <div>
-              <p className="text-sm font-medium text-gray-700 mb-1">Module</p>
-              <p className="text-gray-900">{selectedEvent.module}</p>
-            </div>
-
             {/* Date Range */}
-            <div>
-              <p className="text-sm font-medium text-gray-700 mb-2">Duration</p>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 text-gray-700">
-                  <Clock className="w-4 h-4" />
-                  <span>
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+              <p className="text-sm font-semibold text-gray-700 mb-2">Duration</p>
+              <div className="flex gap-4">
+                <div>
+                  <p className="text-xs text-gray-600">Start Date</p>
+                  <p className="text-lg font-semibold text-gray-900">
                     {selectedEvent.startDate.format("MMM DD, YYYY")}
-                    {!selectedEvent.startDate.isSame(selectedEvent.endDate, "day") &&
-                      ` - ${selectedEvent.endDate.format("MMM DD, YYYY")}`}
-                  </span>
+                  </p>
+                </div>
+                <div className="text-gray-400">→</div>
+                <div>
+                  <p className="text-xs text-gray-600">End Date</p>
+                  <p className="text-lg font-semibold text-gray-900">
+                    {selectedEvent.endDate.format("MMM DD, YYYY")}
+                  </p>
                 </div>
               </div>
+              {!selectedEvent.startDate.isSame(selectedEvent.endDate, "day") && (
+                <p className="text-sm text-gray-600 mt-3">
+                  Duration: {selectedEvent.endDate.diff(selectedEvent.startDate, "day")} days
+                </p>
+              )}
             </div>
 
-            {/* Full Event Data */}
-            <div>
-              <p className="text-sm font-medium text-gray-700 mb-3">Event Information</p>
-              <div className="bg-gray-50 rounded-lg p-4 space-y-2 max-h-96 overflow-y-auto">
-                {selectedEvent.fullData ? (
-                  Object.entries(selectedEvent.fullData).map(([key, value]: [string, any]) => (
-                    <div key={key} className="border-b border-gray-200 pb-2 last:border-0">
-                      <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                        {key}
-                      </p>
-                      <p className="text-sm text-gray-900 mt-1">
-                        {typeof value === "object"
-                          ? JSON.stringify(value)
-                          : String(value || "—")}
-                      </p>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-gray-500">No additional information</p>
-                )}
+            {/* Event Data */}
+            {selectedEvent.fullData && Object.keys(selectedEvent.fullData).length > 0 && (
+              <div>
+                <h4 className="text-sm font-bold text-gray-900 mb-3">Details</h4>
+                <div className="grid grid-cols-2 gap-4 max-h-64 overflow-y-auto">
+                  {Object.entries(selectedEvent.fullData)
+                    .filter(([key]) => !key.startsWith("_"))
+                    .map(([key, value]) => (
+                      <div key={key} className="bg-gray-50 p-3 rounded">
+                        <p className="text-xs font-semibold text-gray-600 uppercase mb-1">
+                          {key}
+                        </p>
+                        <p className="text-sm text-gray-900">
+                          {typeof value === "string" && value.includes("T")
+                            ? dayjs(value).format("MMM DD, YYYY")
+                            : typeof value === "object"
+                            ? JSON.stringify(value)
+                            : String(value || "—")}
+                        </p>
+                      </div>
+                    ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         ) : (
           <Empty description="No event selected" />
         )}
-      </Drawer>
+      </Modal>
     </div>
   );
 }
