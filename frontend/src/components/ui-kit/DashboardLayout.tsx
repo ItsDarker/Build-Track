@@ -59,6 +59,7 @@ interface User {
   email: string;
   name?: string;
   avatarUrl?: string | null;
+  plan?: string;
   role: {
     name: string;
     displayName: string;
@@ -128,7 +129,9 @@ const SIDEBAR_TOP_LEVEL_ROLE_DENY: Record<string, string[]> = {
 
   // Filter sidebar items based on user role
   const roleName = user?.role?.name ?? "VENDOR";
-  const filteredSidebar = navigation.sidebar
+  const isBasicPlan = user?.plan === "BASIC";
+
+  let filteredSidebar = navigation.sidebar
     .filter((item) => {
       const deniedRoles = SIDEBAR_TOP_LEVEL_ROLE_DENY[item.path];
       if (deniedRoles && deniedRoles.includes(roleName)) return false;
@@ -145,6 +148,36 @@ const SIDEBAR_TOP_LEVEL_ROLE_DENY: Record<string, string[]> = {
       return { ...item, children: filteredChildren };
     })
     .filter(Boolean) as SidebarItem[];
+
+  // For BASIC plan users, simplify the sidebar
+  if (isBasicPlan) {
+    filteredSidebar = filteredSidebar
+      .filter((item) => {
+        // Only show essential items for BASIC plan
+        const essentialPaths = ["/app/dashboard", "/app/projects", "/app/tasks"];
+        if (item.path === "/app/projects") {
+          // Redirect My Projects to the basic version
+          return true;
+        }
+        return essentialPaths.some((path) => item.path.startsWith(path));
+      })
+      .map((item) => {
+        // Update projects path to basic version
+        if (item.path === "/app/projects") {
+          return { ...item, path: "/app/basic/projects" };
+        }
+        // For tasks, show only Work Orders and Deliveries
+        if (item.path === "/app/tasks" && item.children) {
+          return {
+            ...item,
+            children: item.children.filter((child) =>
+              ["/app/tasks/work-orders", "/app/tasks/deliveries"].includes(child.path)
+            ),
+          };
+        }
+        return item;
+      });
+  }
 
   const displayName = user.name || user.email.split("@")[0];
   const initials = displayName
@@ -412,37 +445,39 @@ const SIDEBAR_TOP_LEVEL_ROLE_DENY: Record<string, string[]> = {
           ))}
         </nav>
 
-        {/* Messaging and All Modules section */}
-        <div className="px-2 mt-4 border-t border-slate-700 pt-4">
-          <Link
-            href="/app/messaging"
-            className={cn(
-              "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
-              pathname.startsWith("/app/messaging")
-                ? "bg-blue-500/20 text-blue-300"
-                : "text-gray-400 hover:text-white hover:bg-slate-700/50"
-            )}
-          >
-            <MessageOutlined style={{ fontSize: 16 }} />
-            {!collapsed && <span>Messaging</span>}
-          </Link>
+        {/* Messaging and All Modules section — hidden for BASIC plan */}
+        {!isBasicPlan && (
+          <div className="px-2 mt-4 border-t border-slate-700 pt-4">
+            <Link
+              href="/app/messaging"
+              className={cn(
+                "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
+                pathname.startsWith("/app/messaging")
+                  ? "bg-blue-500/20 text-blue-300"
+                  : "text-gray-400 hover:text-white hover:bg-slate-700/50"
+              )}
+            >
+              <MessageOutlined style={{ fontSize: 16 }} />
+              {!collapsed && <span>Messaging</span>}
+            </Link>
 
-          <Link
-            href="/app/modules"
-            className={cn(
-              "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
-              pathname.startsWith("/app/modules")
-                ? "bg-orange-500/20 text-orange-300"
-                : "text-gray-400 hover:text-white hover:bg-slate-700/50"
-            )}
-          >
-            <UnorderedListOutlined style={{ fontSize: 16 }} />
-            {!collapsed && <span>All Modules</span>}
-          </Link>
-        </div>
+            <Link
+              href="/app/modules"
+              className={cn(
+                "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
+                pathname.startsWith("/app/modules")
+                  ? "bg-orange-500/20 text-orange-300"
+                  : "text-gray-400 hover:text-white hover:bg-slate-700/50"
+              )}
+            >
+              <UnorderedListOutlined style={{ fontSize: 16 }} />
+              {!collapsed && <span>All Modules</span>}
+            </Link>
+          </div>
+        )}
 
-        {/* Super Admin link — only for admin roles */}
-        {["SUPER_ADMIN", "ADMIN", "ORG_ADMIN"].includes(user?.role?.name ?? "") && (
+        {/* Super Admin link — only for admin roles (and not for BASIC plan) */}
+        {!isBasicPlan && ["SUPER_ADMIN", "ADMIN", "ORG_ADMIN"].includes(user?.role?.name ?? "") && (
           <div className="px-2 mt-2 border-t border-slate-700 pt-3 pb-2">
             <Link
               href="/admin"
@@ -537,6 +572,11 @@ const SIDEBAR_TOP_LEVEL_ROLE_DENY: Record<string, string[]> = {
                     />
                   </div>
                 );
+              }
+
+              // Hide Support, Reports, and Contacts for BASIC plan users
+              if (isBasicPlan && ["Support", "Reports", "Contacts"].includes(item)) {
+                return null;
               }
 
               // Handle navigation for Support, Reports, and Contacts

@@ -1,5 +1,6 @@
-import ProRoute from "@/components/auth/ProRoute";
 'use client';
+
+import ProRoute from "@/components/auth/ProRoute";
 
 import React from 'react';
 import MessagingV2Shell from '@/components/messagingv2/MessagingV2Shell';

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useUser } from "@/lib/context/UserContext";
 import { Table, Button, Card, Tag, Space, Modal, Form, Input, Select, DatePicker, App, Upload, List, AutoComplete, Tabs, Segmented, Tooltip, Divider } from "antd";
 import { PlusOutlined, EditOutlined, DeleteOutlined, DownloadOutlined, UserAddOutlined, PlayCircleOutlined, CloseCircleOutlined, CheckCircleOutlined, UndoOutlined, FolderOpenOutlined, InboxOutlined, TeamOutlined, UnorderedListOutlined, AppstoreOutlined } from "@ant-design/icons";
 import { getAllModules } from "@/config/buildtrack.config";
@@ -27,6 +28,7 @@ function generateProjectId(projectName: string): string {
 export default function ProjectsPage() {
     const router = useRouter();
     const { message, modal } = App.useApp();
+    const user = useUser();
     const [projects, setProjects] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -67,6 +69,13 @@ export default function ProjectsPage() {
     const [isCreateClientModalOpen, setIsCreateClientModalOpen] = useState(false);
     const [clientForm] = Form.useForm();
     const [clientCreating, setClientCreating] = useState(false);
+
+    // Redirect BASIC users to their simplified projects page
+    useEffect(() => {
+      if (user.plan === "BASIC") {
+        router.replace("/app/basic/projects");
+      }
+    }, [user.plan, router]);
 
     const handleCreateClient = async (values: any) => {
         setClientCreating(true);

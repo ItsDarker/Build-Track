@@ -238,19 +238,21 @@ async function main() {
 
   // Demo Users for all roles
   const demoUsers = [
-    { email: 'finofranklin@gmail.com', name: 'Fino Franklin', role: 'PROJECT_MANAGER' },
-    { email: 'pm@buildtrack.com', name: 'Project Manager', role: 'PROJECT_MANAGER' },
-    { email: 'qc@buildtrack.com', name: 'QC User', role: 'QC_MANAGER' },
-    { email: 'finance@buildtrack.com', name: 'Finance User', role: 'FINANCE_MANAGER' },
-    { email: 'client@buildtrack.com', name: 'Client User', role: 'CLIENT' },
-    { email: 'sales@buildtrack.com', name: 'Sales User', role: 'SALES_MANAGER' },
-    { email: 'orgadmin@buildtrack.com', name: 'Org Admin', role: 'ORG_ADMIN' },
-    { email: 'coordinator@buildtrack.com', name: 'Project Coordinator', role: 'PROJECT_COORDINATOR' },
-    { email: 'procurement@buildtrack.com', name: 'Procurement User', role: 'PROCUREMENT_MANAGER' },
-    { email: 'production@buildtrack.com', name: 'Production User', role: 'PRODUCTION_MANAGER' },
-    { email: 'planner@buildtrack.com', name: 'Planner User', role: 'PLANNER' },
-    { email: 'logistics@buildtrack.com', name: 'Logistics User', role: 'LOGISTICS_MANAGER' },
-    { email: 'vendor@buildtrack.com', name: 'Vendor User', role: 'VENDOR' },
+    { email: 'finofranklin@gmail.com', name: 'Fino Franklin', role: 'PROJECT_MANAGER', plan: 'PRO' },
+    { email: 'pm@buildtrack.com', name: 'Project Manager', role: 'PROJECT_MANAGER', plan: 'PRO' },
+    { email: 'qc@buildtrack.com', name: 'QC User', role: 'QC_MANAGER', plan: 'PRO' },
+    { email: 'finance@buildtrack.com', name: 'Finance User', role: 'FINANCE_MANAGER', plan: 'PRO' },
+    { email: 'client@buildtrack.com', name: 'Client User', role: 'CLIENT', plan: 'PRO' },
+    { email: 'sales@buildtrack.com', name: 'Sales User', role: 'SALES_MANAGER', plan: 'PRO' },
+    { email: 'orgadmin@buildtrack.com', name: 'Org Admin', role: 'ORG_ADMIN', plan: 'PRO' },
+    { email: 'coordinator@buildtrack.com', name: 'Project Coordinator', role: 'PROJECT_COORDINATOR', plan: 'PRO' },
+    { email: 'procurement@buildtrack.com', name: 'Procurement User', role: 'PROCUREMENT_MANAGER', plan: 'PRO' },
+    { email: 'production@buildtrack.com', name: 'Production User', role: 'PRODUCTION_MANAGER', plan: 'PRO' },
+    { email: 'planner@buildtrack.com', name: 'Planner User', role: 'PLANNER', plan: 'PRO' },
+    { email: 'logistics@buildtrack.com', name: 'Logistics User', role: 'LOGISTICS_MANAGER', plan: 'PRO' },
+    { email: 'vendor@buildtrack.com', name: 'Vendor User', role: 'VENDOR', plan: 'PRO' },
+    // BASIC plan test user
+    { email: 'basic@buildtrack.com', name: 'Basic Plan User', role: 'PROJECT_MANAGER', plan: 'BASIC' },
   ];
 
   for (const u of demoUsers) {
@@ -258,16 +260,18 @@ async function main() {
       where: { email: u.email },
       update: {
         roleId: roleMap[u.role],
+        plan: u.plan,
       },
       create: {
         email: u.email,
         name: u.name,
         passwordHash,
         roleId: roleMap[u.role],
+        plan: u.plan,
         emailVerified: new Date(),
       },
     });
-    console.log(`Demo user created: ${u.email}`);
+    console.log(`Demo user created: ${u.email} (${u.plan} plan)`);
   }
 
   // 4. Site Content (Preserved)

@@ -1,5 +1,6 @@
-import ProRoute from "@/components/auth/ProRoute";
 'use client';
+
+import ProRoute from "@/components/auth/ProRoute";
 
 import React, { useState, useEffect } from 'react';
 import { Card, Tabs, Empty, Button, Form, Input, Select, Tag, List, Badge, Typography, message, Skeleton, Space } from 'antd';

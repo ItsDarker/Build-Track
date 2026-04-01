@@ -1,5 +1,6 @@
-import ProRoute from "@/components/auth/ProRoute";
 'use client';
+
+import ProRoute from "@/components/auth/ProRoute";
 
 import React, { useEffect, useState, useMemo } from 'react';
 import {
