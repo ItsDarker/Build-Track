@@ -149,34 +149,42 @@ const SIDEBAR_TOP_LEVEL_ROLE_DENY: Record<string, string[]> = {
     })
     .filter(Boolean) as SidebarItem[];
 
-  // For BASIC plan users, simplify the sidebar
+  // For BASIC plan users, customize sidebar based on role
   if (isBasicPlan) {
-    filteredSidebar = filteredSidebar
-      .filter((item) => {
-        // Only show essential items for BASIC plan
-        const essentialPaths = ["/app/dashboard", "/app/projects", "/app/tasks"];
-        if (item.path === "/app/projects") {
-          // Redirect My Projects to the basic version
-          return true;
-        }
-        return essentialPaths.some((path) => item.path.startsWith(path));
-      })
-      .map((item) => {
-        // Update projects path to basic version
-        if (item.path === "/app/projects") {
-          return { ...item, path: "/app/basic/projects" };
-        }
-        // For tasks, show only Work Orders and Deliveries
-        if (item.path === "/app/tasks" && item.children) {
-          return {
-            ...item,
-            children: item.children.filter((child) =>
-              ["/app/tasks/work-orders", "/app/tasks/deliveries"].includes(child.path)
-            ),
-          };
-        }
-        return item;
-      });
+    const basicSidebar: SidebarItem[] = [];
+
+    // Add items based on user role
+    if (roleName === "PROJECT_MANAGER") {
+      basicSidebar.push(
+        { label: "My Dashboard", path: "/app/basic/dashboard" },
+        { label: "My Projects", path: "/app/basic/projects" },
+        { label: "My Tasks", path: "/app/basic/tasks" },
+        { label: "Customers", path: "/app/basic/customers" },
+        { label: "Messaging", path: "/app/basic/messaging" },
+        { label: "Documents", path: "/app/basic/documents" }
+      );
+    } else if (roleName === "CLIENT" || roleName === "CUSTOMER") {
+      basicSidebar.push(
+        { label: "My Project", path: "/app/basic/my-project" },
+        { label: "Messaging", path: "/app/basic/messaging" }
+      );
+    } else if (roleName === "WORKER" || roleName === "VENDOR") {
+      basicSidebar.push(
+        { label: "My Dashboard", path: "/app/basic/dashboard" },
+        { label: "My Projects", path: "/app/basic/projects" },
+        { label: "My Tasks", path: "/app/basic/tasks" },
+        { label: "Messaging", path: "/app/basic/messaging" },
+        { label: "Documents", path: "/app/basic/documents" }
+      );
+    } else {
+      // Default for other roles
+      basicSidebar.push(
+        { label: "My Dashboard", path: "/app/basic/dashboard" },
+        { label: "My Projects", path: "/app/basic/projects" }
+      );
+    }
+
+    filteredSidebar = basicSidebar;
   }
 
   const displayName = user.name || user.email.split("@")[0];

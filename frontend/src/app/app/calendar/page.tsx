@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Calendar, Badge, Modal, Spin, Empty, Tag, Card, Space, Button } from "antd";
+import { Modal, Spin, Empty, Tag, Card, Button } from "antd";
 import type { Dayjs } from "dayjs";
 import dayjs from "dayjs";
 import { ArrowLeftOutlined, ArrowRightOutlined } from "@ant-design/icons";
@@ -16,13 +16,13 @@ interface CalendarEvent {
 }
 
 const MODULE_COLORS: Record<string, string> = {
-  "project-requirements": "blue",
-  "work-orders": "purple",
-  "delivery-installation": "green",
-  "quality-control": "magenta",
-  "production-scheduling": "orange",
-  "bom-materials-planning": "cyan",
-  default: "gray",
+  "project-requirements": "#1890ff",
+  "work-orders": "#722ed1",
+  "delivery-installation": "#52c41a",
+  "quality-control": "#eb2f96",
+  "production-scheduling": "#fa8c16",
+  "bom-materials-planning": "#13c2c2",
+  default: "#8c8c8c",
 };
 
 export default function CalendarPage() {
@@ -32,7 +32,6 @@ export default function CalendarPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [currentDate, setCurrentDate] = useState<Dayjs>(dayjs());
 
-  // Fetch events
   useEffect(() => {
     const fetchEvents = async () => {
       setLoading(true);
@@ -62,9 +61,6 @@ export default function CalendarPage() {
             for (const record of records) {
               const recordData = record.data || {};
 
-              console.log(`Processing record: ${moduleName}`, recordData);
-
-              // Find date fields
               const dateEntries = Object.entries(recordData).filter(([key]) => {
                 const lower = key.toLowerCase();
                 return (
@@ -76,24 +72,21 @@ export default function CalendarPage() {
                 );
               });
 
-              console.log(`Found ${dateEntries.length} date fields:`, dateEntries.map(([k]) => k));
               if (dateEntries.length === 0) continue;
 
-              // Get start and end dates
               let startDate = null;
               let endDate = null;
 
               for (const [key, value] of dateEntries) {
                 const lower = key.toLowerCase();
-                if ((lower.includes("start") || lower.includes("scheduled") || lower.includes("begin")) && !startDate) {
+                if ((lower.includes("start") || lower.includes("scheduled")) && !startDate) {
                   startDate = dayjs(value as any);
                 }
-                if ((lower.includes("end") || lower.includes("delivery") || lower.includes("due") || lower.includes("expected")) && !endDate) {
+                if ((lower.includes("end") || lower.includes("delivery") || lower.includes("due")) && !endDate) {
                   endDate = dayjs(value as any);
                 }
               }
 
-              // If only one date, use for both
               if (!startDate && !endDate) {
                 startDate = endDate = dayjs(dateEntries[0]?.[1] as any);
               } else if (startDate && !endDate) {
@@ -101,8 +94,6 @@ export default function CalendarPage() {
               } else if (endDate && !startDate) {
                 startDate = endDate;
               }
-
-              console.log(`startDate: ${startDate?.format()}, endDate: ${endDate?.format()}`);
 
               if (startDate && startDate.isValid() && endDate && endDate.isValid()) {
                 const title =
@@ -113,8 +104,6 @@ export default function CalendarPage() {
                     moduleName) +
                   (recordData["Work Order ID"] ? ` - ${recordData["Work Order ID"]}` : "");
 
-                console.log(`✓ Adding event: ${title}`);
-
                 allEvents.push({
                   id: record.id,
                   title: title.trim(),
@@ -123,8 +112,6 @@ export default function CalendarPage() {
                   endDate,
                   fullData: recordData,
                 });
-              } else {
-                console.log(`✗ Skipping record - invalid dates`);
               }
             }
           } catch (err) {
@@ -132,7 +119,6 @@ export default function CalendarPage() {
           }
         }
 
-        console.log(`✓ Total events found: ${allEvents.length}`);
         setEvents(allEvents);
       } finally {
         setLoading(false);
@@ -142,50 +128,75 @@ export default function CalendarPage() {
     fetchEvents();
   }, []);
 
-  // Get events for a specific date
-  const getEventsForDate = (date: Dayjs): CalendarEvent[] => {
-    return events.filter(
-      (event) =>
-        (date.isSame(event.startDate, "day") ||
-          date.isAfter(event.startDate, "day")) &&
-        (date.isSame(event.endDate, "day") ||
-          date.isBefore(event.endDate, "day"))
-    );
-  };
+  const monthStart = currentDate.startOf("month");
+  const monthEnd = currentDate.endOf("month");
+  const calendarStart = monthStart.startOf("week");
+  const calendarEnd = monthEnd.endOf("week");
 
-  // Render cell with events
-  const dateCellRender = (date: Dayjs) => {
-    const dayEvents = getEventsForDate(date);
-    return (
-      <div className="space-y-1">
-        {dayEvents.slice(0, 3).map((event) => (
-          <div
-            key={event.id}
-            onClick={() => {
-              setSelectedEvent(event);
-              setModalOpen(true);
-            }}
-            className="cursor-pointer"
-          >
-            <Badge
-              color={MODULE_COLORS[event.module] || MODULE_COLORS.default}
-              text={
-                <span className="text-xs truncate text-gray-700 hover:text-gray-900">
-                  {event.title.substring(0, 20)}...
-                </span>
-              }
-            />
-          </div>
-        ))}
-        {dayEvents.length > 3 && (
-          <div className="text-xs text-gray-500 px-2">+{dayEvents.length - 3} more</div>
-        )}
-      </div>
-    );
+  const days: Dayjs[] = [];
+  let current = calendarStart;
+  while (current.isSame(calendarEnd, "day") || current.isBefore(calendarEnd, "day")) {
+    days.push(current);
+    current = current.add(1, "day");
+  }
+
+  const weeks = Array.from({ length: Math.ceil(days.length / 7) }).map((_, i) =>
+    days.slice(i * 7, (i + 1) * 7)
+  );
+
+  const monthEvents = events.filter(
+    (e) => !e.endDate.isBefore(calendarStart, "day") && !e.startDate.isAfter(calendarEnd, "day")
+  );
+
+  const getWeekEventBars = (weekDays: Dayjs[]) => {
+    const weekStart = weekDays[0];
+    const weekEnd = weekDays[6];
+
+    const bars: Array<{
+      event: CalendarEvent;
+      startCol: number;
+      endCol: number;
+      width: number;
+      row: number;
+    }> = [];
+
+    const eventsByRow: Array<CalendarEvent[]> = [];
+
+    for (const event of monthEvents.filter(
+      (e) => !e.endDate.isBefore(weekStart, "day") && !e.startDate.isAfter(weekEnd, "day")
+    )) {
+      const eventStart = event.startDate.isBefore(weekStart, "day") ? 0 : event.startDate.diff(weekStart, "day");
+      const eventEnd = event.endDate.isAfter(weekEnd, "day") ? 6 : event.endDate.diff(weekStart, "day");
+      const width = eventEnd - eventStart + 1;
+
+      let row = 0;
+      let placed = false;
+      while (!placed) {
+        if (!eventsByRow[row]) {
+          eventsByRow[row] = [];
+        }
+
+        const overlaps = eventsByRow[row].some((e) => {
+          const eStart = e.startDate.isBefore(weekStart, "day") ? 0 : e.startDate.diff(weekStart, "day");
+          const eEnd = e.endDate.isAfter(weekEnd, "day") ? 6 : e.endDate.diff(weekStart, "day");
+          return !(eventEnd < eStart || eventStart > eEnd);
+        });
+
+        if (!overlaps) {
+          eventsByRow[row].push(event);
+          bars.push({ event, startCol: eventStart, endCol: eventEnd, width, row });
+          placed = true;
+        } else {
+          row++;
+        }
+      }
+    }
+
+    return { bars, numRows: eventsByRow.length };
   };
 
   return (
-    <div className="w-full h-full bg-white p-6">
+    <div className="w-full bg-white p-6">
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900">Calendar</h1>
         <p className="text-gray-600 mt-2">View all your project events and deadlines</p>
@@ -196,149 +207,136 @@ export default function CalendarPage() {
           <Spin size="large" tip="Loading events..." />
         </div>
       ) : events.length === 0 ? (
-        <Card className="mb-6">
+        <Card>
           <Empty description="No events found" />
         </Card>
       ) : null}
 
       <Card className="shadow-sm border border-gray-200">
-        <Calendar
-          fullscreen
-          value={currentDate}
-          onChange={setCurrentDate}
-          dateCellRender={dateCellRender}
-          headerRender={({ value, onChange }: any) => {
-            const start = 0;
-            const end = 12;
-            const monthOptions = [];
+        {/* Header */}
+        <div className="p-4 flex items-center justify-between border-b border-gray-200 mb-6">
+          <div className="flex items-center gap-4">
+            <Button
+              type="text"
+              icon={<ArrowLeftOutlined />}
+              onClick={() => setCurrentDate(currentDate.subtract(1, "month"))}
+            />
+            <div className="flex gap-2 min-w-[200px]">
+              <select
+                value={currentDate.month()}
+                onChange={(e) => setCurrentDate(currentDate.clone().month(parseInt(e.target.value)))}
+                className="px-3 py-1 border border-gray-300 rounded text-sm"
+              >
+                {Array.from({ length: 12 }).map((_, i) => (
+                  <option key={i} value={i}>{dayjs().month(i).format("MMMM")}</option>
+                ))}
+              </select>
+              <select
+                value={currentDate.year()}
+                onChange={(e) => setCurrentDate(currentDate.clone().year(parseInt(e.target.value)))}
+                className="px-3 py-1 border border-gray-300 rounded text-sm"
+              >
+                {Array.from({ length: 30 }).map((_, i) => {
+                  const year = dayjs().year() - 10 + i;
+                  return <option key={year} value={year}>{year}</option>;
+                })}
+              </select>
+            </div>
+            <Button
+              type="text"
+              icon={<ArrowRightOutlined />}
+              onClick={() => setCurrentDate(currentDate.add(1, "month"))}
+            />
+          </div>
+          <Button type="primary" onClick={() => setCurrentDate(dayjs())}>Today</Button>
+        </div>
 
-            const getYear = value.year();
-            const currentYear = new Date().getFullYear();
-            const start_year = currentYear - 10;
-            const end_year = start_year + 20;
+        {/* Calendar */}
+        <div className="max-w-7xl mx-auto overflow-x-auto">
+          {/* Day headers */}
+          <div className="grid grid-cols-7 gap-0 border-b border-gray-300 bg-gray-50">
+            {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
+              <div key={day} className="p-2 text-center font-semibold text-gray-700 border-r border-gray-300 text-sm">
+                {day}
+              </div>
+            ))}
+          </div>
 
-            const yearOptions = [];
-            for (let i = start_year; i < end_year; i++) {
-              yearOptions.push({
-                label: i.toString(),
-                value: i,
-              });
-            }
-
-            for (let i = start; i < end; i++) {
-              monthOptions.push({
-                label: dayjs().month(i).format("MMM"),
-                value: i,
-              });
-            }
-
-            const month = value.month();
+          {/* Weeks */}
+          {weeks.map((weekDays, weekIdx) => {
+            const { bars, numRows } = getWeekEventBars(weekDays);
 
             return (
-              <div className="p-4 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <Button
-                    type="text"
-                    icon={<ArrowLeftOutlined />}
-                    onClick={() => {
-                      onChange(value.subtract(1, "month"));
-                    }}
-                  />
-                  <div className="flex gap-2">
-                    <select
-                      value={month}
-                      onChange={(e) => {
-                        const newMonth = parseInt(e.target.value);
-                        onChange(value.clone().month(newMonth));
-                      }}
-                      className="px-3 py-1 border border-gray-300 rounded hover:border-gray-400 focus:outline-none"
-                    >
-                      {monthOptions.map((op) => (
-                        <option key={op.value} value={op.value}>
-                          {op.label}
-                        </option>
-                      ))}
-                    </select>
-                    <select
-                      value={getYear}
-                      onChange={(e) => {
-                        const newYear = parseInt(e.target.value);
-                        onChange(value.clone().year(newYear));
-                      }}
-                      className="px-3 py-1 border border-gray-300 rounded hover:border-gray-400 focus:outline-none"
-                    >
-                      {yearOptions.map((op) => (
-                        <option key={op.value} value={op.value}>
-                          {op.label}
-                        </option>
-                      ))}
-                    </select>
+              <div key={weekIdx}>
+                {/* Event bars row */}
+                {numRows > 0 && (
+                  <div className="grid grid-cols-7 gap-0 border-b border-gray-300 relative bg-gray-50 px-1" style={{ minHeight: `${numRows * 24 + 8}px` }}>
+                    {bars.map((bar) => (
+                      <div
+                        key={bar.event.id}
+                        onClick={() => {
+                          setSelectedEvent(bar.event);
+                          setModalOpen(true);
+                        }}
+                        className="absolute h-5 rounded px-1 text-white text-xs font-semibold cursor-pointer hover:shadow-md transition overflow-hidden"
+                        style={{
+                          left: `${(bar.startCol / 7) * 100 + 0.4}%`,
+                          width: `${(bar.width / 7) * 100 - 0.8}%`,
+                          top: `${8 + bar.row * 24}px`,
+                          backgroundColor: MODULE_COLORS[bar.event.module] || MODULE_COLORS.default,
+                        }}
+                        title={bar.event.title}
+                      >
+                        <span className="block truncate">{bar.event.title}</span>
+                      </div>
+                    ))}
                   </div>
-                  <Button
-                    type="text"
-                    icon={<ArrowRightOutlined />}
-                    onClick={() => {
-                      onChange(value.add(1, "month"));
-                    }}
-                  />
+                )}
+
+                {/* Days grid */}
+                <div className="grid grid-cols-7 gap-0 border-b border-gray-300">
+                  {weekDays.map((day) => {
+                    const isCurrentMonth = day.month() === currentDate.month();
+                    return (
+                      <div
+                        key={day.format("YYYY-MM-DD")}
+                        className={`border-r border-gray-300 p-2 min-h-24 text-right text-sm font-semibold ${
+                          isCurrentMonth ? "bg-white" : "bg-gray-50"
+                        }`}
+                      >
+                        {day.date()}
+                      </div>
+                    );
+                  })}
                 </div>
-                <Button
-                  type="primary"
-                  onClick={() => {
-                    onChange(dayjs());
-                  }}
-                >
-                  Today
-                </Button>
               </div>
             );
-          }}
-          style={{
-            minHeight: "600px",
-          }}
-        />
+          })}
+        </div>
       </Card>
 
-      {/* Event Details Modal */}
-      <Modal
-        title={
-          <div className="flex items-center gap-2">
-            <span className="text-lg font-bold">Event Details</span>
-          </div>
-        }
-        open={modalOpen}
-        onCancel={() => setModalOpen(false)}
-        footer={null}
-        width={600}
-      >
+      {/* Modal */}
+      <Modal title="Event Details" open={modalOpen} onCancel={() => setModalOpen(false)} footer={null} width={600}>
         {selectedEvent ? (
           <div className="space-y-6">
-            {/* Event Title */}
             <div>
-              <h3 className="text-xl font-bold text-gray-900 mb-3">
-                {selectedEvent.title}
-              </h3>
-              <Tag color={MODULE_COLORS[selectedEvent.module] || MODULE_COLORS.default}>
+              <h3 className="text-xl font-bold text-gray-900 mb-3">{selectedEvent.title}</h3>
+              <Tag color={MODULE_COLORS[selectedEvent.module] || MODULE_COLORS.default} style={{ color: "#fff" }}>
                 {selectedEvent.module}
               </Tag>
             </div>
 
-            {/* Date Range */}
             <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
               <p className="text-sm font-semibold text-gray-700 mb-2">Duration</p>
               <div className="flex gap-4">
                 <div>
                   <p className="text-xs text-gray-600">Start Date</p>
-                  <p className="text-lg font-semibold text-gray-900">
-                    {selectedEvent.startDate.format("MMM DD, YYYY")}
-                  </p>
+                  <p className="text-lg font-semibold text-gray-900">{selectedEvent.startDate.format("MMM DD, YYYY")}</p>
                 </div>
                 <div className="text-gray-400">→</div>
                 <div>
                   <p className="text-xs text-gray-600">End Date</p>
-                  <p className="text-lg font-semibold text-gray-900">
-                    {selectedEvent.endDate.format("MMM DD, YYYY")}
-                  </p>
+                  <p className="text-lg font-semibold text-gray-900">{selectedEvent.endDate.format("MMM DD, YYYY")}</p>
                 </div>
               </div>
               {!selectedEvent.startDate.isSame(selectedEvent.endDate, "day") && (
@@ -348,7 +346,6 @@ export default function CalendarPage() {
               )}
             </div>
 
-            {/* Event Data */}
             {selectedEvent.fullData && Object.keys(selectedEvent.fullData).length > 0 && (
               <div>
                 <h4 className="text-sm font-bold text-gray-900 mb-3">Details</h4>
@@ -357,9 +354,7 @@ export default function CalendarPage() {
                     .filter(([key]) => !key.startsWith("_"))
                     .map(([key, value]) => (
                       <div key={key} className="bg-gray-50 p-3 rounded">
-                        <p className="text-xs font-semibold text-gray-600 uppercase mb-1">
-                          {key}
-                        </p>
+                        <p className="text-xs font-semibold text-gray-600 uppercase mb-1">{key}</p>
                         <p className="text-sm text-gray-900">
                           {typeof value === "string" && value.includes("T")
                             ? dayjs(value).format("MMM DD, YYYY")
