@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { Card, Row, Col, Button, Modal, Spin, Empty, message } from "antd";
 import { PlusOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import { apiClient } from "@/lib/api/client";
-import { getModuleBySlug, getAllModules } from "@/config/buildtrack.config";
+import { getAllModules } from "@/config/buildtrack.config";
 import { useUser } from "@/lib/context/UserContext";
 import { canAccessModule } from "@/config/rbac";
 
@@ -50,12 +50,6 @@ export default function BasicTasksPage() {
       canAccessModule(user.role.name, mod.slug)
     );
 
-    // Include work-orders separately
-    const workOrdersModule = getModuleBySlug("work-orders");
-    if (workOrdersModule && canAccessModule(user.role.name, "work-orders")) {
-      allModules.push(workOrdersModule);
-    }
-
     setModules(allModules);
     setLoading(false);
   }, [user.role.name]);
@@ -67,7 +61,7 @@ export default function BasicTasksPage() {
     setFormModalOpen(false);
 
     try {
-      const res = await apiClient.get(`/modules/${module.slug}/records`);
+      const res = await apiClient.get(`/backend-api/modules/${module.slug}/records`);
       if (res.data) {
         setRecords((res.data as any).records || []);
       }
@@ -101,7 +95,7 @@ export default function BasicTasksPage() {
       onOk: async () => {
         try {
           if (!selectedModule) return;
-          await apiClient.delete(`/modules/${selectedModule.slug}/records/${recordId}`);
+          await apiClient.delete(`/backend-api/modules/${selectedModule.slug}/records/${recordId}`);
           message.success("Record deleted successfully");
           await handleModuleClick(selectedModule);
         } catch (error) {
@@ -118,12 +112,12 @@ export default function BasicTasksPage() {
 
       if (editingRecord) {
         await apiClient.put(
-          `/modules/${selectedModule.slug}/records/${editingRecord.id}`,
+          `/backend-api/modules/${selectedModule.slug}/records/${editingRecord.id}`,
           { data: formData }
         );
         message.success("Record updated successfully");
       } else {
-        await apiClient.post(`/modules/${selectedModule.slug}/records`, {
+        await apiClient.post(`/backend-api/modules/${selectedModule.slug}/records`, {
           data: formData,
         });
         message.success("Record created successfully");
@@ -195,7 +189,7 @@ export default function BasicTasksPage() {
         onCancel={() => setModalOpen(false)}
         width={1200}
         footer={null}
-        bodyStyle={{ maxHeight: "70vh", overflowY: "auto" }}
+        styles={{ body: { maxHeight: "70vh", overflowY: "auto" } }}
       >
         {recordLoading ? (
           <div className="flex items-center justify-center h-96">
